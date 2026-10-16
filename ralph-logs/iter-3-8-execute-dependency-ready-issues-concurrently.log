@@ -1,0 +1,901 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/8-execute-dependency-ready-issues-concurrently.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cd3-bcd8-72e0-b609-bbc231bd2dea
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 8 of 15 — 8-execute-dependency-ready-issues-concurrently.md
+=== END METADATA ===
+
+TASK:
+# 8. Execute dependency-ready issues concurrently
+
+**Type:** AFK  
+**Status:** Implemented; repository-wide lint retains the unrelated predecessor formatting blocker  
+**User stories:** US-4  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Schedule the approved DAG with two concurrent executors by default and one integration queue. Dispatch only issues whose prerequisites have integrated, isolate their runtime resources, and preserve independent progress when an issue exhausts attempts. Make readiness and integration queue positions observable through status events. Use the already-implemented single-issue path rather than duplicating execution logic.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 189–195): dependency readiness, two workers, current integration base, isolated environments.
+- `PRD.md` (lines 203–209): serial integration and cleanup.
+- `PRD.md` (lines 73–75): one run per repository.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 7: Retry failed work and skip hung validation checks](7-retry-failed-work-and-skip-hung-checks.md): predecessor contracts and the code delivered by that slice.
+- `src/execution/scheduler.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/execution/integration-queue.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/process/environment.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Treat integrated-with-omissions as dependency-complete but carry the run's verification debt. Executor completion is not dependency completion. Allocate issue worktree bases at dispatch and candidate bases at integration time, not when the graph was first approved.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Schedule only dependency-ready issues
+
+**Files:** `src/execution/scheduler.ts`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** Implement ready/pending/running/integration_queued/integrated/blocked states, with default concurrency 2 and validated positive project override. Select ready issues in stable graph order. Mark descendants blocked by exhausted prerequisites while continuing independent branches. Prevent duplicate dispatch on repeated events.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import validateIssueGraph, executeIssue, AttemptPolicy, and RunStore; export scheduleReadyIssues and reconcileReadiness.
+- **GOTCHA:** A submitted issue still awaits integration and cannot unlock children. An active-run repository lock remains separate from worker slots.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/08-concurrency.test.ts`; add the tests below as this slice develops.
+
+### 2. Serialize integration and isolate environments
+
+**Files:** `src/execution/integration-queue.ts`, `src/process/environment.ts`, `src/execution/scheduler.ts`
+
+- **IMPLEMENT:** Queue successful submissions in stable arrival order and allow one integrateIssue call at a time. Refresh integration HEAD for every candidate. Lease unique ports/resource namespaces and separate environment directories through the approved command templates; release only owned leases. If a configured resource cannot be isolated, serialize its use rather than collide.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import integrateIssue, EnvironmentLease and prepareEnvironment/disposeEnvironment.
+- **GOTCHA:** Do not invent new setup commands to achieve isolation. Extend approved configuration to express allocation during /ralph-commands; missing required capabilities are explicit setup blockers.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/08-concurrency.test.ts`; add the tests below as this slice develops.
+
+### 3. Demonstrate parallel DAG progress
+
+**Files:** `tests/integration/08-concurrency.test.ts`
+
+- **IMPLEMENT:** Use a diamond graph and an independent E issue. Hold B/C agents to verify overlap and the concurrency cap; verify D waits until both integrate. Exhaust one branch and prove E continues. Assert candidates use successive integration SHAs and service resources do not collide.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import createFakeOpenCode, createTestProject and scheduler public entrypoints.
+- **GOTCHA:** Tests should observe dispatched jobs, commits and resource use, not scheduler private queues.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/08-concurrency.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] At most configured executor concurrency is active and at most one integration is active.
+- [x] A dependent issue never starts from an unintegrated parent submission.
+- [x] Independent work continues after another issue exhausts attempts.
+- [x] Each candidate validates against the latest integration commit.
+- [x] Simultaneous fixture applications receive distinct ports/resources and owned cleanup releases them.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/08-concurrency.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded. — Type checking and touched-file lint pass; full lint retains the pre-existing `tests/browser/dashboard.test.ts:38` formatting error.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/08-concurrency.test.ts
+
+```
+
+**Demonstration:** Run A→B/C→D plus independent E with B/C held concurrently; inspect status transitions and prove D begins only after both candidate integrations.
+
+## Blocked by
+
+- [7-retry-failed-work-and-skip-hung-checks.md](7-retry-failed-work-and-skip-hung-checks.md) — retry failed work and skip hung validation checks supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+
+## Completion evidence (2026-10-15)
+
+Implemented `scheduleReadyIssues` / `reconcileReadiness` and the public router's
+`scheduleIssues(runId)`. Successful baseline preparation hands off automatically.
+Ready selection is stable in graph order; environment setup can finish asynchronously.
+Two executor slots are the default, with a positive integer project override. Each
+attempt releases its slot after owned executor cleanup, before waiting in the separate
+arrival-ordered integration queue. `runIssue` remains the sole retry loop. All public
+integration calls share that queue, including single-issue calls. Submitted work never
+unlocks dependencies; integrated work with omissions does, carrying verification debt.
+Exhaustion blocks descendants without terminating independent branches. Repeated
+scheduler calls share the canonical repository/run owner rather than redispatching.
+The existing active-run repository lock remains separate from worker allocation.
+
+Executor worktrees refresh the integration base at dispatch preparation; each candidate
+refreshes it when serial integration starts. The existing exact-commit validation and
+expected-old ref advance remain authoritative. Concurrent journal writes now retry
+revision conflicts while checking attempt/approval/control identity. Timeout omission
+persistence similarly retries unrelated journal revisions without inventing a repair.
+Durable `execution.observed` / `issue.changed` events and `/ralph-status` show readiness,
+queue order, blockers, checks and qualified verification.
+
+Approved command configuration now supports `resources` (environment source name to
+port/namespace/directory allocation) and `exclusiveResources` for shared resources.
+Discovery proposes these through `/ralph-commands`; approval/hash/verification still
+cover the exact configuration. Commands reference allocation through existing env
+mappings; no commands are invented or rewritten. Executors prepare approved lifecycle
+commands before dispatch, using main-session permission while their executor session
+is not yet bound. Their prompts/attempt evidence retain allocation and lifecycle results.
+Candidates receive fresh environments. Startup without allocated ports serializes use;
+explicit shared resource names serialize their use as well. Allocation and directory
+cleanup record intent before effects. Idempotent ownership-based cleanup releases only
+the job's ports/directories/locks after process cleanup succeeds, retaining failures.
+Missing references/capabilities are setup blockers; denial/cancellation wait.
+
+TDD evidence: the initial diamond regression failed at the absent router scheduler,
+then passed through real Git worktrees and per-job controllable fake SDK responses.
+Resource proposals first failed strict configuration parsing, then passed with two
+actual fixture HTTP services on distinct ports/namespaces/directories. The one-slot
+regression initially could not dispatch independent E while A's merger was held; it
+passed after executor and integration lifetimes were separated. The timeout race
+regression initially allocated a repair after an unrelated active-control journal write;
+it passes after retry-safe omission persistence. Its approved cleanup removes the
+fixture's readiness marker, so candidate cleanliness remains enforced. Tests observe
+jobs, exact successive Git bases, service responses, owned cleanup, blocked descendants,
+queue positions and omitted checks rather than private scheduler queues. Existing
+issue-7 setup-timeout assertions were updated to the new executor lifecycle boundary.
+Documentation changes are non-behavior exceptions; no extra tests mirror documentation.
+
+The requested A→B/C→D plus independent E demonstration is exercised through
+`createCommandRouter` and the existing OpenCode SDK adapter boundary. B/C overlap
+within two slots; D waits for both validated integrations; exhausted B blocks D while
+C/E finish. A held serial integrator does not occupy the sole configured executor slot.
+Shared resources serialize and cleanup of one fixture preserves the other fixture's
+live service/directory. Integrated omissions unlock D with incomplete verification.
+
+Wiki updated: created `docs/wiki/features/concurrent-execution.md`, updated the index
+and single-issue integration page. README documents the public entrypoint and approved
+allocation fields. Native Linux/Windows and credentialed live OpenCode smoke were not
+run; all resource/check command fixtures declare macOS/Linux/Windows coverage and
+unsupported hosts remain explicit blockers. No publication, external messages or
+user-target-branch merge was performed.
+
+The direct-entrypoint concurrency regression also failed with two active executor jobs
+under a configured one-slot override. Moving the slot pool into the existing
+`executeIssue` boundary made both direct calls and DAG calls obey the same budget,
+without duplicating the retry or integration logic. It now passes with one active
+executor; slots remain independent from integration and the repository run lock.
+
+Final focused validation (Bun 1.4.3, macOS):
+- `bun run typecheck`: passed.
+- `bun test tests/integration/08-concurrency.test.ts`: 9 passed, 0 failed; 121 assertions.
+- `bunx biome check` on all 18 touched source/test files: passed.
+- `bun run lint`: blocked only by the pre-existing formatting error in `tests/browser/dashboard.test.ts:38`, left unchanged under the unrelated-file constraint.
+
+The issue-7 hung-check fixture now approves cleanup of its untracked readiness marker
+and asserts integration on attempt one. This keeps the timeout regression focused on
+omission rather than an incidental dirty-worktree repair, while preserving the original
+clock deadline and candidate-cleanliness policy.
+
+- Final fresh-process `bun test --timeout 30000 tests/integration`: 165 passed, 1 opt-in browser test skipped, 0 failed; 958 assertions across 14 files. This run includes the final shared-slot implementation and fixture cleanup correction.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing implementation and run the focused acceptance checks to confirm whether this task is already complete.
+exec
+/bin/zsh -lc "pwd; rg --files -g AGENTS.md -g package.json -g '*08-concurrency*' -g '*scheduler*' -g '*integration-queue*' -g '*environment*' -g '*8-execute*' -g README.md -g PRD.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+src/process/environment.ts
+src/execution/scheduler.ts
+src/execution/integration-queue.ts
+ralph-logs/iter-1-8-execute-dependency-ready-issues-concurrently.log
+ralph-logs/iter-2-8-execute-dependency-ready-issues-concurrently.log
+package.json
+README.md
+tests/helpers/dashboard-scheduler.ts
+tests/integration/08-concurrency.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc 'git status --short' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+
+exec
+/bin/zsh -lc "sed -n '73,100p' PRD.md; sed -n '180,215p' PRD.md; cat README.md; rg -n 'test\\(|it\\(|scheduleIssues|concurrency|EnvironmentLease' tests/integration/08-concurrency.test.ts src/process/environment.ts src/core/orchestrator.ts; rg --files .agents docs | head -50" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+- ✅ Reusable installable OpenCode plugin package.
+- ✅ macOS, Linux, and native Windows support.
+- ✅ One active feature workflow per repository, including its linked worktrees.
+
+### Out of scope
+
+- ❌ Automatic target-branch merge, push, deployment, or pull request creation.
+- ❌ GitHub issue synchronization or another external issue tracker.
+- ❌ Browser-based answers, approvals, or execution controls.
+- ❌ Execution continuing independently after OpenCode exits.
+- ❌ Multiple concurrent feature workflows in one repository.
+- ❌ Formal ASD-STE100 certification or numerical compliance scoring.
+- ❌ Automatic additions or changes to approved commands during feature execution.
+- ❌ Automatic success claims when validation or functional review is incomplete.
+
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+
+## 6. Core Architecture & Patterns
+
+
+### 7.4 Preflight and baseline
+
+Execution requires a clean working checkout, a selected committed starting point, valid approved artifacts, and verified command configuration. Default the starting point to the current branch's HEAD at execution approval, show it in chat, and allow an explicit alternative.
+
+Create the feature integration branch and run baseline validation before scheduling issues. Checks that finish with a failing exit code block execution. Baseline failures are not charged to any issue. Setup failures are reported as preflight blockers.
+
+During a feature run, a validation timeout follows the user-selected skip policy, including at baseline: record and skip the exact check for this run, continue remaining checks, and carry a missing-validation status to the final report. Setup/readiness commands do not qualify for skipping. Initial `/ralph-commands` verification must succeed before the project is ready; the feature-run skip policy does not silently approve broken initial setup.
+
+### 7.5 Dependency scheduling and execution
+
+Run up to two eligible issues concurrently by default. An issue is eligible only when every dependency has been integrated and passed all non-skipped checks. Agent completion alone does not satisfy a dependency.
+
+Create each issue's branch and worktree from the latest integration commit when it starts. Executors receive the approved issue, PRD, relevant project instructions, configured model, and TDD instructions. Concurrent environments must have separate resources where isolation is required.
+
+If an executor cannot resolve a requirement from the PRD or code, send its question to the main OpenCode chat. Block that issue and its dependents while independent work continues. If the answer changes approved scope, revise the relevant artifacts and obtain renewed approval before dependent implementation.
+
+### 7.6 TDD requirements
+
+Implement one behavior at a time: write a meaningful failing test through a public interface, observe the expected failure, implement the minimum change, then refactor while tests remain green. Do not write a batch of speculative tests before all implementation. Repair executors follow the same process, normally beginning with a regression test.
+
+The approved issue plan supplies the intended behaviors and interface changes, avoiding a redundant approval at every TDD cycle. Record red/green evidence in execution logs. Expected red-stage failures do not consume issue repair attempts. Documentation or configuration changes with no meaningful automated behavior test may use a documented exception plus appropriate validation.
+
+### 7.7 Integration and worktree lifecycle
+
+A separate merge agent combines each completed submission with the latest integration branch in a temporary candidate worktree. Integration is sequential even when execution is parallel.
+
+The merger may resolve mechanical conflicts. Conflicts requiring behavior or feature decisions return to the executor with context and consume the issue's attempt budget. The command runner validates the candidate commit using approved checks. Only then does the orchestrator advance the integration branch to that exact candidate. Never advance the feature branch first and rely on rollback after failed checks.
+
+After successful integration and checks, remove the issue worktree. Retain its commit references, execution evidence, and logs. Preserve failed worktrees for diagnosis. Cleanup failure is reported and must not reverse an otherwise recorded integration or delete unrecognized user work.
+
+### 7.8 Attempts, timeouts, and command skipping
+
+| Event | Required behavior |
+| --- | --- |
+| Issue submission fails completed validation | Return check output to executor; allow three total issue attempts: initial attempt plus two repairs |
+# Ralph for OpenCode
+
+A locally installable OpenCode plugin with durable session jobs, independent code and functional review, bounded review repairs, a read-only dashboard, and interruption recovery. Exact tested dependencies and platform results are in [compatibility](docs/opencode-compatibility.md).
+
+The complete deterministic setup-to-report demonstration runs through the installed public command/adapter boundary. Production human answers and approvals remain blocked: the OpenCode adapter cannot yet verify their provenance. A host integration must supply correlated human responses. The automatic scheduler starts code review; a host must call `reviewFeature` with functional environment, surface and observation-tool options for the final dual review/report. Native Linux/Windows and credentialed full-workflow evidence remain release blockers. See [package validation](docs/package-validation.md).
+
+## Build and install locally
+
+Use Git and the Bun version in `.bun-version` (also pinned in `package.json`). From this source directory:
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run lint
+bun run pack:local
+```
+
+Copy `opencode-ralph-plugin-0.2.0.tgz` to each target repository, then run there:
+
+```sh
+bun add ./opencode-ralph-plugin-0.2.0.tgz
+bun -e 'console.log(require("node:url").pathToFileURL(require("node:fs").realpathSync("node_modules/opencode-ralph-plugin")).href)'
+```
+
+Add the generated, encoded URL to the repository's `opencode.json`, preserving any existing settings:
+
+```json
+{
+  "plugins": ["REPLACE_WITH_GENERATED_PACKAGE_DIRECTORY_URL"]
+}
+```
+
+Use the **entire** URL printed by the command. It points to the package directory, where OpenCode resolves `server.js` and `tui.js`; do not point it to `dist/plugin.js`. This handles Windows drives and spaces. The example uses single quotes around JavaScript for PowerShell and POSIX shells; native Windows results are pending CI. A relative tarball dependency is recommended; Bun 1.4.3 failed to install the tested percent-encoded absolute `file:` tarball URL with spaces. Each target must be a Git repository. The repository root need not have a commit just to load the plugin; feature/review operations need committed inputs.
+
+Start OpenCode **2.0.29** in that repository (see compatibility for the local binary path). Restart OpenCode after changing plugin configuration. No registry publication is required or performed by these scripts.
+
+## Commands and operation
+
+- `/ralph-commands` explores lifecycle commands in a read-only session, presents the exact revision/hash, and requires a correlated human approval before saving `.ralph/commands.json`. Production approval currently reports unsupported; a host adapter with verified input provenance is required to complete setup. Each execution also requires host permission.
+
+- `/ralph-orchestrator [feature]` requires verified project commands for the current configuration and host. It collects missing feature input, explores the repository in a read-only interview session, asks recommended questions in the main session, and persists the conversation. Reply `approve <revision>` to the presented explanation, or describe revisions. Approved explanations continue through PRD/graph generation and combined execution approval. Execution approval presents the starting SHA and runs baseline preflight when the checkout is clean; setup/check failures block, and check timeouts remain visible as run-local omissions. A passed baseline automatically schedules dependency-ready issues with two executor slots by default and one integration queue. The production adapter reports unavailable human-input provenance and leaves the request pending.
+
+- `/ralph-status [run-id]` reads durable status and the dashboard URL. With no argument it selects the latest run.
+- `/ralph-pause [run-id]` records pause intent and freezes new dispatch while active work settles.
+- `/ralph-resume [run-id]` records explicit resume intent after pause/recovery; preserved attempts and revisions remain in force. Blocked recovery requires resolving its disclosed facts first.
+- `/ralph-stop [run-id]` cancels correlated sessions and cleans up owned processes. Stale completions cannot advance the run.
+
+The dashboard URL includes an access token in its fragment. Open it locally; treat it as private. The listener uses loopback with an automatically allocated port, so independent repositories can run together. The browser is read-only; commands and approvals belong in OpenCode. State and write locks live under the repository's canonical Git common directory, `ralph/runs`, and are shared by linked worktrees. Independent repositories use independent stores. The plugin stays attached to the OpenCode server lifecycle; shutdown stops owned work and the dashboard. Restart reconciles facts and waits for explicit resume.
+
+The v2 package ships server and TUI entry points. Slash commands execute directly, emit a status notification, and queue their exact output as a synthetic inbox item without waking the model. The TUI displays Ralph status notifications; the dashboard and persisted store remain authoritative.
+
+The public `adapter`, `store`, `commands`, `types`, `review/*`, `reporting/completion` and `process` exports support typed host integration. `createCommandRouter(...).scheduleIssues(runId)` schedules the approved DAG; `executeIssue(runId, issueId)` executes/integrates one approved issue with at most three attempts and retained failure evidence; `answerExecutorQuestion(runId, issueId, response)` validates a host-provided correlated human response; `continuePlanning(runId)` presents and continues a pending execution approval; `runJob` dispatches a correlated session; `reviewFeature` coordinates the two reviewers and final report. `process` exposes ownership tracking/cleanup for approved command owners, not command approval. Tests and fixture code are excluded from runtime exports and the tarball.
+
+Code and functional reviewers load their bundled `skills/code-review` and `skills/functional-review` resources. Code-review options accept a `{ providerID, modelID }` model; functional review accepts its own model through `functionalOptions`. Executor jobs carry the same optional model field. Model/tool availability and OpenCode permissions remain host-owned; no permission is auto-approved. Command configuration validates lifecycle ordering, platform coverage (or explicit unsupported reasons), paths, timeouts, argument arrays, explicit shells and environment references. Role models and replacement skill paths are read from optional `.ralph/project.json` and captured with hashes on each run.
+
+## Interview settings
+
+Project replacements resolve relative to the workspace root. Omit `skillPaths.interview`
+to use the original bundled grill-me guidance. Omit `models.interview` to capture the main
+session's selected model; an unavailable selection produces an actionable error.
+
+```json
+{
+  "schemaVersion": 1,
+  "models": { "interview": { "providerID": "your-provider", "modelID": "your-model" } },
+  "skillPaths": { "interview": "skills/my-interview.md" },
+  "concurrency": 2,
+  "timeoutMs": 300000,
+  "agentTimeoutMs": 1800000
+}
+```
+
+Runs record model selections, skill paths and content hashes, the verified command hash,
+and timeout/concurrency defaults. Agent timeouts interrupt planning and retain the lock
+and evidence. Human answers do not time out. `agentTimeoutMs` separately controls executor and merger deadlines (default thirty minutes), and is recorded on the run and each issue attempt. One canonical repository lock includes
+planning; explanation approval retains it through execution. Terminal coordinated review releases the matching lock. Interrupted locks require reconciliation and explicit resume.
+
+## Concurrent execution resources
+
+Ready issues are selected in approved graph order. A submission waits in the integration
+queue; children start only after all parents integrate, including qualified integration
+with omitted checks. `/ralph-status` and durable events expose ready, pending, running,
+integration_queued, integrated, failed and blocked states plus queue order. The executor
+slot ends after submission cleanup; merger/validation work uses a separate serial queue.
+
+`/ralph-commands` may propose resource allocation in the exact approved configuration:
+
+```json
+{
+  "resources": {
+    "RALPH_PORT": "port",
+    "RALPH_NAMESPACE": "namespace",
+    "RALPH_DIRECTORY": "directory"
+  },
+  "exclusiveResources": ["shared-test-database"]
+}
+```
+
+Command `env` mappings reference these source names, for example
+`{"PORT":"RALPH_PORT","APP_NAMESPACE":"RALPH_NAMESPACE","APP_DATA":"RALPH_DIRECTORY"}`.
+Ports, namespaces and directories are allocated per lifecycle/job. Executor prompts
+receive the allocation; candidates receive fresh allocations. The runner executes only
+approved commands, using main-session permission before an executor session exists.
+Shared resource names serialize use within the repository. Startup without allocated
+ports also serializes use. Missing required references block setup; commands are never
+invented or rewritten to obtain isolation. Owned cleanup releases only that lifecycle's
+resources; cleanup failures retain ownership and diagnostics.
+
+## Executor questions
+
+An executor may return `{"kind":"needs_input","question":"...","recommendedAnswer":"...","affectedRequirement":"..."}`. Ralph persists the question on its run/issue/attempt and publishes it through the main-session adapter. The issue and descendants wait while independent issues continue. Human waiting consumes no executor capacity, agent deadline or retry. A correlated clarification resumes the same worktree and attempt with a new job identity and the remaining active-time budget.
+
+Hosts answer through the adapter's authenticated `UserInputResult` contract. The public router also accepts a later response via `answerExecutorQuestion`, followed by `scheduleIssues` for clarification or `continuePlanning` for revision approval. Stale requests, changed revisions, duplicate messages and unrelated sessions are rejected. The production adapter currently leaves human input pending because verified provenance is unavailable.
+
+For scope changes, a correlated user answer can carry JSON `{"kind":"revise_scope","prd":"complete PRD text","graph":<complete graph>,"files":<issue-path to Markdown map>}`. Ralph compares content, validates and publishes a new draft, presents affected work and preserved integrated evidence, and requires the normal combined execution approval. Adapter-delivered answers present that gate automatically. Revised artifacts cannot execute under the previous approval. Answers and approvals have no browser mutation endpoint.
+
+## Validation semantics
+
+Three **total issue attempts** include the first submission and two retries; an expected failing TDD red test does not consume an attempt. Three **total review rounds** apply to the final dual review; each generated repair task has its own three-attempt limit. Functional infrastructure retries have a separate three-attempt budget. Issue repair limits are enforced through the public single-issue entrypoint; the dependency scheduler preserves independent progress when an issue exhausts its budget.
+
+The validation policy skips only timed-out validation checks for the current run, never setup/readiness timeouts, permission denials, cancellations or completed failures. Those omissions must remain in the report and must not rewrite approved commands. The baseline runs on an isolated clean checkout before implementation. Check timeouts are run-local omissions; setup failures and timeouts block readiness. Retain failed worktrees and their evidence for diagnosis; clean successful worktrees only after validated integration. Recovery does not silently discard retained resources.
+
+A completed agent job is not proof of a verified feature. Reports distinguish `verified`, `incomplete-validation` (including skipped checks), `unverified` (missing review evidence) and `unresolved` (blocking issues/findings). Inspect the report's commit, checks, unavailable review and cleanup/resource fields. No workflow script publishes, pushes, creates a PR or merges into a target branch.
+
+## Reproduce the package demonstration
+
+```sh
+bun test tests/integration/15-package.test.ts
+bun run test:package
+bun test tests/e2e/full-workflow.test.ts
+bun run test:browser
+bun run test:smoke
+```
+
+The package probe builds a clean distribution, packs it, installs it into two committed temporary repositories with spaces in their paths, and loads the installed plugin. It checks bundled skills/dashboard assets, separate stores and dashboard data, concurrent ports, argv preservation, local readiness, child cleanup and pause/resume. The workflow demo approves discovered commands, interviews, generates and approves a PRD/issue graph, prepares a clean baseline, executes real red/green addition tests, commits through the executor/merger worktrees, and dispatches independent reviewers through the fake SDK HTTP boundary. The second repository really times out its approved validation check; no execution state is seeded. The host explicitly supplies functional review options to the public coordinator after scheduling. Reports are `verified` for the passing-evidence fixture and `incomplete-validation` for the skipped-evidence fixture. These are deterministic fixture verdicts, not live-agent evidence. Temporary repositories are removed; `test:package` prints platform, runtime, outcomes and blockers. Set `PACKAGE_EVIDENCE_PATH` to retain JSON evidence.
+
+For the real installed OpenCode server probe, enable `OPENCODE_SMOKE=1` (PowerShell: `$env:OPENCODE_SMOKE='1'`) before `bun run test:smoke`. It uses a local deterministic model. The separate credentialed session probe requires `OPENCODE_LIVE_SMOKE=1`, `OPENCODE_SMOKE_URL` and `OPENCODE_SMOKE_MODEL=provider/model`; without them it reports SKIPPED. The credentialed probe covers a model session, not the complete workflow; production human provenance and automatic functional-review wiring remain blockers. A v2 server also requires authentication: set `OPENCODE_SMOKE_PASSWORD` for the live probe. Credentials remain in the configured server; do not copy them into fixtures or package assets.
+
+See [troubleshooting](docs/troubleshooting.md). CI runs the required suites on macOS, Ubuntu and native Windows and retains per-platform package evidence. A green fixture demo does not remove the production-host or unrun-platform blockers.
+src/process/environment.ts:14:export interface EnvironmentLease {
+src/process/environment.ts:23:  prepare(job: JobEnvelope): Promise<EnvironmentLease>;
+src/process/environment.ts:31:  preparation?: Promise<EnvironmentLease>;
+src/process/environment.ts:254:  let preparing: Promise<EnvironmentLease> | undefined;
+tests/integration/08-concurrency.test.ts:22:test("diamond execution overlaps within two slots; only integrated parents unlock D", async () => {
+tests/integration/08-concurrency.test.ts:30:  const pending = f.router.scheduleIssues(f.runId);
+tests/integration/08-concurrency.test.ts:52:    const duplicate = f.router.scheduleIssues(f.runId);
+tests/integration/08-concurrency.test.ts:96:test("exhausted B blocks D while C and independent E continue", async () => {
+tests/integration/08-concurrency.test.ts:100:    const run = required(await f.router.scheduleIssues(f.runId));
+tests/integration/08-concurrency.test.ts:113:    await f.router.scheduleIssues(f.runId);
+tests/integration/08-concurrency.test.ts:141:test("approved service templates allocate distinct ports, namespaces and owned directories", async () => {
+tests/integration/08-concurrency.test.ts:192:          'fetch("http://127.0.0.1:"+process.env.PORT).then(r=>r.text()).then(t=>process.exit(t===process.env.NAMESPACE?0:1)).catch(()=>process.exit(1))',
+tests/integration/08-concurrency.test.ts:198:  const pending = f.router.scheduleIssues(f.runId);
+tests/integration/08-concurrency.test.ts:254:test("a submitted executor releases its slot while the serial integrator is held", async () => {
+tests/integration/08-concurrency.test.ts:258:  planning.settings.concurrency = 1;
+tests/integration/08-concurrency.test.ts:262:  const pending = f.router.scheduleIssues(f.runId);
+tests/integration/08-concurrency.test.ts:295:test("shared approved resources serialize use and release only the owned lease", async () => {
+tests/integration/08-concurrency.test.ts:309:  const pending = f.router.scheduleIssues(f.runId);
+tests/integration/08-concurrency.test.ts:352:test("invalid executor concurrency blocks before dispatch", async () => {
+tests/integration/08-concurrency.test.ts:355:    for (const concurrency of [0, -1, 1.5]) {
+tests/integration/08-concurrency.test.ts:358:      planning.settings.concurrency = concurrency;
+tests/integration/08-concurrency.test.ts:360:      await expect(f.router.scheduleIssues(f.runId)).rejects.toThrow(
+tests/integration/08-concurrency.test.ts:370:test("integration with run-local omissions unlocks dependents and preserves verification debt", async () => {
+tests/integration/08-concurrency.test.ts:380:    const run = required(await f.router.scheduleIssues(f.runId));
+tests/integration/08-concurrency.test.ts:397:test("an unrelated journal update cannot turn a timed-out check into an issue repair", async () => {
+tests/integration/08-concurrency.test.ts:436:  const pending = f.router.scheduleIssues(f.runId, { clock: time.clock });
+tests/integration/08-concurrency.test.ts:473:test("single-issue calls share the configured executor cap", async () => {
+tests/integration/08-concurrency.test.ts:477:  planning.settings.concurrency = 1;
+docs/package-validation.md
+docs/package-evidence-macos.json
+docs/functional-review-validation.md
+docs/recovery-validation.md
+docs/opencode-compatibility.md
+docs/wiki/open-questions.md
+docs/wiki/index.md
+.agents/issues/2-discover-approve-and-verify-project-commands.md
+.agents/issues/6-execute-and-integrate-one-issue-with-tdd.md
+.agents/issues/11-review-completed-feature-code.md
+.agents/issues/3-interview-and-approve-feature-explanation.md
+.agents/issues/1-install-plugin-and-run-opencode-session.md
+.agents/issues/7-retry-failed-work-and-skip-hung-checks.md
+.agents/issues/4-generate-prd-and-approve-issue-graph.md
+.agents/issues/12-verify-acceptance-with-browser-and-http.md
+.agents/issues/9-resolve-executor-questions-in-opencode.md
+.agents/issues/13-repair-findings-within-three-review-rounds.md
+.agents/issues/8-execute-dependency-ready-issues-concurrently.md
+.agents/issues/10-observe-execution-in-read-only-dashboard.md
+.agents/issues/5-prepare-feature-branch-and-validate-baseline.md
+.agents/issues/15-verify-packaged-workflow-across-platforms.md
+.agents/issues/14-pause-stop-and-recover-interrupted-workflows.md
+docs/troubleshooting.md
+docs/review-loop-validation.md
+docs/wiki/features/bounded-review-repairs.md
+docs/wiki/features/project-commands.md
+docs/wiki/features/feature-planning.md
+docs/wiki/features/concurrent-execution.md
+docs/wiki/features/feature-interview.md
+docs/wiki/features/workflow-recovery.md
+docs/wiki/features/package-distribution.md
+docs/wiki/features/functional-review.md
+docs/wiki/features/execution-baseline.md
+docs/wiki/features/independent-code-review.md
+docs/wiki/features/executor-questions.md
+docs/wiki/features/single-issue-integration.md
+docs/wiki/features/read-only-dashboard.md
+docs/wiki/features/ralph-task-loop.md
+docs/wiki/features/plugin-session-results.md
+
+exec
+/bin/zsh -lc "cat package.json; sed -n '1,240p' src/execution/scheduler.ts; cat src/execution/integration-queue.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+import { runIssue } from "../core/orchestrator.js";
+import type { RunRecord } from "../core/types.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { reviewIntegratedExecution } from "../review/after-execution.js";
+import type { RunStore } from "../state/run-store.js";
+import type { AttemptOptions } from "./attempts.js";
+import { integrationQueue } from "./integration-queue.js";
+import { reconcileReadiness } from "./readiness.js";
+
+export { reconcileReadiness } from "./readiness.js";
+
+const active = new Map<string, Promise<RunRecord | undefined>>();
+export function scheduleReadyIssues(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  options: AttemptOptions = {},
+) {
+  const key = `${store.repositoryId}:${runId}`;
+  const existing = active.get(key);
+  if (existing) return existing;
+  const promise = schedule(store, adapter, runId, options).finally(() => {
+    active.delete(key);
+  });
+  active.set(key, promise);
+  return promise;
+}
+async function schedule(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  options: AttemptOptions,
+) {
+  const initial = await store.getRun(runId);
+  if (
+    initial?.review &&
+    !initial.review.superseded &&
+    initial.execution?.issues.every((i) => i.status === "integrated")
+  )
+    return initial;
+  const concurrency = initial?.planning?.settings.concurrency ?? 2;
+  if (!Number.isInteger(concurrency) || concurrency <= 0)
+    throw new Error("Executor concurrency must be a positive integer");
+  if (
+    !initial?.baseline ||
+    !["passed", "passed_with_omissions"].includes(initial.baseline.status) ||
+    initial.planning?.phase !== "execution_approved"
+  )
+    throw new Error("Validated baseline and approved graph required");
+  const epoch = initial.control?.epoch ?? 0;
+  const queue = integrationQueue(store, runId);
+  const workers = new Map<string, Promise<void>>();
+  let fatal: unknown;
+  let projection: Promise<unknown> = Promise.resolve();
+  const publish = () => {
+    const update = projection.then(async () => {
+      for (;;) {
+        const run = await store.getRun(runId);
+        if (
+          !run ||
+          run.planning?.phase !== "execution_approved" ||
+          (run.control && run.control.status !== "active") ||
+          (run.control?.epoch ?? 0) !== epoch ||
+          run.planning?.graph?.hash !== initial.planning?.graph?.hash
+        )
+          return;
+        const evidence = reconcileReadiness(run, queue.positions);
+        // Passing execution checks cannot attest the still-pending review phases.
+        if (evidence.issues.every((issue) => issue.status === "integrated")) {
+          evidence.verification = "incomplete";
+          evidence.reviewPending = true;
+        }
+        if (JSON.stringify(run.execution) === JSON.stringify(evidence)) return;
+        if (await store.recordExecution(runId, run.revision, evidence)) return;
+      }
+    });
+    projection = update.catch(() => {});
+    return update;
+  };
+  queue.listeners.add(publish);
+  try {
+    for (;;) {
+      await publish();
+      const run = await store.getRun(runId);
+      if (
+        !run ||
+        run.planning?.phase !== "execution_approved" ||
+        (run.control && run.control.status !== "active") ||
+        (run.control?.epoch ?? 0) !== epoch ||
+        run.planning?.graph?.hash !== initial.planning?.graph?.hash
+      )
+        break;
+      const ready = reconcileReadiness(run, queue.positions).issues.filter(
+        (i) =>
+          i.status === "ready" ||
+          (i.status === "integration_queued" &&
+            run.issueAttempts?.[i.id]?.status === "submitted" &&
+            !workers.has(i.id)),
+      );
+      for (const issue of ready) {
+        if (workers.has(issue.id)) continue;
+        const worker = runIssue(store, adapter, runId, issue.id, options)
+          .then(() => {})
+          .catch((cause: unknown) => {
+            fatal ??= cause;
+          })
+          .finally(async () => {
+            workers.delete(issue.id);
+            await publish();
+          });
+        workers.set(issue.id, worker);
+      }
+      if (fatal || !workers.size) break;
+      await Promise.race(workers.values());
+    }
+    await Promise.all(workers.values());
+    await publish();
+    const latest = await store.getRun(runId);
+    if (
+      fatal &&
+      latest?.planning?.graph?.hash === initial.planning?.graph?.hash &&
+      latest?.planning?.phase === "execution_approved" &&
+      (!latest?.control || latest.control.status === "active")
+    )
+      throw fatal;
+    return reviewIntegratedExecution(store, adapter, runId);
+  } finally {
+    queue.listeners.delete(publish);
+  }
+}
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { RunStore } from "../state/run-store.js";
+import type { AttemptOptions } from "./attempts.js";
+import type { IssueAttempt } from "./execute-issue.js";
+import { integrateSubmission } from "./integrate-issue.js";
+
+/** Shared by the single-issue and DAG paths, including separate store instances. */
+const queues = new Map<string, IntegrationQueue>();
+export class IntegrationQueue {
+  readonly listeners = new Set<() => Promise<void>>();
+  private entries = new Map<string, Promise<IssueAttempt>>();
+  private order: string[] = [];
+  private tail: Promise<unknown> = Promise.resolve();
+  get positions(): string[] {
+    return [...this.order];
+  }
+  enqueue(
+    store: RunStore,
+    adapter: OpenCodeAdapter,
+    runId: string,
+    issueId: string,
+    options: AttemptOptions = {},
+  ) {
+    const existing = this.entries.get(issueId);
+    if (existing) return existing;
+    this.order.push(issueId);
+    const result = this.tail
+      .then(async () => {
+        await this.changed();
+        return integrateSubmission(store, adapter, runId, issueId, options);
+      })
+      .finally(async () => {
+        this.order = this.order.filter((id) => id !== issueId);
+        this.entries.delete(issueId);
+        await this.changed();
+      });
+    this.entries.set(issueId, result);
+    this.tail = result.catch(() => {});
+    // Arrival is observable even while another candidate is validating.
+    void this.changed().catch(() => {});
+    return result;
+  }
+  private async changed() {
+    for (const listener of this.listeners) await listener();
+  }
+}
+export function integrationQueue(store: RunStore, runId: string) {
+  const key = `${store.repositoryId}:${runId}`;
+  let queue = queues.get(key);
+  if (!queue) {
+    queue = new IntegrationQueue();
+    queues.set(key, queue);
+  }
+  return queue;
+}
+
+exec
+/bin/zsh -lc 'bun test tests/integration/08-concurrency.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run typecheck' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 67ms:
+$ biome check src tests scripts
+Checked 98 files in 89ms. No fixes applied.
+
+ succeeded in 1618ms:
+$ tsc --noEmit
+
+codex
+The scheduler and resource isolation are already implemented. Type checking and repository-wide lint pass, so the recorded lint blocker has been resolved. The concurrency tests are still running; the diamond dependency and resource-isolation scenarios have passed.
+ succeeded in 74825ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/08-concurrency.test.ts:
+(pass) diamond execution overlaps within two slots; only integrated parents unlock D [9030.49ms]
+(pass) exhausted B blocks D while C and independent E continue [4952.19ms]
+(pass) approved service templates allocate distinct ports, namespaces and owned directories [23690.64ms]
+(pass) a submitted executor releases its slot while the serial integrator is held [8331.11ms]
+(pass) shared approved resources serialize use and release only the owned lease [8734.46ms]
+(pass) invalid executor concurrency blocks before dispatch [119.19ms]
+(pass) integration with run-local omissions unlocks dependents and preserves verification debt [6940.42ms]
+(pass) an unrelated journal update cannot turn a timed-out check into an issue repair [10601.93ms]
+(pass) single-issue calls share the configured executor cap [2457.10ms]
+
+ 9 pass
+ 0 fail
+ 121 expect() calls
+Ran 9 tests across 1 file. [74.92s]
+
+codex
+Already implemented; no changes needed.
+
+Verified with Bun 1.4.3:
+
+- Type checking: passed.
+- Repository-wide lint: passed; the recorded blocker is resolved.
+- Concurrency tests: 9 passed, 0 failed, 121 assertions.
+tokens used
+22,369
+Already implemented; no changes needed.
+
+Verified with Bun 1.4.3:
+
+- Type checking: passed.
+- Repository-wide lint: passed; the recorded blocker is resolved.
+- Concurrency tests: 9 passed, 0 failed, 121 assertions.

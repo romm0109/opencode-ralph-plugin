@@ -1,0 +1,740 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/5-prepare-feature-branch-and-validate-baseline.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cc3-9ad1-7981-84d4-63ab8944ff28
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 2 of 3
+File      : 5 of 15 — 5-prepare-feature-branch-and-validate-baseline.md
+=== END METADATA ===
+
+TASK:
+# 5. Prepare the feature branch and validate its baseline
+
+**Type:** AFK  
+**Status:** Implemented; repository-wide lint has an unrelated existing formatting blocker  
+**User stories:** US-1, US-5  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Turn an execution approval into a clean, isolated feature baseline. Verify Git state and selected commit, create the feature integration branch and baseline worktree, prepare its environment, and run configured checks. Record failures without charging an issue attempt. Introduce the shared run-local validation skip policy needed for baseline timeouts, then expose readiness through OpenCode status.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 181–187): clean checkout, selected commit and baseline rules.
+- `PRD.md` (lines 144–152): repository identity and durable operation intent.
+- `PRD.md` (lines 211–225): timeout skip policy.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 4: Generate the PRD and approve a valid issue graph](4-generate-prd-and-approve-issue-graph.md): predecessor contracts and the code delivered by that slice.
+- `src/execution/preflight.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/git/worktrees.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/execution/validation.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Run Git through argument arrays with explicit cwd. Persist expected starting commit and operation intent before creating branches/worktrees. A baseline check with an exit failure blocks execution; a timed-out check becomes an explicit omission under the run-local policy.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Validate and create the execution baseline
+
+**Files:** `src/execution/preflight.ts`, `src/git/worktrees.ts`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** Require verified configuration and matching execution approval, reject tracked or relevant untracked changes, resolve selected HEAD to a commit, and confirm the repository lock. Create a unique ralph/<feature-id> branch and owned worktree from the exact approved commit without changing the user's checkout. Record branch/worktree ownership and operation IDs.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Export preflightRun from preflight.ts and createOwnedWorktree, inspectWorktree, removeOwnedWorktree from worktrees.ts; import RunStore and node:child_process spawn.
+- **GOTCHA:** Handle unborn repositories and branch collisions with an actionable blocker; never auto-commit or stash user changes. Preserve existing unrelated worktrees.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/05-baseline.test.ts`; add the tests below as this slice develops.
+
+### 2. Run baseline validation with qualified results
+
+**Files:** `src/execution/validation.ts`, `src/execution/preflight.ts`
+
+- **IMPLEMENT:** Implement validateCandidate using the approved command revision and exact commit identity. Prepare environment, execute applicable checks, and clean up. Record a timed-out check ID in the run-local skip set and continue; nonzero exits and setup/readiness failures block baseline. Return passed, passed_with_omissions, or failed results with check evidence.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import runCommand, prepareEnvironment, disposeEnvironment; export validateCandidate and ValidationSummary from validation.ts.
+- **GOTCHA:** Initial project verification in issue 2 remains strict. Every check skipped permits feature progress with incomplete validation, not a verified baseline.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/05-baseline.test.ts`; add the tests below as this slice develops.
+
+### 3. Exercise baseline behavior with real Git fixtures
+
+**Files:** `tests/integration/05-baseline.test.ts`
+
+- **IMPLEMENT:** Test clean and dirty checkouts, unborn repository, selected commit, branch collision, failing baseline, check timeout, all checks skipped, and setup failure. Assert target HEAD and checkout stay unchanged, no issue budget is consumed, and run config is unchanged.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import createTestProject, preflightRun, and validateCandidate.
+- **GOTCHA:** Record the exact command config hash and candidate SHA so later submission checks cannot reuse unrelated baseline evidence.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/05-baseline.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] Dirty checkout and invalid starting commit block before an issue runs.
+- [x] Feature branch starts at the approved commit; target branch and user checkout remain untouched.
+- [x] Completed baseline failures block execution without consuming issue attempts.
+- [x] Timeout omissions are run-local, visible, and cannot mark baseline fully verified.
+- [x] Cleanup is attempted after failures and only owned resources are affected.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/05-baseline.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/05-baseline.test.ts
+
+```
+
+**Demonstration:** Run the approved plan with a failing baseline, inspect the blocker, then repeat in a clean fixture with a passing or timed-out check and inspect the distinct status.
+
+## Blocked by
+
+- [4-generate-prd-and-approve-issue-graph.md](4-generate-prd-and-approve-issue-graph.md) — generate the prd and approve a valid issue graph supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+### Implementation evidence — 2026-10-15
+
+- Added approval-bound starting SHA selection/presentation, automatic `preflightRun` handoff, canonical-lock/config/artifact/checkout gates, owned `ralph/<run-id>` branch and baseline worktree operations, guarded cleanup and `/ralph-status` readiness/blockers.
+- Added `validateCandidate` with exact SHA + command revision/hash evidence, approved lifecycle preparation/disposal and durable run-local timeout skips. Setup/readiness and completed check failures block; all checks skipped remain `passed_with_omissions`. Baseline envelopes have attempt zero and no issue ID; approved JSON stays unchanged.
+- Red/green evidence: initial public baseline test failed because preflight was absent, then passed. A check mutating tracked files was incorrectly accepted (red), then rejected (green). Cached readiness incorrectly bypassed changed config (red), then rechecked prerequisites (green). Added real Git regressions for dirty/unborn/invalid starts, branch collisions/unrelated worktrees, setup failures/timeouts, completed failures, omissions, remaining checks, concurrency and lock/config mismatch.
+- `bun test tests/integration/05-baseline.test.ts`: 17 passing tests, 60 assertions on the final acceptance rerun. Increased fixture command deadlines to 2 seconds and file test budget to 30 seconds after a loaded-host rerun exceeded Bun's default 5-second test budget in a two-fixture scenario; production deadlines remain the approved configuration values.
+- `bun run typecheck`: passes. Predecessor regression suite (`01-plugin`, `02-project-commands`, `03-interview`, `04-planning`): 56 passing tests.
+- `bun run lint`: fails only on the existing formatting of `tests/browser/dashboard.test.ts:38`; that unrelated file was not modified. Biome checks for all 11 changed/new TypeScript files pass. The combined lint/platform acceptance checkbox remains open.
+- Demonstrated all three outcomes through `createCommandRouter(...).dispatch("ralph-orchestrator", ...)`, the controllable OpenCode adapter and real Git fixtures: exit 7 yields a persisted blocker, success yields `passed`, timeout yields `passed_with_omissions` plus the exact skipped ID in `ralph-status`.
+- Updated `docs/wiki/features/execution-baseline.md`, the wiki index/planning page and README. Native Linux/Windows and live OpenCode human/model approval were not run; production human provenance remains an adapter limitation. No publication, external messages or target-branch merging performed.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing baseline implementation and rerun this ticket’s acceptance commands to see whether any work remains.
+
+exec
+/bin/zsh -lc "git status --short; rg --files -g 'AGENTS.md' -g '*5-prepare*' -g 'package.json' -g '*baseline*' -g 'README.md' -g 'PRD.md' -g '.bun-version'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+.bun-version
+ralph-logs/iter-1-5-prepare-feature-branch-and-validate-baseline.log
+package.json
+README.md
+docs/wiki/features/execution-baseline.md
+tests/integration/05-baseline.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc "rg --files .agents docs | head -60; cat package.json; cat .bun-version; sed -n '1,220p' src/execution/preflight.ts; cat docs/wiki/features/execution-baseline.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+docs/package-validation.md
+docs/package-evidence-macos.json
+docs/functional-review-validation.md
+docs/recovery-validation.md
+docs/opencode-compatibility.md
+docs/wiki/open-questions.md
+docs/wiki/index.md
+.agents/issues/2-discover-approve-and-verify-project-commands.md
+.agents/issues/6-execute-and-integrate-one-issue-with-tdd.md
+.agents/issues/11-review-completed-feature-code.md
+.agents/issues/3-interview-and-approve-feature-explanation.md
+.agents/issues/1-install-plugin-and-run-opencode-session.md
+.agents/issues/7-retry-failed-work-and-skip-hung-checks.md
+.agents/issues/4-generate-prd-and-approve-issue-graph.md
+.agents/issues/12-verify-acceptance-with-browser-and-http.md
+.agents/issues/9-resolve-executor-questions-in-opencode.md
+.agents/issues/13-repair-findings-within-three-review-rounds.md
+.agents/issues/8-execute-dependency-ready-issues-concurrently.md
+.agents/issues/10-observe-execution-in-read-only-dashboard.md
+.agents/issues/5-prepare-feature-branch-and-validate-baseline.md
+.agents/issues/15-verify-packaged-workflow-across-platforms.md
+.agents/issues/14-pause-stop-and-recover-interrupted-workflows.md
+docs/troubleshooting.md
+docs/review-loop-validation.md
+docs/wiki/features/bounded-review-repairs.md
+docs/wiki/features/project-commands.md
+docs/wiki/features/feature-planning.md
+docs/wiki/features/concurrent-execution.md
+docs/wiki/features/feature-interview.md
+docs/wiki/features/workflow-recovery.md
+docs/wiki/features/package-distribution.md
+docs/wiki/features/functional-review.md
+docs/wiki/features/execution-baseline.md
+docs/wiki/features/independent-code-review.md
+docs/wiki/features/executor-questions.md
+docs/wiki/features/single-issue-integration.md
+docs/wiki/features/read-only-dashboard.md
+docs/wiki/features/ralph-task-loop.md
+docs/wiki/features/plugin-session-results.md
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+1.4.3
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { assertProjectReady } from "../commands/project-setup.js";
+import { commandConfigHash } from "../config/commands.js";
+import { loadProjectConfig } from "../config/project.js";
+import type { Failure, JobEnvelope, RunOperation } from "../core/types.js";
+import { verifyReviewRepository } from "../git/review-workspace.js";
+import {
+  createOwnedWorktree,
+  gitOutput,
+  removeOwnedWorktree,
+} from "../git/worktrees.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { artifactHash, issueBundleHash } from "../planning/artifacts.js";
+import { validateIssueGraph } from "../planning/graph.js";
+import type { RunStore } from "../state/run-store.js";
+import { type ValidationSummary, validateCandidate } from "./validation.js";
+
+export interface BaselineState {
+  status: "preparing" | "passed" | "passed_with_omissions" | "failed";
+  operationId: string;
+  candidateCommit: string;
+  commandHash: string;
+  commandRevision: number;
+  approvalRequestId?: string;
+  branch?: string;
+  workspace?: string;
+  blocker?: string;
+  error?: Failure;
+  validation?: ValidationSummary;
+}
+export async function preflightRun(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+) {
+  const initial = await store.getRun(runId);
+  const state = initial?.planning;
+  if (!initial || !state) throw new Error("Unknown planning run");
+  if (initial.baseline?.status === "preparing") return initial;
+  const epoch = initial.control?.epoch ?? 0;
+  const baseline: BaselineState = {
+    status: "preparing",
+    operationId: `baseline-${randomUUID()}`,
+    candidateCommit: state.executionApproval?.selectedCommit ?? "",
+    commandHash: state.commandHash,
+    commandRevision: 0,
+    ...(state.executionApproval
+      ? { approvalRequestId: state.executionApproval.requestId }
+      : {}),
+  };
+  async function save(expectedRevision?: number) {
+    const run = await store.getRun(runId);
+    if (
+      !run ||
+      (run.baseline?.operationId !== initial?.baseline?.operationId &&
+        run.baseline?.operationId !== baseline.operationId) ||
+      (run.control?.epoch ?? 0) !== epoch ||
+      run.planning?.executionApproval?.requestId !==
+        state?.executionApproval?.requestId ||
+      !(await store.recordBaseline(
+        runId,
+        expectedRevision ?? run.revision,
+        baseline,
+        baseline.validation?.skippedCheckIds ?? [],
+      ))
+    )
+      throw new Error("Stale baseline transition");
+  }
+  let owned: RunOperation | undefined;
+  try {
+    if (initial.control && initial.control.status !== "active") return initial;
+    if (
+      state.phase !== "execution_approved" ||
+      !state.prd ||
+      !state.graph ||
+      !state.executionApproval ||
+      state.executionApproval.prdHash !== state.prd.hash ||
+      state.executionApproval.graphHash !== state.graph.hash ||
+      state.executionApproval.revision !== state.graph.revision ||
+      !baseline.candidateCommit ||
+      state.selectedCommit !== baseline.candidateCommit
+    )
+      throw new Error(
+        "Matching execution approval and selected commit are required",
+      );
+    await verifyReviewRepository(state.workspace, store.repositoryId);
+    const lock = JSON.parse(
+      await readFile(join(store.root, "active-run.lock/owner.json"), "utf8"),
+    );
+    if (lock.runId !== runId || lock.repositoryId !== store.repositoryId)
+      throw new Error("Repository lock belongs to another run");
+    await assertProjectReady(state.workspace);
+    const config = await loadProjectConfig(state.workspace);
+    baseline.commandRevision = config.commands.revision;
+    if (commandConfigHash(config.commands) !== state.commandHash)
+      throw new Error("Approved command configuration changed");
+    validateIssueGraph(state.graph.value, state.graph.files, state.prd);
+    const graph = JSON.parse(
+      await readFile(join(state.workspace, state.graph.artifactPath), "utf8"),
+    );
+    const files: Record<string, string> = {};
+    for (const path of Object.keys(state.graph.files))
+      files[path] = await readFile(
+        join(state.workspace, dirname(state.graph.artifactPath), path),
+        "utf8",
+      );
+    if (
+      artifactHash(
+        await readFile(join(state.workspace, state.prd.artifactPath), "utf8"),
+      ) !== state.prd.hash ||
+      issueBundleHash(graph, files) !== state.graph.hash
+    )
+      throw new Error("Approved planning artifacts changed");
+    try {
+      await gitOutput(state.workspace, [
+        "rev-parse",
+        "--verify",
+        "HEAD^{commit}",
+      ]);
+    } catch (cause) {
+      throw new Error(
+        "Repository HEAD is unborn or invalid; create a commit before execution",
+        { cause },
+      );
+    }
+    if (
+      !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(baseline.candidateCommit) ||
+      (
+        await gitOutput(state.workspace, [
+          "rev-parse",
+          "--verify",
+          `${baseline.candidateCommit}^{commit}`,
+        ])
+      ).trim() !== baseline.candidateCommit
+    )
+      throw new Error(
+        "Selected starting commit is invalid; select and approve a committed starting point",
+      );
+    if (
+      (
+        await gitOutput(state.workspace, [
+          "status",
+          "--porcelain",
+          "--untracked-files=all",
+        ])
+      ).trim()
+    )
+      throw new Error(
+        "Checkout is dirty; commit or remove tracked and relevant untracked changes before execution",
+      );
+    if (
+      initial.baseline &&
+      ["passed", "passed_with_omissions"].includes(initial.baseline.status) &&
+      initial.baseline.candidateCommit === baseline.candidateCommit &&
+      initial.baseline.commandHash === baseline.commandHash &&
+      initial.baseline.approvalRequestId === state.executionApproval.requestId
+    )
+      return initial;
+    baseline.branch = `ralph/${runId}`;
+    baseline.workspace = join(store.root, "worktrees", runId);
+    if (
+      (
+        await gitOutput(state.workspace, [
+          "for-each-ref",
+          "--format=%(refname)",
+          `refs/heads/${baseline.branch}`,
+        ])
+      ).trim()
+    )
+      throw new Error(
+        `Branch ${baseline.branch} already exists; inspect it and select a new feature ID`,
+      );
+    await save(initial.revision);
+    await mkdir(dirname(baseline.workspace), { recursive: true });
+    const job: JobEnvelope = {
+      runId,
+      jobId: baseline.operationId,
+      role: "baseline",
+      attempt: 0,
+      workspace: baseline.workspace,
+      baseCommit: baseline.candidateCommit,
+      inputRevisions: {
+        commands: config.commands.revision,
+        approval: state.executionApproval.revision,
+      },
+      prompt: "Validate approved feature baseline",
+    };
+    owned = {
+      operationId: baseline.operationId,
+      kind: "baseline.workspace",
+      status: "intent",
+      job,
+      ref: `refs/heads/${baseline.branch}`,
+      expectedOld: baseline.candidateCommit,
+      expectedNew: baseline.candidateCommit,
+    };
+    await createOwnedWorktree(store, state.workspace, owned);
+    baseline.validation = await validateCandidate({
+      store,
+      adapter,
+      job,
+      config: config.commands,
+      sourceWorkspace: state.workspace,
+    });
+    baseline.status = baseline.validation.status;
+    if (baseline.validation.blocker) {
+      baseline.blocker = baseline.validation.blocker;
+      baseline.error = {
+        code: "baseline-blocked",
+        message: baseline.validation.blocker,
+        cause: baseline.validation.blocker,
+      };
+    }
+    if (baseline.status === "failed")
+      await removeOwnedWorktree(store, state.workspace, owned.operationId);
+    await save();
+  } catch (cause) {
+    baseline.status = "failed";
+# Feature execution baseline
+
+## Summary
+Human execution approval hands off to preflight before any issue dispatch. Preflight creates an owned integration branch and worktree at the exact approved SHA and validates it with the captured command configuration.
+
+## Key behavior
+- Approval presents and captures the starting SHA; `requestPlanningApproval` accepts an optional alternative starting reference before the request is issued. Approval binds that SHA to the approved PRD and issue graph.
+- `preflightRun` verifies artifact hashes, project verification, command hash, canonical repository lock, committed HEAD, selected commit and clean tracked/untracked state. It never commits or stashes user changes.
+- Branch `ralph/<run-id>` and workspace under the canonical run root are recorded with operation intent before Git mutations. Existing branches block; the user's branch and unrelated worktrees remain unchanged.
+- Baseline command envelopes use role `baseline`, attempt zero and no issue ID. Failures consume no issue attempts. Failed baselines attempt environment and owned worktree cleanup; ambiguous ownership blocks deletion.
+- `validateCandidate` prepares the environment, runs checks and disposes partial startup. Evidence includes the exact candidate SHA, command revision/hash, lifecycle results and check results. Changed candidate HEAD or tracked files invalidate results.
+- A check timeout with successful process cleanup persists that exact ID in `RunRecord.validationSkips`. Later validation skips those IDs; setup/readiness failures and nonzero check exits never qualify. Approved JSON is unchanged. All skipped checks yield `passed_with_omissions`, never `passed`.
+- `/ralph-status` and adapter status publication expose baseline readiness/blockers and skips. Compare-and-swap reservations avoid duplicate preflight effects; stale completion cannot publish readiness. Cached readiness rechecks approval, configuration, artifacts and checkout prerequisites.
+
+## Code references
+- `src/execution/preflight.ts` — approval gates, baseline orchestration and typed blocker evidence.
+- `src/execution/validation.ts` — qualified validation and shared run-local skip policy.
+- `src/git/worktrees.ts` — Git argument arrays, owned workspace inspection and guarded removal.
+- `src/state/run-store.ts` — baseline events and durable skip persistence.
+- `src/planning/issues.ts`, `src/commands/router.ts`, `src/core/orchestrator.ts` — approval SHA, status and automatic handoff.
+- `src/process/environment.ts` — optional separate check execution; initial project verification remains strict.
+- `tests/integration/05-baseline.test.ts` — real Git fixtures and public command demonstrations.
+
+## Related
+- [Planning approval](feature-planning.md)
+- [Project commands](project-commands.md)
+
+## Notes
+Issue scheduling is downstream. Native Linux/Windows and live production human approval were not exercised; the production adapter still requires verified human-input provenance. Project commands and generated artifacts must be committed or otherwise leave a clean checkout before baseline creation; preflight reports this explicitly.
+
+## Last updated
+2026-10-15
+
+exec
+/bin/zsh -lc 'bun test tests/integration/05-baseline.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun --version; bun run typecheck' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 90ms:
+$ biome check src tests scripts
+Checked 98 files in 101ms. No fixes applied.
+
+ succeeded in 1533ms:
+1.4.3
+$ tsc --noEmit
+
+exec
+/bin/zsh -lc "sed -n '1,110p' .agents/issues/README.md; sed -n '88,97p' PRD.md; sed -n '144,152p' PRD.md; sed -n '181,187p' PRD.md; sed -n '211,225p' PRD.md; tail -28 .agents/issues/5-prepare-feature-branch-and-validate-baseline.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+sed: .agents/issues/README.md: No such file or directory
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+Keep configuration and approved requirements suitable for version control. Ignore runtime logs, transient state, process metadata, and credentials. Store canonical run state in a location shared by the repository's linked worktrees; do not create independent schedulers from copies of tracked files. Use the repository's Git common directory to identify its lock and canonical runtime root.
+
+The bundled `to-issues` workflow is adapted to the per-feature issue directory. This intentionally differs from its standalone `.agents/issues/` default, keeping separate feature graphs unambiguous.
+
+### 6.5 Durable job contracts
+
+Each dispatched job records role, run ID, issue ID when relevant, attempt, session, workspace, input artifact revisions, and starting commit. Results reference produced commits, logs, evidence, findings, or questions.
+
+Persist intent before externally visible Git/process operations, then persist their observed result. Recovery must detect already-completed operations and avoid duplicate integrations. Late results from cancelled or superseded attempts cannot advance workflow state.
+### 7.4 Preflight and baseline
+
+Execution requires a clean working checkout, a selected committed starting point, valid approved artifacts, and verified command configuration. Default the starting point to the current branch's HEAD at execution approval, show it in chat, and allow an explicit alternative.
+
+Create the feature integration branch and run baseline validation before scheduling issues. Checks that finish with a failing exit code block execution. Baseline failures are not charged to any issue. Setup failures are reported as preflight blockers.
+
+During a feature run, a validation timeout follows the user-selected skip policy, including at baseline: record and skip the exact check for this run, continue remaining checks, and carry a missing-validation status to the final report. Setup/readiness commands do not qualify for skipping. Initial `/ralph-commands` verification must succeed before the project is ready; the feature-run skip policy does not silently approve broken initial setup.
+### 7.8 Attempts, timeouts, and command skipping
+
+| Event | Required behavior |
+| --- | --- |
+| Issue submission fails completed validation | Return check output to executor; allow three total issue attempts: initial attempt plus two repairs |
+| Agent gets stuck or times out | Stop that attempt and retry from reconciled saved work; consumes the same three-attempt budget |
+| Issue exhausts attempts | Block issue and dependents, continue independent work, request user intervention |
+| Validation check times out | Terminate its owned process tree, skip that check ID for the remainder of the feature run, and record the omission |
+| Every validation check is skipped | Continue execution and review; report missing automated validation and never label it fully verified |
+| Setup or startup times out | Do not skip; retry within the affected task's attempt budget, then block affected work |
+| Check exits nonzero | Treat as a failure, not as a timeout or a reason to disable it |
+
+The skip list is run-local, applies to later issues and review validation, and never modifies approved JSON. Future features try the commands again. Skipping a validation command must not skip environment cleanup or secretly remove another check.
+
+Implementation default: command timeouts are explicit in the approved JSON, with a suggested ten minutes for ordinary checks and configurable longer setup budgets. Agent attempts default to a configurable thirty-minute deadline. These durations were not prescribed by the user and must be visible in configuration.
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/05-baseline.test.ts
+
+```
+
+**Demonstration:** Run the approved plan with a failing baseline, inspect the blocker, then repeat in a clean fixture with a passing or timed-out check and inspect the distinct status.
+
+## Blocked by
+
+- [4-generate-prd-and-approve-issue-graph.md](4-generate-prd-and-approve-issue-graph.md) — generate the prd and approve a valid issue graph supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+### Implementation evidence — 2026-10-15
+
+- Added approval-bound starting SHA selection/presentation, automatic `preflightRun` handoff, canonical-lock/config/artifact/checkout gates, owned `ralph/<run-id>` branch and baseline worktree operations, guarded cleanup and `/ralph-status` readiness/blockers.
+- Added `validateCandidate` with exact SHA + command revision/hash evidence, approved lifecycle preparation/disposal and durable run-local timeout skips. Setup/readiness and completed check failures block; all checks skipped remain `passed_with_omissions`. Baseline envelopes have attempt zero and no issue ID; approved JSON stays unchanged.
+- Red/green evidence: initial public baseline test failed because preflight was absent, then passed. A check mutating tracked files was incorrectly accepted (red), then rejected (green). Cached readiness incorrectly bypassed changed config (red), then rechecked prerequisites (green). Added real Git regressions for dirty/unborn/invalid starts, branch collisions/unrelated worktrees, setup failures/timeouts, completed failures, omissions, remaining checks, concurrency and lock/config mismatch.
+- `bun test tests/integration/05-baseline.test.ts`: 17 passing tests, 60 assertions on the final acceptance rerun. Increased fixture command deadlines to 2 seconds and file test budget to 30 seconds after a loaded-host rerun exceeded Bun's default 5-second test budget in a two-fixture scenario; production deadlines remain the approved configuration values.
+- `bun run typecheck`: passes. Predecessor regression suite (`01-plugin`, `02-project-commands`, `03-interview`, `04-planning`): 56 passing tests.
+- `bun run lint`: fails only on the existing formatting of `tests/browser/dashboard.test.ts:38`; that unrelated file was not modified. Biome checks for all 11 changed/new TypeScript files pass. The combined lint/platform acceptance checkbox remains open.
+- Demonstrated all three outcomes through `createCommandRouter(...).dispatch("ralph-orchestrator", ...)`, the controllable OpenCode adapter and real Git fixtures: exit 7 yields a persisted blocker, success yields `passed`, timeout yields `passed_with_omissions` plus the exact skipped ID in `ralph-status`.
+- Updated `docs/wiki/features/execution-baseline.md`, the wiki index/planning page and README. Native Linux/Windows and live OpenCode human/model approval were not run; production human provenance remains an adapter limitation. No publication, external messages or target-branch merging performed.
+
+ succeeded in 35426ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/05-baseline.test.ts:
+(pass) approved baseline isolates the exact selected commit and exposes readiness [1580.98ms]
+(pass) completed baseline failure blocks without spending an issue attempt and removes only its worktree [1460.55ms]
+(pass) timeout omissions persist for this run, including when every check is skipped [3813.21ms]
+(pass) checks cannot attest the approved candidate after changing tracked files [1440.58ms]
+(pass) tracked changes block before baseline or issue commands run [824.02ms]
+(pass) untracked changes block before baseline or issue commands run [789.96ms]
+(pass) unborn HEAD and invalid selected commit produce blockers [1496.20ms]
+(pass) branch collision preserves existing branch and unrelated worktrees [802.51ms]
+(pass) setup failures are never skipped and cleanup still runs [1259.12ms]
+(pass) repository lock mismatch and changed configuration block execution [1535.23ms]
+(pass) concurrent preflight calls create one owned baseline [1407.23ms]
+(pass) cached readiness cannot bypass changed approved configuration [1390.85ms]
+(pass) a timed-out check does not prevent remaining checks or cleanup [3715.71ms]
+(pass) setup timeouts block without adding a validation omission [3260.03ms]
+(pass) public orchestrator and status demonstrate failed baseline [1377.11ms]
+(pass) public orchestrator and status demonstrate passed baseline [3586.55ms]
+(pass) public orchestrator and status demonstrate passed_with_omissions baseline [5723.03ms]
+
+ 17 pass
+ 0 fail
+ 60 expect() calls
+Ran 17 tests across 1 file. [35.54s]
+
+codex
+Already implemented; no changes needed.
+
+Verified with pinned Bun 1.4.3:
+
+- Typecheck passed.
+- Repository-wide lint passed; the previous blocker is resolved.
+- Baseline tests passed: 17 tests, 60 assertions.
+
+Native Linux/Windows and live OpenCode checks remain unverified.
+tokens used
+13,595
+Already implemented; no changes needed.
+
+Verified with pinned Bun 1.4.3:
+
+- Typecheck passed.
+- Repository-wide lint passed; the previous blocker is resolved.
+- Baseline tests passed: 17 tests, 60 assertions.
+
+Native Linux/Windows and live OpenCode checks remain unverified.

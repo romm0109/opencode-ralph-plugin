@@ -1,0 +1,1141 @@
+{
+  "date": "2026-10-16",
+  "protocol": "native-interview-v1",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "os": "macOS 26.5.2 / Darwin 25.5.0",
+  "runtime": {
+    "bun": "1.4.3 (c6da4a4d3)",
+    "opencodeCli": "2.0.29",
+    "opencodeClient": "2.0.29",
+    "opencodePlugin": "2.0.29",
+    "opencodeSchema": "2.0.29"
+  },
+  "status": "release-blocked",
+  "automated": {
+    "scope": "Two packed Git consumers; installed command and question-tool boundary; stage-owned writer/completion tools; automatic TDD/integration/dual review; qualified report; separate pinned real-host native form API smoke",
+    "synthetic": true,
+    "commands": [
+      {
+        "command": "bun --version",
+        "exitCode": 0,
+        "seconds": 0.01,
+        "log": "/tmp/ralph-native-release-20261016/00.log",
+        "status": "passed",
+        "summary": "1.4.3"
+      },
+      {
+        "command": "bun run typecheck",
+        "exitCode": 0,
+        "seconds": 1.78,
+        "log": "/tmp/ralph-native-release-20261016/01.log",
+        "status": "passed",
+        "summary": "$ tsc --noEmit"
+      },
+      {
+        "command": "bun run lint",
+        "exitCode": 0,
+        "seconds": 0.14,
+        "log": "/tmp/ralph-native-release-20261016/02.log",
+        "status": "passed",
+        "summary": "$ biome check src tests scripts\nChecked 120 files in 83ms. No fixes applied."
+      },
+      {
+        "command": "bun test --timeout 30000 tests/integration/15-package.test.ts",
+        "exitCode": 0,
+        "seconds": 15.14,
+        "log": "/tmp/ralph-native-release-20261016/03.log",
+        "status": "passed",
+        "summary": "(pass) recovery notifications are deferred until v2 plugin activation finishes [177.99ms]\n\n 3 pass\n 0 fail\n 15 expect() calls\nRan 3 tests across 1 file. [15.13s]"
+      },
+      {
+        "command": "bun run test:status",
+        "exitCode": 0,
+        "seconds": 14.76,
+        "log": "/tmp/ralph-native-release-20261016/04.log",
+        "status": "passed",
+        "summary": "\n 15 pass\n 279 filtered out\n 0 fail\n 74 expect() calls\nRan 15 tests across 22 files. [14.74s]"
+      },
+      {
+        "command": "bun run test",
+        "exitCode": 0,
+        "seconds": 293.0,
+        "log": "/tmp/ralph-native-release-20261016/05.log",
+        "status": "passed",
+        "summary": "\n 293 pass\n 1 skip\n 0 fail\n 2018 expect() calls\nRan 294 tests across 22 files. [292.98s]"
+      },
+      {
+        "command": "bun run build",
+        "exitCode": 0,
+        "seconds": 2.76,
+        "log": "/tmp/ralph-native-release-20261016/06.log",
+        "status": "passed",
+        "summary": "rendering chunks...\ncomputing gzip size...\n../public/index.html        0.34 kB \u2502 gzip:  0.24 kB\n../public/assets/app.css    1.21 kB \u2502 gzip:  0.63 kB\n../public/assets/app.js   203.82 kB \u2502 gzip: 63.87 kB\n\u2713 built in 490ms"
+      },
+      {
+        "command": "bun run test:browser",
+        "exitCode": 0,
+        "seconds": 14.11,
+        "log": "/tmp/ralph-native-release-20261016/07.log",
+        "status": "passed",
+        "summary": "  \u2713  4 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted verified report and chat status (453ms)\n  \u2713  5 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted unverified report and chat status (466ms)\n  \u2713  6 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted unresolved report and chat status (481ms)\n  \u2713  7 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted incomplete-validation report and chat status (440ms)\n\n  7 passed (13.1s)"
+      },
+      {
+        "command": "bun run test:package",
+        "exitCode": 0,
+        "seconds": 15.41,
+        "log": "/tmp/ralph-native-release-20261016/08.log",
+        "status": "passed",
+        "summary": "  \"liveEvidence\": \"docs/live-opencode-trial.md (2026-10-15 trial is historical; new native flow needs a human-visible trial; this command uses deterministic fixtures)\",\n  \"releaseBlockers\": [\n    \"Native Linux and Windows CI results required\",\n    \"Human-visible new-protocol native forms, focus and progress trial required\"\n  ]\n}"
+      },
+      {
+        "command": "bun run test:e2e",
+        "exitCode": 0,
+        "seconds": 17.35,
+        "log": "/tmp/ralph-native-release-20261016/09.log",
+        "status": "passed",
+        "summary": "(pass) installed setup-to-report workflow preserves verified versus skipped validation in two projects [17327.97ms]\n\n 1 pass\n 0 fail\n 3 expect() calls\nRan 1 test across 1 file. [17.34s]"
+      },
+      {
+        "command": "bun run test:smoke",
+        "exitCode": 0,
+        "seconds": 6.4,
+        "log": "/tmp/ralph-native-release-20261016/10.log",
+        "status": "passed",
+        "summary": "\n 1 pass\n 3 skip\n 0 fail\n 1 expect() calls\nRan 4 tests across 2 files. [6.38s]"
+      },
+      {
+        "command": "OPENCODE_SMOKE=1 bun test --timeout 180000 tests/smoke/opencode.test.ts",
+        "exitCode": 1,
+        "seconds": 40.5,
+        "log": "/tmp/ralph-native-release-20261016/11.log",
+        "status": "failed",
+        "summary": "\n 1 pass\n 1 skip\n 1 fail\n 44 expect() calls\nRan 3 tests across 1 file. [40.48s]"
+      }
+    ],
+    "finalFollowupChecks": [
+      {
+        "command": "bun run typecheck",
+        "status": "passed",
+        "exitCode": 0
+      },
+      {
+        "command": "bun run lint",
+        "status": "passed",
+        "exitCode": 0
+      },
+      {
+        "command": "bun test --timeout 30000 tests/integration/15-package.test.ts",
+        "status": "passed",
+        "exitCode": 0,
+        "log": "/tmp/ralph-native-release-20261016/17-final-package-integration.log",
+        "summary": "3 passed, 0 failed; 15 assertions"
+      },
+      {
+        "command": "bun run test:package",
+        "status": "passed",
+        "exitCode": 0,
+        "log": "/tmp/ralph-native-release-20261016/18-final-package.log",
+        "evidence": "/tmp/ralph-native-release-20261016/package-evidence-final.json"
+      },
+      {
+        "command": "OPENCODE_SMOKE=1 bun test --timeout 180000 tests/smoke/opencode.test.ts",
+        "status": "failed",
+        "exitCode": 1,
+        "log": "/tmp/ralph-native-release-20261016/16-final-host.log",
+        "summary": "1 passed, 1 skipped (credentialed provider), 1 failed; 44 assertions; no native opening form, zero pending permissions"
+      }
+    ],
+    "package": {
+      "platform": "darwin",
+      "bun": "1.4.3",
+      "repositories": [
+        {
+          "root": "/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph verified project YuPkFQ/.git/ralph/runs",
+          "port": "60704",
+          "outcome": "verified",
+          "stages": [
+            "setup",
+            "interview",
+            "prd",
+            "issues",
+            "executor",
+            "merger",
+            "review",
+            "report"
+          ],
+          "commandHash": "5b89b52c12a9207b815c481bf12c3c19fd187fcf134ff71355db19778ebbbe0c"
+        },
+        {
+          "root": "/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph skipped project nweoUF/.git/ralph/runs",
+          "port": "60714",
+          "outcome": "incomplete-validation",
+          "stages": [
+            "setup",
+            "interview",
+            "prd",
+            "issues",
+            "executor",
+            "merger",
+            "review",
+            "report"
+          ],
+          "commandHash": "866c5f500ba23f80051b706211688db8be6cdb5a74690044385c1711b8b81401"
+        }
+      ],
+      "archiveSha256": "f87255aa50ba0ff0518968d5a83b1db0794a90e09dbb66411d0452c986d6fb28",
+      "architecture": "arm64",
+      "opencode": "2.0.29",
+      "scope": "Installed command/native-question boundary/completion tools/same-session PRD/fresh issues/automatic execution and dual review/report",
+      "liveEvidence": "docs/live-opencode-trial.md (2026-10-15 trial is historical; new native flow needs a human-visible trial; this command uses deterministic fixtures)",
+      "releaseBlockers": [
+        "Native Linux and Windows CI results required",
+        "Human-visible new-protocol native forms, focus and progress trial required",
+        "Pinned installed host persists opening request but exposes no native form (docs/live-opencode-evidence.json)"
+      ],
+      "temporaryConsumersAndArchiveRemoved": true
+    },
+    "installedHostNativeFlow": {
+      "status": "failed",
+      "openingRequestPersisted": true,
+      "formListEmpty": true,
+      "pendingPermissions": 0,
+      "waitMilliseconds": 15000,
+      "observedRunId": "feature-204b141b-d657-4ad2-94d2-be55f7b61d1d",
+      "observedInterviewSessionId": "ses_ebbf7c4b8ffesCCX6Yuy4GL6rN",
+      "nativeAnswersAndPrdAssertions": "not reached",
+      "diagnosis": "Temporary tracing reached question.execute in src/opencode/native-input.ts. No form appeared. Production tracing was removed and both production files matched their original bytes.",
+      "diagnosticLogs": [
+        "/tmp/ralph-native-release-20261016/12-host-retry.log",
+        "/tmp/ralph-native-release-20261016/13-host-diagnostic.log",
+        "/tmp/ralph-native-release-20261016/14-host-form.log",
+        "/tmp/ralph-native-release-20261016/15-host-trace.log"
+      ],
+      "finalFailureLog": "/tmp/ralph-native-release-20261016/16-final-host.log"
+    },
+    "revalidation": {
+      "iteration": 2,
+      "date": "2026-10-16",
+      "status": "release-blocked",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "os": "macOS 26.5.2 / Darwin 25.5.0 (25F84)",
+      "runtime": {
+        "bun": "1.4.3 (c6da4a4d3)",
+        "opencodeCli": "2.0.29",
+        "opencodeClient": "2.0.29",
+        "opencodePlugin": "2.0.29",
+        "opencodeSchema": "2.0.29"
+      },
+      "scope": "Revalidation of existing task implementation after predecessor iteration 2; no runtime, fixture, dependency or approved-command changes",
+      "commands": [
+        {
+          "command": "bun --version",
+          "exitCode": 0,
+          "seconds": 0.01,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/00.log",
+          "status": "passed",
+          "logSha256": "bd31e8d9cf8d14a1e9e3fdf3b9f6a524819aed0d1b14627523c6765767c7d8f1",
+          "summary": "1.4.3"
+        },
+        {
+          "command": "bun run typecheck",
+          "exitCode": 0,
+          "seconds": 1.95,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/01.log",
+          "status": "passed",
+          "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+          "summary": "$ tsc --noEmit"
+        },
+        {
+          "command": "bun run lint",
+          "exitCode": 0,
+          "seconds": 0.14,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/02.log",
+          "status": "passed",
+          "logSha256": "fc3cfe57bb76ab9f240f3556c2d6a504ed8726c6e06189ab35a9e4ac3596cdb2",
+          "summary": "$ biome check src tests scripts\nChecked 120 files in 81ms. No fixes applied."
+        },
+        {
+          "command": "bun test --timeout 30000 tests/integration/15-package.test.ts",
+          "exitCode": 0,
+          "seconds": 15.45,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/03.log",
+          "status": "passed",
+          "logSha256": "de46406bdbb92c8a6c053b191ef170c16a24d504499c980c5e274d00a76cc687",
+          "summary": "(pass) a tarball loads in two repositories with bundled assets and isolated state [15242.81ms]\n(pass) recovery notifications are deferred until v2 plugin activation finishes [172.81ms]\n\n 3 pass\n 0 fail\n 15 expect() calls\nRan 3 tests across 1 file. [15.44s]"
+        },
+        {
+          "command": "bun run test:status",
+          "exitCode": 0,
+          "seconds": 14.32,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/04.log",
+          "status": "passed",
+          "logSha256": "6b0b1b69b56c456ce5226dd5f0301ec5aab9b3e2e29272cb21b7a2e9740ab20a",
+          "summary": "tests/integration/15-package.test.ts:\n\n 15 pass\n 279 filtered out\n 0 fail\n 74 expect() calls\nRan 15 tests across 22 files. [14.30s]"
+        },
+        {
+          "command": "bun run test",
+          "exitCode": 0,
+          "seconds": 302.79,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/05.log",
+          "status": "passed",
+          "logSha256": "e6b986641661e063aaf3c76070b64f32d241fd26b001760325043dea922edef4",
+          "summary": "(skip) real agent-browser submits committed fixture form and retains screenshot\n\n 293 pass\n 1 skip\n 0 fail\n 2018 expect() calls\nRan 294 tests across 22 files. [302.77s]"
+        },
+        {
+          "command": "bun run build",
+          "exitCode": 0,
+          "seconds": 4.28,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/06.log",
+          "status": "passed",
+          "logSha256": "b8e30a111a4330c97f1727dc3cc8630d520f0ee20f13580e32140b0bda135c19",
+          "summary": "\u2713 30 modules transformed.\nrendering chunks...\ncomputing gzip size...\n../public/index.html        0.34 kB \u2502 gzip:  0.24 kB\n../public/assets/app.css    1.21 kB \u2502 gzip:  0.63 kB\n../public/assets/app.js   203.82 kB \u2502 gzip: 63.87 kB\n\u2713 built in 714ms"
+        },
+        {
+          "command": "bun run test:browser",
+          "exitCode": 0,
+          "seconds": 14.3,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/07.log",
+          "status": "passed",
+          "logSha256": "12099c05cf132a026784dbe1440a20be6664291e0168d7e51b4fb9cf8a659f74",
+          "summary": "  \u2713  3 tests/browser/dashboard.test.ts:212:1 \u203a native planning shows owner, attempts, waiting and blockers without browser mutations (558ms)\n  \u2713  4 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted verified report and chat status (487ms)\n  \u2713  5 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted unverified report and chat status (486ms)\n  \u2713  6 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted unresolved report and chat status (557ms)\n  \u2713  7 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted incomplete-validation report and chat status (375ms)\n\n  7 passed (13.1s)"
+        },
+        {
+          "command": "bun run test:package",
+          "exitCode": 0,
+          "seconds": 17.89,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/08.log",
+          "status": "passed",
+          "logSha256": "0b7736962fe231de2df119c9afe43923f1e975c0f9004759f588688d8e60488d",
+          "summary": "  \"liveEvidence\": \"docs/live-opencode-trial.md (2026-10-15 trial is historical; new native flow needs a human-visible trial; this command uses deterministic fixtures)\",\n  \"releaseBlockers\": [\n    \"Native Linux and Windows CI results required\",\n    \"Human-visible new-protocol native forms, focus and progress trial required\",\n    \"Pinned installed host persists opening request but exposes no native form (docs/live-opencode-evidence.json)\"\n  ]\n}"
+        },
+        {
+          "command": "bun run test:e2e",
+          "exitCode": 0,
+          "seconds": 18.43,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/09.log",
+          "status": "passed",
+          "logSha256": "e7d4d36b359fb9fc28a6cb8d578770ad464fb1ae8c725050dcf223ccc1ef00cc",
+          "summary": "Packaged workflow: darwin, Bun 1.4.3; complete deterministic workflow.\n(pass) installed setup-to-report workflow preserves verified versus skipped validation in two projects [18409.39ms]\n\n 1 pass\n 0 fail\n 3 expect() calls\nRan 1 test across 1 file. [18.42s]"
+        },
+        {
+          "command": "bun run test:smoke",
+          "exitCode": 0,
+          "seconds": 7.68,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/10.log",
+          "status": "passed",
+          "logSha256": "453103bdd344c8eeba9bcc61ea5cba31bcb91b63a83d97a40e532415c2f3b97e",
+          "summary": "(pass) local tarball installs and loads its plugin, skills and dashboard in two consumers [7626.16ms]\n\n 1 pass\n 3 skip\n 0 fail\n 1 expect() calls\nRan 4 tests across 2 files. [7.66s]"
+        },
+        {
+          "command": "OPENCODE_SMOKE=1 bun test --timeout 180000 tests/smoke/opencode.test.ts",
+          "exitCode": 1,
+          "seconds": 41.26,
+          "log": "/tmp/ralph-native-release-iteration2-20261016/11.log",
+          "status": "failed",
+          "logSha256": "7e22b1faa5569f9cf600ac2e58301f38e335c0a3f9d4bd3992114d6ed462a8dd",
+          "summary": "(skip) credentialed live model response through an existing OpenCode instance\n\n 1 pass\n 1 skip\n 1 fail\n 44 expect() calls\nRan 3 tests across 1 file. [41.25s]"
+        }
+      ],
+      "package": {
+        "platform": "darwin",
+        "bun": "1.4.3",
+        "repositories": [
+          {
+            "root": "/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph verified project WqYkaE/.git/ralph/runs",
+            "port": "51238",
+            "outcome": "verified",
+            "stages": [
+              "setup",
+              "interview",
+              "prd",
+              "issues",
+              "executor",
+              "merger",
+              "review",
+              "report"
+            ],
+            "commandHash": "5b89b52c12a9207b815c481bf12c3c19fd187fcf134ff71355db19778ebbbe0c"
+          },
+          {
+            "root": "/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph skipped project fEgGTU/.git/ralph/runs",
+            "port": "51248",
+            "outcome": "incomplete-validation",
+            "stages": [
+              "setup",
+              "interview",
+              "prd",
+              "issues",
+              "executor",
+              "merger",
+              "review",
+              "report"
+            ],
+            "commandHash": "866c5f500ba23f80051b706211688db8be6cdb5a74690044385c1711b8b81401"
+          }
+        ],
+        "archiveSha256": "a1af7a5f4e502dc0d2f4adbb513baccf7bd7e9e73320049c327493b193825b4e",
+        "architecture": "arm64",
+        "opencode": "2.0.29",
+        "scope": "Installed command/native-question boundary/completion tools/same-session PRD/fresh issues/automatic execution and dual review/report",
+        "liveEvidence": "docs/live-opencode-trial.md (2026-10-15 trial is historical; new native flow needs a human-visible trial; this command uses deterministic fixtures)",
+        "releaseBlockers": [
+          "Native Linux and Windows CI results required",
+          "Human-visible new-protocol native forms, focus and progress trial required",
+          "Pinned installed host persists opening request but exposes no native form (docs/live-opencode-evidence.json)"
+        ],
+        "temporaryConsumersAndArchiveRemoved": true
+      },
+      "installedHostNativeFlow": {
+        "status": "failed",
+        "openingRequestPersisted": true,
+        "formListEmpty": true,
+        "pendingPermissions": 0,
+        "waitMilliseconds": 15000,
+        "observedRunId": "feature-4d637529-5ad6-485e-8766-c23e1a00b784",
+        "observedInterviewSessionId": "ses_ebbcd5449ffeyypnbhJaP34jHo",
+        "nativeAnswersAndPrdAssertions": "not reached",
+        "log": "/tmp/ralph-native-release-iteration2-20261016/11.log",
+        "summary": "1 passed (fresh lockfile install), 1 credentialed-provider skip, 1 failed; 44 assertions. Same missing opening form as iteration 1."
+      },
+      "humanVisibleTrial": {
+        "status": "not-run",
+        "reason": "Human participation requested during iteration 2; no human answers or acceptance recorded. App inventory alone is not a trial. Installed-host API smoke remains blocked before native answers."
+      },
+      "platformEvidence": {
+        "darwin-arm64": "All required local commands rerun sequentially; opted-in installed-host smoke fails before opening answer",
+        "linux": "not-run",
+        "win32": "not-run"
+      },
+      "sourceReceipts": {
+        ".bun-version": "bd31e8d9cf8d14a1e9e3fdf3b9f6a524819aed0d1b14627523c6765767c7d8f1",
+        "package.json": "cfe2afc64f4ba410bf740676d352bbdd2f9ec438078fe25ce993d169da169442",
+        "bun.lock": "96c7cd4bdc7886a55ba5c293205133fe4e323c459f88d9e9e3ca8f5e33c97139",
+        "src/opencode/native-input.ts": "8ae41ba18f3708daa76b9ea399a97878b601d16fe32652dc19923280679a6cc9",
+        "src/plugin.ts": "f603641845f194eb492aa796eda8a6287d8b8356eef871df5f39970b3f086a8c",
+        "tests/smoke/opencode.test.ts": "a7c64ad87e9c57d6a63839995f4d659f0908f9c340feb2e75f94892e9aba1f8d",
+        "tests/helpers/model-fixture.ts": "0c0560aecd30cc70c99af287a7e27ee6d4b19ce55ccdd7c0581fd57bcba8cfa0",
+        "tests/helpers/packaged-workflow.ts": "275788fd03bf8a1d42819ca52427e8d29281dba15bdfe52b2cda7447a4ea998b",
+        "tests/helpers/packaged-probe.ts": "d5be3c6997897f36a0ea1e18423a9148a07e596f3ced0c0af3b7ed609b579e3c",
+        "tests/helpers/package.ts": "4b6f76ba24538622a2e8e11f64c5b6ef57ad80c4d37bf8df2e204ba4df9d1778"
+      },
+      "artifactNote": "Logs remain local under /tmp. Package identity is for the archive tested before this documentation-only evidence refresh; the archive and consumers were removed by the harness.",
+      "releaseBlockers": [
+        "Pinned installed host native opening request waits without exposing a form; installed-host smoke fails",
+        "Human-visible installed native forms/session navigation/progress and shutdown trial",
+        "Native Linux and Windows evidence"
+      ],
+      "documentationFollowupChecks": [
+        {
+          "command": "bun run typecheck",
+          "exitCode": 0,
+          "status": "passed"
+        },
+        {
+          "command": "bun test --timeout 30000 tests/integration/15-package.test.ts",
+          "exitCode": 0,
+          "status": "passed",
+          "log": "/tmp/ralph-native-release-iteration2-20261016/12-final-package-integration.log",
+          "logSha256": "1a3d4a43eb73cb7d3cb32d025d60217a0983ac3328710b2320fae5b8f6a9ed25",
+          "summary": "3 passed, 0 failed; 15 assertions"
+        }
+      ]
+    }
+  },
+  "humanVisibleTrial": {
+    "status": "not-run",
+    "reason": "No human-visible new-protocol trial recorded; participation requested in both task iterations, with no human answers or acceptance recorded",
+    "checklist": "docs/live-opencode-trial.md",
+    "nativeFormRendering": false,
+    "sessionFocusObservedByHuman": false,
+    "visibleProgressObservedByHuman": false
+  },
+  "platformEvidence": {
+    "darwin-arm64": "Automated suites pass except pinned installed-host native opening form; no human acceptance",
+    "linux": "not-run",
+    "win32": "not-run"
+  },
+  "releaseBlockers": [
+    "Pinned installed host native opening request waits without exposing a form; installed-host smoke fails",
+    "Human-visible installed native forms/session navigation/progress and shutdown trial",
+    "Native Linux and Windows evidence"
+  ],
+  "historicalPreviousProtocol": {
+    "date": "2026-10-15",
+    "platform": "darwin",
+    "arch": "arm64",
+    "bun": "1.4.3",
+    "opencode": "2.0.29",
+    "setup": {
+      "status": "verified",
+      "revision": 3,
+      "hash": "25dcbd07a3a911d24f70f4f0560e9de1fa54f3c01c14fdc923ef75aa0e13380d",
+      "commands": [
+        {
+          "id": "install-dependencies",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "bun install v1.4.3 (c6da4a4d3)\n\nChecked 305 installs across 360 packages (no changes) [81.00ms]\n\n"
+        },
+        {
+          "id": "install-chromium",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "\n"
+        },
+        {
+          "id": "typecheck",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "\n$ tsc --noEmit\n"
+        },
+        {
+          "id": "lint",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "Checked 101 files in 99ms. No fixes applied.\n\n$ biome check src tests scripts\n"
+        },
+        {
+          "id": "integration-tests",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "s) a non-secret boolean environment reference does not make the proposal contain a secret [351.42ms]\n\ntests/integration/15-package.test.ts:\n(pass) the distributable has no dependency on a developer-local copy of itself [0.48ms]\n(pass) a tarball loads in two repositories with bundled assets and isolated state [21659.55ms]\n(pass) recovery notifications are deferred until v2 plugin activation finishes [205.69ms]\n\n1 tests skipped:\n(skip) real agent-browser submits committed fixture form and retains screenshot\n\n 203 pass\n 1 skip\n 0 fail\n 1266 expect() calls\nRan 204 tests across 15 files. [539.77s]\n"
+        },
+        {
+          "id": "build",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "vite v7.1.12 building for production...\ntransforming...\n\u2713 30 modules transformed.\nrendering chunks...\ncomputing gzip size...\n../public/index.html        0.34 kB \u2502 gzip:  0.24 kB\n../public/assets/app.css    1.21 kB \u2502 gzip:  0.63 kB\n../public/assets/app.js   203.29 kB \u2502 gzip: 63.77 kB\n\u2713 built in 766ms\n\n$ bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts\n"
+        },
+        {
+          "id": "browser-tests",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "rkflow controls (1.9s)\n  \u2713  3 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted verified report and chat status (805ms)\n  \u2713  4 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted unverified report and chat status (948ms)\n  \u2713  5 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted unresolved report and chat status (1.1s)\n  \u2713  6 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted incomplete-validation report and chat status (866ms)\n\n  6 passed (29.2s)\n\n$ bun run scripts/browser-tests.ts\n$ vite build\n"
+        },
+        {
+          "id": "installed-host-smoke",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "d3)\nInstalled package smoke: darwin, Bun 1.4.3\n\n$ bun test tests/smoke\n\ntests/smoke/opencode.test.ts:\n(pass) a fresh checkout installs from its lockfile without a prebuilt plugin archive [13214.20ms]\n(pass) installed package: real OpenCode session, command, denied tool, events, restart [14803.45ms]\n(skip) credentialed live model response through an existing OpenCode instance\n\ntests/smoke/package-install.test.ts:\n(pass) local tarball installs and loads its plugin, skills and dashboard in two consumers [10559.91ms]\n\n 3 pass\n 1 skip\n 0 fail\n 34 expect() calls\nRan 4 tests across 2 files. [38.61s]\n"
+        },
+        {
+          "id": "full-workflow-tests",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "bun test v1.4.3 (c6da4a4d3)\nPackaged workflow: darwin, Bun 1.4.3; complete deterministic workflow.\n\n$ bun test tests/e2e\n\ntests/e2e/full-workflow.test.ts:\n(pass) installed setup-to-report workflow preserves verified versus skipped validation in two projects [23447.01ms]\n\n 1 pass\n 0 fail\n 3 expect() calls\nRan 1 test across 1 file. [23.46s]\n"
+        },
+        {
+          "id": "package-validation",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "\"executor\",\n        \"merger\",\n        \"review\",\n        \"report\"\n      ],\n      \"commandHash\": \"866c5f500ba23f80051b706211688db8be6cdb5a74690044385c1711b8b81401\"\n    }\n  ],\n  \"architecture\": \"arm64\",\n  \"opencode\": \"2.0.29\",\n  \"scope\": \"Installed setup/interview/PRD/issues/TDD integration/dual review/report\",\n  \"releaseBlockers\": [\n    \"Production human-input provenance is unsupported\",\n    \"All three platform CI results required\",\n    \"Credentialed full workflow not verified\",\n    \"Host functional lifecycle/tool options required for final dual review\"\n  ]\n}\n\n$ bun run scripts/package-smoke.ts\n"
+        }
+      ]
+    },
+    "baselineFailures": [
+      {
+        "baseCommit": "599908f32f59909feb802cc47cfabb9b7a654d8e",
+        "reason": "Preflight omitted the main-session permission owner",
+        "issueAttemptsUsed": 0
+      },
+      {
+        "baseCommit": "36e23ea2d55717306e67f65034556ac768716f8d",
+        "reason": "Executor admission order raced across asynchronous state reads",
+        "tests": {
+          "pass": 207,
+          "skip": 1,
+          "fail": 1
+        },
+        "issueAttemptsUsed": 0
+      }
+    ],
+    "hostLifecycleRegressions": {
+      "isolatedLocationModuleOwnership": "passed",
+      "cancelAfterPromptDelivery": "passed",
+      "cancelledExecutorRecovery": "passed",
+      "acceptedBaselinePreservation": "passed",
+      "independentHostBirthOwnership": "passed",
+      "installedNativeHostSmoke": {
+        "passed": 1,
+        "assertions": 35,
+        "durationSeconds": 41.48
+      },
+      "recoverySuite": {
+        "passed": 34,
+        "assertions": 193,
+        "durationSeconds": 47.06
+      },
+      "locationObservationBootstrap": "passed",
+      "foregroundOwnedShell": "passed in real installed OpenCode",
+      "backgroundReceiptNotCompletion": "passed",
+      "serviceIsolationAfterJournalCache": {
+        "passed": 1,
+        "assertions": 21,
+        "durationSeconds": 27.12
+      }
+    },
+    "firstFeatureTrial": {
+      "runId": "feature-8af0c6b9-0aa3-490c-80b8-51874fca416d",
+      "status": "stopped",
+      "acceptedBaseline": "2b344128d8b1d0995d9eff9f9606f814566949a8",
+      "baselineChecksPassed": 8,
+      "issueAttemptsConsumed": 2,
+      "red": {
+        "passed": 210,
+        "skipped": 1,
+        "failed": 6,
+        "failureReason": "missing issueSummary (expected)",
+        "durationSeconds": 571.99
+      },
+      "green": "not accepted: unchanged service-isolation test exceeded 90 seconds",
+      "preserved": "journal, approvals, worktrees and attempt counts retained in the first temporary repository"
+    },
+    "secondSetup": {
+      "status": "verified",
+      "revision": 2,
+      "hash": "79e69b43fb4776f0f009d0094905b101e4a6d085f62955a9eea249e52c4235ae",
+      "commands": [
+        {
+          "id": "install-dependencies",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "bun install v1.4.3 (c6da4a4d3)\n\nChecked 305 installs across 360 packages (no changes) [210.00ms]\n\n"
+        },
+        {
+          "id": "install-chromium",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "\n"
+        },
+        {
+          "id": "typecheck",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "\n$ tsc --noEmit\n"
+        },
+        {
+          "id": "lint",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "Checked 104 files in 89ms. No fixes applied.\n\n$ biome check src tests scripts\n"
+        },
+        {
+          "id": "integration-tests",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": ") registered OpenCode setup command discloses unavailable human approval and saves nothing [379.69ms]\n(pass) command configuration allows an empty or partial unsupported-platform map [1.61ms]\n(pass) approved commands use Bun wrappers when the host executable is OpenCode [450.10ms]\n(pass) a non-secret boolean environment reference does not make the proposal contain a secret [1835.32ms]\n(pass) setup status identifies verification as running while an approved command waits for permission [359.40ms]\n\ntests/integration/15-package.test.ts:\n(pass) the distributable has no dependency on a developer-local copy of itself [0.58ms]\n(pass) a tarball loads in two repositories with bundled assets and isolated state [22731.86ms]\n(pass) recovery notifications are deferred until v2 plugin activation finishes [179.24ms]\n\n1 tests skipped:\n(skip) real agent-browser submits committed fixture form and retains screenshot\n\n 218 pass\n 1 skip\n 0 fail\n 1327 expect() calls\nRan 219 tests across 16 files. [343.20s]\n"
+        },
+        {
+          "id": "build",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "vite v7.1.12 building for production...\ntransforming...\n\u2713 30 modules transformed.\nrendering chunks...\ncomputing gzip size...\n../public/index.html        0.34 kB \u2502 gzip:  0.24 kB\n../public/assets/app.css    1.21 kB \u2502 gzip:  0.63 kB\n../public/assets/app.js   203.29 kB \u2502 gzip: 63.77 kB\n\u2713 built in 634ms\n\n$ bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts\n"
+        },
+        {
+          "id": "browser-tests",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "\u2502 gzip:  0.63 kB\n../public/assets/app.js   203.29 kB \u2502 gzip: 63.77 kB\n\u2713 built in 868ms\n\nRunning 6 tests using 1 worker\n\n  \u2713  1 tests/browser/dashboard.test.ts:10:1 \u203a scheduler-produced diamond catches up after reconnect and retains all-skipped validation (12.0s)\n  \u2713  2 tests/browser/dashboard.test.ts:88:1 \u203a observes two live agents, blocked descendants, skipped validation and reconnect without workflow controls (1.8s)\n  \u2713  3 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted verified report and chat status (890ms)\n  \u2713  4 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted unverified report and chat status (817ms)\n  \u2713  5 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted unresolved report and chat status (751ms)\n  \u2713  6 tests/browser/review-report.test.ts:11:3 \u203a browser report matches persisted incomplete-validation report and chat status (794ms)\n\n  6 passed (19.3s)\n\n$ bun run scripts/browser-tests.ts\n$ vite build\n"
+        },
+        {
+          "id": "installed-host-smoke",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "bun test v1.4.3 (c6da4a4d3)\nInstalled package smoke: darwin, Bun 1.4.3\n\n$ bun test tests/smoke\n\ntests/smoke/opencode.test.ts:\n(pass) a fresh checkout installs from its lockfile without a prebuilt plugin archive [14422.99ms]\n(pass) installed package: real OpenCode session, command, denied tool, events, restart [17040.99ms]\n(skip) credentialed live model response through an existing OpenCode instance\n\ntests/smoke/package-install.test.ts:\n(pass) local tarball installs and loads its plugin, skills and dashboard in two consumers [12921.74ms]\n\n 3 pass\n 1 skip\n 0 fail\n 37 expect() calls\nRan 4 tests across 2 files. [44.42s]\n"
+        },
+        {
+          "id": "full-workflow-tests",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "bun test v1.4.3 (c6da4a4d3)\nPackaged workflow: darwin, Bun 1.4.3; complete deterministic workflow.\n\n$ bun test tests/e2e\n\ntests/e2e/full-workflow.test.ts:\n(pass) installed setup-to-report workflow preserves verified versus skipped validation in two projects [19189.59ms]\n\n 1 pass\n 0 fail\n 3 expect() calls\nRan 1 test across 1 file. [19.21s]\n"
+        },
+        {
+          "id": "package-validation",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "\"report\"\n      ],\n      \"commandHash\": \"5b89b52c12a9207b815c481bf12c3c19fd187fcf134ff71355db19778ebbbe0c\"\n    },\n    {\n      \"root\": \"/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph skipped project 0k8ZIa/.git/ralph/runs\",\n      \"port\": \"63307\",\n      \"outcome\": \"incomplete-validation\",\n      \"stages\": [\n        \"setup\",\n        \"interview\",\n        \"prd\",\n        \"issues\",\n        \"executor\",\n        \"merger\",\n        \"review\",\n        \"report\"\n      ],\n      \"commandHash\": \"866c5f500ba23f80051b706211688db8be6cdb5a74690044385c1711b8b81401\"\n    }\n  ],\n  \"architecture\": \"arm64\",\n  \"opencode\": \"2.0.29\",\n  \"scope\": \"Installed setup/interview/PRD/issues/TDD integration/dual review/report\",\n  \"releaseBlockers\": [\n    \"Production human-input provenance is unsupported\",\n    \"All three platform CI results required\",\n    \"Credentialed full workflow not verified\",\n    \"Host functional lifecycle/tool options required for final dual review\"\n  ]\n}\n\n$ bun run scripts/package-smoke.ts\n"
+        },
+        {
+          "id": "status-behavior-tests",
+          "status": "completed",
+          "exitCode": 0,
+          "summary": "ic router starts a session job and status exposes its persisted response [131.88ms]\n(pass) v2 TUI status notifications are scoped and their subscription is disposed [1.24ms]\n\ntests/integration/09-questions.test.ts:\n\ntests/integration/03-interview.test.ts:\n\ntests/integration/11-code-review.test.ts:\n\ntests/integration/14-recovery.test.ts:\n\ntests/integration/08-concurrency.test.ts:\n\ntests/integration/10-dashboard.test.ts:\n(pass) public status provides a working dashboard URL and plugin disposal closes it [204.59ms]\n\ntests/integration/07-retries.test.ts:\n(pass) all hung checks are omitted with incomplete status, immutable config and fresh-run retry [3116.36ms]\n\ntests/integration/13-review-loop.test.ts:\n\ntests/integration/02-project-commands.test.ts:\n(pass) setup status identifies verification as running while an approved command waits for permission [367.07ms]\n\ntests/integration/15-package.test.ts:\n\n 9 pass\n 210 filtered out\n 0 fail\n 37 expect() calls\nRan 9 tests across 16 files. [17.29s]\n"
+        }
+      ]
+    },
+    "credentialedFeature": {
+      "status": "verified",
+      "runId": "feature-4936a199-b6bc-492a-be6d-351590d5b760",
+      "repository": "/private/tmp/ralph-live-trial-2/repo",
+      "branch": "ralph/feature-4936a199-b6bc-492a-be6d-351590d5b760",
+      "commit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+      "selectedBaseCommit": "8eb0131475917a470bd5f6cd0beaf54826fc0804",
+      "commandHash": "79e69b43fb4776f0f009d0094905b101e4a6d085f62955a9eea249e52c4235ae",
+      "commandRevision": 2,
+      "issueAttempts": {
+        "A": 2
+      },
+      "validationSkips": [],
+      "rounds": [
+        {
+          "number": 1,
+          "commit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "code": "unverified",
+          "functional": "unverified"
+        },
+        {
+          "number": 2,
+          "commit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "code": "passed",
+          "functional": "passed"
+        }
+      ],
+      "cleanupFailures": [],
+      "acceptanceCriteria": [
+        {
+          "id": "prd-1",
+          "status": "pass"
+        },
+        {
+          "id": "prd-2",
+          "status": "pass"
+        },
+        {
+          "id": "prd-3",
+          "status": "pass"
+        },
+        {
+          "id": "prd-4",
+          "status": "pass"
+        },
+        {
+          "id": "prd-5",
+          "status": "pass"
+        },
+        {
+          "id": "prd-6",
+          "status": "pass"
+        },
+        {
+          "id": "prd-7",
+          "status": "pass"
+        },
+        {
+          "id": "prd-8",
+          "status": "pass"
+        },
+        {
+          "id": "issue-A-1",
+          "status": "pass"
+        },
+        {
+          "id": "issue-A-2",
+          "status": "pass"
+        },
+        {
+          "id": "issue-A-3",
+          "status": "pass"
+        },
+        {
+          "id": "issue-A-4",
+          "status": "pass"
+        },
+        {
+          "id": "issue-A-5",
+          "status": "pass"
+        },
+        {
+          "id": "issue-A-6",
+          "status": "pass"
+        },
+        {
+          "id": "issue-A-7",
+          "status": "pass"
+        }
+      ],
+      "candidateChecks": [
+        {
+          "id": "typecheck",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        },
+        {
+          "id": "lint",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        },
+        {
+          "id": "integration-tests",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        },
+        {
+          "id": "build",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        },
+        {
+          "id": "browser-tests",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        },
+        {
+          "id": "installed-host-smoke",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        },
+        {
+          "id": "full-workflow-tests",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        },
+        {
+          "id": "package-validation",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        },
+        {
+          "id": "status-behavior-tests",
+          "status": "passed",
+          "attempt": 2,
+          "candidateCommit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "commandRevision": 2
+        }
+      ]
+    },
+    "terminalInput": {
+      "session": "ses_ec05fa259ffeLZFnNJ1Lzx3WfR",
+      "form": "frm_13fd2b9630017qk9yvvKjOhZ96",
+      "action": "/ralph-answer, Enter on default Reject",
+      "observed": "Native dialog showed Reject selected, Approve exact displayed revision, and custom reply; form cleared; setup returned rejected; approved revision remained 2."
+    },
+    "memoryBenchmark": {
+      "journalMB": "over 250",
+      "previousRetainedHeapMB": 618,
+      "currentRetainedHeapMB": 70,
+      "scope": "same-history listRuns plus five getRun reads, standalone Bun; not a cross-platform memory guarantee"
+    },
+    "finalSourceIntegration": {
+      "passed": 232,
+      "skipped": 1,
+      "failed": 0,
+      "assertions": 1418,
+      "durationSeconds": 466.37,
+      "skip": "separately gated agent-browser fixture",
+      "includes": "final fast-command output receipt and dashboard cursor fixes"
+    },
+    "completionAudit": {
+      "runId": "feature-4936a199-b6bc-492a-be6d-351590d5b760",
+      "phase": "completed",
+      "setupVerified": "verified",
+      "explanationApproval": true,
+      "executionApproval": true,
+      "prdHash": "02fc8276903307cbc2cf4a7200a01e1d28bda469f93f9db5e0c0cdca28bd36a3",
+      "graphHash": "cea322fefe5d32ad084f95fb524b986c44fe3abbcfe13868e10e509f62e3b55b",
+      "baseline": "passed",
+      "jobs": [
+        {
+          "role": "interview",
+          "attempt": 1,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec08790edffePdKk4DWkbXzJQh"
+        },
+        {
+          "role": "prd",
+          "attempt": 1,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec085a910ffeYMKE6nEpt42ihY"
+        },
+        {
+          "role": "issues",
+          "attempt": 1,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec084e458ffeoXIblbCQ33bBDr"
+        },
+        {
+          "role": "executor",
+          "attempt": 1,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec07ad934ffe3owMwCNY4QpMnd"
+        },
+        {
+          "role": "executor",
+          "attempt": 2,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec06f8c59ffe9tDiJoC0l6jcoe"
+        },
+        {
+          "role": "merger",
+          "attempt": 2,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec065eccfffeIoOBPyk4WpRUJ5"
+        },
+        {
+          "role": "code-review",
+          "attempt": 1,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec05578ddffevKC5XZGOUpPDKP"
+        },
+        {
+          "role": "functional-review",
+          "attempt": 1,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec04cf129ffeRl7TLNby7rNESL"
+        },
+        {
+          "role": "code-review",
+          "attempt": 1,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec03544e7ffek2Iq3HqzLal7IS"
+        },
+        {
+          "role": "functional-review",
+          "attempt": 1,
+          "status": "terminal",
+          "outcome": "completed",
+          "sessionId": "ses_ec024e8a0ffer607JgVtOzZTWo"
+        }
+      ],
+      "integratedIssues": [
+        {
+          "id": "A",
+          "status": "integrated"
+        }
+      ],
+      "tdd": [
+        {
+          "issue": "A",
+          "attempt": 2,
+          "cycles": [
+            {
+              "red": 1,
+              "green": 0
+            }
+          ],
+          "nativeReceiptCount": 9
+        }
+      ],
+      "reviewRounds": [
+        {
+          "number": 1,
+          "commit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "code": "unverified",
+          "functional": "unverified",
+          "criteria": [
+            {
+              "id": "prd-1",
+              "status": "pass"
+            },
+            {
+              "id": "prd-2",
+              "status": "pass"
+            },
+            {
+              "id": "prd-3",
+              "status": "pass"
+            },
+            {
+              "id": "prd-4",
+              "status": "pass"
+            },
+            {
+              "id": "prd-5",
+              "status": "pass"
+            },
+            {
+              "id": "prd-6",
+              "status": "pass"
+            },
+            {
+              "id": "prd-7",
+              "status": "unverified"
+            },
+            {
+              "id": "prd-8",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-1",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-2",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-3",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-4",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-5",
+              "status": "unverified"
+            },
+            {
+              "id": "issue-A-6",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-7",
+              "status": "unverified"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "commit": "e24fc00f2be8179b0a057f37e250e2061e9eaa2a",
+          "code": "passed",
+          "functional": "passed",
+          "criteria": [
+            {
+              "id": "prd-1",
+              "status": "pass"
+            },
+            {
+              "id": "prd-2",
+              "status": "pass"
+            },
+            {
+              "id": "prd-3",
+              "status": "pass"
+            },
+            {
+              "id": "prd-4",
+              "status": "pass"
+            },
+            {
+              "id": "prd-5",
+              "status": "pass"
+            },
+            {
+              "id": "prd-6",
+              "status": "pass"
+            },
+            {
+              "id": "prd-7",
+              "status": "pass"
+            },
+            {
+              "id": "prd-8",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-1",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-2",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-3",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-4",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-5",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-6",
+              "status": "pass"
+            },
+            {
+              "id": "issue-A-7",
+              "status": "pass"
+            }
+          ]
+        }
+      ],
+      "outcome": "verified",
+      "skippedChecks": [],
+      "cleanupFailures": []
+    },
+    "fastCommandOutputRegression": {
+      "deterministicProtocolCases": 2,
+      "installedNativeHostAssertions": 35,
+      "outcome": "passed"
+    },
+    "finalChecks": {
+      "integration": "232 passed, 1 gated browser fixture skipped, 0 failed",
+      "status": "13 passed",
+      "typecheck": "passed",
+      "lint": "passed",
+      "build": "passed",
+      "browser": "6 passed",
+      "smoke": "3 passed, 1 separately gated credentialed smoke skipped, 37 assertions",
+      "coldInstall": "first attempt timed out at 120s; unchanged retry passed in 100.83s",
+      "packagedE2E": "passed; verified and incomplete-validation qualified reports in separate consumers",
+      "package": "passed; installed workflow and bundled resources in two repositories"
+    },
+    "installedNativeStatus": {
+      "runId": "feature-4936a199-b6bc-492a-be6d-351590d5b760",
+      "phase": "completed",
+      "issueSummary": {
+        "total": 1,
+        "pending": 0,
+        "ready": 0,
+        "running": 0,
+        "integration_queued": 0,
+        "integrated": 1,
+        "blocked": 0,
+        "failed": 0
+      },
+      "outcome": "verified",
+      "missingRunMessage": "No Ralph run found."
+    },
+    "finalInstallation": {
+      "plugin": "/Users/rwmmtzqy/.local/share/opencode/ralph-local/verified-20261015/node_modules/opencode-ralph-plugin",
+      "archiveSha256": "45afb811d51beb09af66adba3ff387d5b2f76048b2b508c7f772bcd6d6b84e2c",
+      "globalConfig": "/Users/rwmmtzqy/.config/opencode/opencode.json",
+      "backup": "/Users/rwmmtzqy/.config/opencode/opencode.json.pre-ralph-20261015-1792081409116",
+      "serverAndTuiActive": true,
+      "nativeDashboard": {
+        "connected": true,
+        "outcome": "verified",
+        "sameReviewedCommit": true,
+        "screenshot": "/private/tmp/ralph-live-trial-2/verified-dashboard.png"
+      }
+    }
+  },
+  "historicalEvidenceNotice": "The 2026-10-15 credentialed trial used the replaced protocol and does not satisfy native-interview-v1 acceptance.",
+  "recordedAtUtc": "2026-10-16T09:27:52.741071+00:00",
+  "allRequiredChecksPassed": false,
+  "sourceCheckout": {
+    "commit": null,
+    "reason": "Repository is unborn/uncommitted; packaged consumers use independent real committed Git histories."
+  }
+}

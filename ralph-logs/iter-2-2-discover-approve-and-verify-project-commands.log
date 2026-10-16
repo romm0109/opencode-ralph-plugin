@@ -1,0 +1,1190 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/2-discover-approve-and-verify-project-commands.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cc2-10d3-7ab2-97ae-6876cb3fd7d5
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 2 of 3
+File      : 2 of 15 — 2-discover-approve-and-verify-project-commands.md
+=== END METADATA ===
+
+TASK:
+# 2. Discover, approve, and verify project commands
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-1  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Implement /ralph-commands from codebase exploration to a user-approved, saved, verified .ralph/commands.json. Execute setup, checks, app startup/readiness, and cleanup through a platform-aware runner. Expose clear setup status in OpenCode and block project readiness when verification fails. Preserve previous verified configuration until a replacement is explicitly approved.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 156–165): one-time command discovery, approval, save, verification, and immutable run revisions.
+- `PRD.md` (lines 285–299): permissions, secret references, models and platform-aware commands.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 1: Install the plugin and run an OpenCode session](1-install-plugin-and-run-opencode-session.md): predecessor contracts and the code delivered by that slice.
+- `src/commands/project-setup.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/config/commands.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/process/runner.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/process/environment.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Use the adapter and durable store established by issue 1. Model command results as completed, timed_out, cancelled, or permission_denied rather than conflating every failure with an exit code. Store environment variable names, never secret values, in tracked JSON.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Define and propose project lifecycle commands
+
+**Files:** `src/config/commands.ts`, `src/commands/project-setup.ts`, `skills/command-discovery/SKILL.md`
+
+- **IMPLEMENT:** Define CommandSpec with stable id, phase (setup/check/start/readiness/cleanup), executable, args, cwd, timeoutMs, platform applicability, and environment references; allow an explicitly selected shell when necessary. Validate IDs, platform applicability, paths and lifecycle ordering. Dispatch a repository-exploration job that returns a proposed complete configuration and rationale, not a write approval.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import OpenCodeAdapter from src/opencode/adapter.ts and RunStore from src/state/run-store.ts. Export parseCommandConfig, CommandSpec, and ApprovedCommandConfig from src/config/commands.ts.
+- **GOTCHA:** Handle absent scripts honestly and explain unsupported platform variants. Configuration changes are a user-run setup operation, not automatic feature-agent behavior.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/02-project-commands.test.ts`; add the tests below as this slice develops.
+
+### 2. Approve, save, and verify the exact configuration
+
+**Files:** `src/process/runner.ts`, `src/process/environment.ts`, `src/commands/project-setup.ts`, `src/commands/router.ts`
+
+- **IMPLEMENT:** Present the full revision to the main session, obtain a correlated user approval, atomically save it, and run the selected lifecycle. Implement runCommand and prepareEnvironment/disposeEnvironment with owned-process tracking, timeouts, readiness and cleanup. Store verification against the configuration content hash and host platform. Surface check logs and cleanup errors in status.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import spawn from node:child_process and path helpers from node:path; export runCommand and CommandResult from runner.ts, EnvironmentLease and prepareEnvironment/disposeEnvironment from environment.ts.
+- **GOTCHA:** Do not auto-approve initial setup by skipping a timed-out check. Always attempt applicable cleanup after setup/check errors. Use argument arrays on Windows; do not rely on /bin/sh, kill -9, or Unix-only utility syntax.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/02-project-commands.test.ts`; add the tests below as this slice develops.
+
+### 3. Exercise setup approval and execution with fixtures
+
+**Files:** `tests/integration/02-project-commands.test.ts`, `tests/fixtures/process-child.ts`
+
+- **IMPLEMENT:** Test proposal rejection, modified/stale approval, successful verification, failed check, missing executable, hung setup, hung check, readiness timeout and child-tree cleanup. Use portable fixture commands to record argv/cwd and verify environment handling. Verify denied execution cannot be bypassed by the runner.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import createTestProject and createFakeOpenCode from issue 1 helpers; import public setup handler and runCommand rather than mocking their private internals.
+- **GOTCHA:** No real application credentials are needed. Concurrent resource allocation is extended in issue 8; make environment leases explicit now.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/02-project-commands.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [ ] Approval is required before executable JSON is saved; approved content and hash match what is verified.
+- [ ] Verification failure leaves project setup not-ready and reports the failing phase.
+- [ ] Startup/readiness/cleanup work for configured local services; command arguments containing spaces survive unchanged.
+- [ ] Commands and logs do not persist supplied secret values.
+- [ ] The runner enforces timeouts and records owned child processes on all supported platforms.
+- [ ] This slice's behavioral regression tests pass: `bun test tests/integration/02-project-commands.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [ ] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/02-project-commands.test.ts
+
+```
+
+**Demonstration:** Run /ralph-commands in a fixture with a check and HTTP readiness endpoint, approve it, and inspect verified status and saved JSON. Repeat with a failing command to demonstrate the readiness gate.
+
+## Blocked by
+
+- [1-install-plugin-and-run-opencode-session.md](1-install-plugin-and-run-opencode-session.md) — install the plugin and run an opencode session supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+## Completion evidence — 2026-10-15
+
+Implemented the public `/ralph-commands` router/plugin boundary, bundled read-only
+command discovery, strict lifecycle schema/platform coverage, exact revision/hash
+approval correlation, atomic command save, immutable approved revision archives,
+verification status/readiness assertion, per-command host permissions, environment
+references/redaction, bounded logs, owned process wrappers, timeouts/readiness and
+cleanup of partial startup. Save intent with approval request/session/message identity
+and verification results use the predecessor RunStore. Replacement rejection or stale
+approval preserves the previously verified file. Setup is serialized across linked
+worktrees; cwd symlink escapes are rejected at execution.
+
+TDD red/green evidence: first rejection test failed because `setupProject` did not exist;
+it passed after adding proposal/approval handling. Approved verification initially
+returned `not-ready` and became green after lifecycle execution. The HTTP/argv/secret
+fixture exposed Bun's missing IPC-channel `unref` method and canonical macOS temp-path
+behavior; corrected implementation/test expectations made it green. An overlapping
+setup test demonstrated a second configuration executing during pending approval;
+the repository lock made it green. The immutable archive assertion failed with ENOENT
+before archive storage and passed afterward. Additional failure/denial/schema/cleanup
+regressions exercise already implemented behavior through public interfaces.
+
+Validation on macOS arm64/Bun 1.4.3: `bun run typecheck` passed. The slice's
+`bun test tests/integration/02-project-commands.test.ts` has 15 passing tests.
+`bun test --timeout 30000 tests/integration` passed 90 tests, skipped 1 gated browser
+probe, failed 0 (before the final archive assertion and registered-command test were
+added; the final slice suite was rerun afterward). Predecessor suite alone passed 19.
+Biome passes all 11 changed source/test files. Repository-wide `bun run lint` fails
+only on formatting in untouched `tests/browser/dashboard.test.ts:38`; it was not edited
+because this task prohibits unrelated changes.
+
+Demonstration: the public `dispatch("ralph-commands", ..., mainSession)` boundary
+uses fake SDK repository discovery and a correlated host human approval. The portable
+fixture executes setup/check with unchanged space-containing arguments and referenced
+environment values, starts an HTTP service plus descendant, verifies the HTTP endpoint,
+cleans the tree, and inspects verified status, saved JSON, and its immutable archive.
+A failing check returns not-ready with phase/exit/log evidence and still runs cleanup;
+cleanup failure also blocks `assertProjectReady`. No application credentials are used.
+
+**Remaining blocker; this ticket is not fully complete:** the predecessor's pinned v2
+adapter explicitly lacks verified human-input provenance. Production `requestUserInput`
+continues returning unsupported; neither assistant/API-created messages nor permission
+replies are substituted for human approval. A registered-command fixture proves this
+stops before writing commands. The host's real `ctx.permission.assert` is wired for
+execution authorization, but live approval/permission interaction was not smoke-tested.
+Native Linux/Windows execution remains unrun locally; platform coverage is explicit in
+config and the runner includes Windows argument-array/tree-cleanup paths. Interrupted
+setup locks remain retained and require reconciliation rather than automatic stealing.
+
+Wiki created: `docs/wiki/features/project-commands.md`; index/open questions and
+README/compatibility limitations updated. No publication, external message or branch
+merge was performed.
+
+## Revalidation — 2026-10-15
+
+The implementation above was already present on entry; no behavioral changes were
+made or claimed. Bun 1.4.3 rerun: the issue-2 suite passed all 15 tests (61 assertions),
+including HTTP readiness/child cleanup and the registered-command refusal to save
+without a verified approval channel. Scoped Biome checks passed for the 10 relevant
+source/test files. This is revalidation, not new red/green implementation evidence.
+
+The production approval blocker remains: `createOpenCodeAdapter.requestUserInput`
+returns `unsupported`. Inspected pinned SDK form types expose answered/cancelled
+state and a public reply operation, but no responder-origin evidence; their presence
+alone does not establish the predecessor's required human-input provenance contract.
+No live human approval or native Linux/Windows execution was run. The ticket remains
+incomplete rather than treating fixture approvals as production approval evidence.
+
+Current repository-wide validation differs from the earlier evidence: typecheck
+fails on missing issue-6 `src/execution/execute-issue.ts` and
+`src/execution/integrate-issue.ts` imports. Lint reports seven errors and four warnings
+outside this slice's scoped check: formatting in `src/agents/results.ts`,
+`src/core/types.ts`, `src/git/worktrees.ts`, `src/state/run-store.ts`,
+`tests/browser/dashboard.test.ts`, and `tests/integration/06-single-issue.test.ts`,
+plus import ordering in `src/agents/results.ts` and non-null assertion warnings in
+the issue-6 test. These unrelated files were not changed. No wiki update was needed
+because this rerun changed no durable project behavior or approval contract.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll inspect the current command setup and approval boundary, then check whether this iteration can resolve the recorded blocker.
+exec
+/bin/zsh -lc "pwd; rg --files -g AGENTS.md -g package.json -g '*project-setup*' -g '*commands*' -g '*adapter*' -g 'README.md' -g 'SKILL.md' -g 'PRD.md' | head -70" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+PRD.md
+src/opencode/adapter.ts
+src/commands/project-setup.ts
+src/config/commands.ts
+skills/grill-me/SKILL.md
+skills/tdd/SKILL.md
+skills/to-issues/SKILL.md
+skills/create-prd/SKILL.md
+skills/code-review/SKILL.md
+skills/merge/SKILL.md
+skills/functional-review/SKILL.md
+skills/command-discovery/SKILL.md
+ralph-logs/iter-1-2-discover-approve-and-verify-project-commands.log
+package.json
+README.md
+docs/wiki/features/project-commands.md
+tests/integration/02-project-commands.test.ts
+
+exec
+/bin/zsh -lc "git status --short; rg -n 'requestUserInput|unsupported|approval|provenance' src/opencode/adapter.ts src/commands/project-setup.ts; cat package.json; sed -n '88,97p;156,165p;285,299p' PRD.md; rg --files tasks .ralph docs | head -65" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+src/opencode/adapter.ts:33:  requestUserInput(request: UserInputRequest): Promise<UserInputResult>;
+src/opencode/adapter.ts:199:            code: "unsupported",
+src/opencode/adapter.ts:426:    async requestUserInput(_request) {
+src/opencode/adapter.ts:430:          code: "unsupported",
+src/opencode/adapter.ts:432:            "Ralph has no verified human approval/provenance channel yet. No assistant or API-created message is accepted as approval.",
+src/commands/project-setup.ts:68:    prompt: `${instructions}\nExplore this repository using read-only tools. Return ONLY a complete JSON command configuration: schemaVersion:1, revision:${revision}, rationale, commands with id, phase(setup/check/start/readiness/cleanup), executable, args array, cwd relative to workspace, timeoutMs, platforms(darwin/linux/win32), env mapping target variable names to source variable names; optional explicit shell. Optional resources maps approved environment source names to port, namespace, or directory allocation; commands reference those source names through env. Use exclusiveResources for shared resources that cannot be isolated. Startup without an allocated port is serialized. Missing required isolation capabilities must be disclosed as setup blockers, never invent setup commands. Explain absent scripts honestly in rationale, unsupported platforms in unsupportedPlatforms. Require a check per supported platform; order lifecycle phases. Never execute commands, write files, or include secret values. This proposal is not approval.`,
+src/commands/project-setup.ts:108:  const approval = await adapter.requestUserInput(request);
+src/commands/project-setup.ts:109:  if (!approval.ok)
+src/commands/project-setup.ts:110:    return { status: "not-ready", reason: approval.error.message };
+src/commands/project-setup.ts:112:    approval.requestId !== request.requestId ||
+src/commands/project-setup.ts:113:    approval.revision !== revision ||
+src/commands/project-setup.ts:114:    approval.sessionId !== sessionId ||
+src/commands/project-setup.ts:115:    approval.source !== "user" ||
+src/commands/project-setup.ts:116:    !approval.messageId ||
+src/commands/project-setup.ts:117:    approval.text.trim() !== `approve ${hash}`
+src/commands/project-setup.ts:121:      reason: "Rejected, modified or stale approval",
+src/commands/project-setup.ts:133:      reason: "Configuration changed while awaiting approval",
+src/commands/project-setup.ts:153:      messageId: approval.messageId,
+src/commands/project-setup.ts:282:/** Canonical repository lock covers discovery, approval, save and verification. */
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+### 7.1 Project setup: `/ralph-commands`
+
+1. Explore project manifests, scripts, test patterns, local development instructions, and environment dependencies.
+2. Recommend platform-appropriate commands with a purpose, working directory, timeout, and expected result.
+3. Include dependency setup, validation checks, app startup, readiness, and cleanup where needed. Support isolated ports and test resources for concurrent worktrees.
+4. Present the complete proposal in OpenCode chat. Save executable configuration only after user approval.
+5. Save the approved JSON and verify setup and checks immediately. Persist verification status and logs.
+6. Require successfully verified project setup before `/ralph-orchestrator` starts an interview.
+
+This is normally a one-time project action. The user may explicitly rerun it to replace the configuration. Feature agents cannot append, weaken, or rewrite approved commands. New test files are allowed and should be exercised by the existing approved commands. Capture a configuration revision for each run so later setup edits do not silently alter an active run.
+### Permissions and process scope
+
+Inherit existing OpenCode permissions without silently broadening them. Preserve prompts required by that policy. For commands invoked directly by the deterministic runner, execution approval covers the exact approved configuration and run scope; do not use the runner to bypass explicit OpenCode denials. Resolve permission API support in the integration spike.
+
+Keep owned process IDs, worktree paths, and resource allocations so stopping and cleanup affect only Ralph-owned resources. Treat repository text and tool output as data; neither can approve a phase, rewrite command policy, or advance a branch through prose alone.
+
+### Local dashboard access
+
+Bind to loopback by default. Use a per-process access token and reject unauthorized cross-origin requests. Expose read-only endpoints only. Do not place credentials or raw secret values in dashboard payloads or persisted configuration. Configuration references environment variable names; runtime values remain outside tracked artifacts.
+
+### Project configuration
+
+Configuration covers command lifecycle, platform variants, working directories, timeouts, resource allocation, concurrency, role models, and skill overrides. Bundle grill-me, create-prd, to-issues, and TDD instructions and their necessary referenced resources, subject to redistribution rights. Allow explicit project replacements and record selected versions or content hashes with each run.
+
+One role may use the same model as another while still operating in an independent session. Cross-platform command definitions must preserve executable arguments and avoid accidental shell interpolation. When a shell is needed, its platform-specific choice is part of the approved configuration.
+rg: tasks: No such file or directory (os error 2)
+rg: .ralph: No such file or directory (os error 2)
+docs/package-validation.md
+docs/package-evidence-macos.json
+docs/functional-review-validation.md
+docs/recovery-validation.md
+docs/opencode-compatibility.md
+docs/wiki/open-questions.md
+docs/wiki/index.md
+docs/wiki/features/bounded-review-repairs.md
+docs/wiki/features/project-commands.md
+docs/wiki/features/feature-planning.md
+docs/wiki/features/concurrent-execution.md
+docs/wiki/features/feature-interview.md
+docs/wiki/features/workflow-recovery.md
+docs/wiki/features/package-distribution.md
+docs/wiki/features/functional-review.md
+docs/wiki/features/execution-baseline.md
+docs/wiki/features/independent-code-review.md
+docs/wiki/features/executor-questions.md
+docs/wiki/features/single-issue-integration.md
+docs/wiki/features/read-only-dashboard.md
+docs/wiki/features/ralph-task-loop.md
+docs/wiki/features/plugin-session-results.md
+docs/review-loop-validation.md
+docs/troubleshooting.md
+
+exec
+/bin/zsh -lc "sed -n '1,100p;390,465p' src/opencode/adapter.ts; cat docs/opencode-compatibility.md; cat docs/wiki/features/project-commands.md; rg --files .agents | head -25; rg --files | rg '1-install|2-discover|backlog/.*/README|process/(runner|environment)'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+import { randomUUID } from "node:crypto";
+import {
+  OpenCode,
+  type OpenCodeClient,
+  type SessionApi,
+  type V2Event,
+} from "@opencode/client";
+import { executorQuestionSchema } from "../agents/results.js";
+import type {
+  Failure,
+  JobEnvelope,
+  JobResult,
+  UserInputRequest,
+  UserInputResult,
+} from "../core/types.js";
+import type { RunStore } from "../state/run-store.js";
+import { ralphBridge } from "./bridge.js";
+
+export interface OpenCodeAdapter {
+  getSessionModel?(sessionId: string): Promise<JobEnvelope["model"]>;
+  /** Explicit host permission; no SDK denial may fall back to direct execution. */
+  authorizeCommand?(request: {
+    job: JobEnvelope;
+    command: import("../config/commands.js").CommandSpec;
+    hash: string;
+  }): Promise<{ ok: boolean; error?: Failure }>;
+  inspectSession?(
+    job: JobEnvelope,
+  ): Promise<"idle" | "busy" | "missing" | "unknown">;
+  discoverTools?(workspace: string): Promise<string[]>;
+  dispatchJob(job: JobEnvelope): Promise<JobResult>;
+  cancelJob(job: JobEnvelope): Promise<{ ok: boolean; error?: Failure }>;
+  requestUserInput(request: UserInputRequest): Promise<UserInputResult>;
+  publishStatus(
+    sessionId: string,
+    workspace: string,
+    text: string,
+  ): Promise<{ ok: boolean; error?: Failure }>;
+  receiveEvent(event: V2Event): Promise<void>;
+}
+
+export interface AdapterHost {
+  assertCommandPermission?(
+    sessionId: string,
+    command: import("../config/commands.js").CommandSpec,
+    hash: string,
+  ): Promise<void>;
+  session: Pick<
+    SessionApi,
+    "create" | "get" | "prompt" | "wait" | "context" | "interrupt"
+  > &
+    Partial<Pick<SessionApi, "active">>;
+  tools(workspace: string): Promise<string[]>;
+  prepareReview(workspace: string, tools: string[]): Promise<void>;
+  notify(workspace: string, text: string): Promise<void>;
+}
+
+export function createAdapterClient(
+  baseUrl: string,
+  fetch?: (input: Request) => Promise<Response>,
+  headers?: RequestInit["headers"],
+): OpenCodeClient & AdapterHost {
+  const client = OpenCode.make({
+    baseUrl,
+    ...(headers ? { headers } : {}),
+    ...(fetch
+      ? {
+          fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
+            fetch(new Request(input, init))) as typeof globalThis.fetch,
+        }
+      : {}),
+  });
+  const bridge = client.rpc(ralphBridge);
+  return Object.assign(client, {
+    tools: (workspace: string) =>
+      bridge.tools({}, { location: { directory: workspace } }),
+    prepareReview: async (workspace: string, tools: string[]) => {
+      await bridge.prepareReview(
+        { tools },
+        { location: { directory: workspace } },
+      );
+    },
+    notify: async (workspace: string, text: string) => {
+      await bridge.publishStatus(
+        { text },
+        { location: { directory: workspace } },
+      );
+    },
+  });
+}
+
+function statusOf(cause: unknown): number | undefined {
+  if (!cause || typeof cause !== "object") return undefined;
+  const value = cause as { status?: number; cause?: unknown };
+  return (
+    value.status ?? (value.cause !== cause ? statusOf(value.cause) : undefined)
+  );
+}
+function failure(cause: unknown): Failure {
+  const message =
+            raw.kind === "needs_input"
+          )
+            question = executorQuestionSchema.parse(raw);
+        }
+        const result: JobResult = {
+          ...bound,
+          outcome: question ? "needs_input" : "completed",
+          ...(question ? { question } : {}),
+          text,
+          evidence: [assistant.id],
+        };
+        await store.recordResult(result);
+        const current = (await store.getRun(job.runId))?.jobs[job.jobId];
+        return current?.envelope.attempt === job.attempt && current.result
+          ? current.result
+          : { ...bound, outcome: "cancelled", evidence: [] };
+      } catch (cause) {
+        return finish(bound, failure(cause));
+      }
+    },
+    async cancelJob(job) {
+      const entry = (await store.getRun(job.runId))?.jobs[job.jobId];
+      if (!entry || entry.envelope.attempt !== job.attempt)
+        return {
+          ok: false,
+          error: { code: "sdk-error", message: "Unknown or stale job" },
+        };
+      if (entry.status === "terminal") return { ok: true };
+      await store.recordResult({
+        ...entry.envelope,
+        outcome: "cancelled",
+        evidence: [],
+        error: { code: "cancelled", message: "Cancellation requested" },
+      });
+      return abortSession(entry.envelope);
+    },
+    async requestUserInput(_request) {
+      return {
+        ok: false,
+        error: {
+          code: "unsupported",
+          message:
+            "Ralph has no verified human approval/provenance channel yet. No assistant or API-created message is accepted as approval.",
+        },
+      };
+    },
+    async publishStatus(_sessionId, workspace, text) {
+      try {
+        await client.notify(workspace, text);
+        return { ok: true };
+      } catch (cause) {
+        return { ok: false, error: failure(cause) };
+      }
+    },
+    async receiveEvent(event) {
+      if (event.type !== "permission.replied" || event.data.reply !== "reject")
+        return;
+      for (const run of await store.listRuns()) {
+        for (const entry of Object.values(run.jobs)) {
+          if (
+            entry.status !== "terminal" &&
+            entry.envelope.sessionId === event.data.sessionID
+          )
+            await finish(entry.envelope, {
+              code: "permission-denied",
+              message: "OpenCode permission rejected",
+              cause: event.data,
+            });
+        }
+      }
+    },
+  };
+}
+# OpenCode compatibility
+
+## Supported combination
+
+This package targets **OpenCode 2.0.29**. Its server/TUI definitions and typed adapter use the v2 API; v1 hosts are no longer supported. Version 0.2.0 replaces the earlier 1.19.0 integration.
+
+| Component | Exact version |
+| --- | --- |
+| `@opencode/cli` (development/test CLI) | 2.0.29 |
+| `@opencode/plugin`, `@opencode/client`, `@opencode/schema` | 2.0.29 |
+| Bun | 1.4.3 |
+| TypeScript / Biome | 5.9.3 / 2.4.6 |
+
+The real-server smoke probe builds, packs, installs and loads the package in an isolated Git repository. On macOS arm64 it exercises completed sessions, direct commands without model calls, event subscription, denied shell execution, linked-worktree observation restrictions, persistence, restart, explicit resume, interruption and status RPC. The deterministic local model proves the host boundary, not credentialed external-provider behavior. Native Linux/Windows results remain pending CI.
+
+## Installation and entry points
+
+Follow [README](../README.md). Configure `plugins` with the installed **package directory**, preferably a canonical, encoded file URL. Do not use the old `plugin` entry pointing to `dist/plugin.js`. OpenCode resolves `server.js` and `tui.js` from that directory; both have default definitions with `id: 'ralph'` and `setup(context)`. Package imports also expose `/server` and `/tui`.
+
+Tests use `node_modules/@opencode/cli/bin/opencode.exe`, including on macOS/Linux. The manifest trusts this pinned CLI's postinstall script. Version changes require new runtime evidence, not just a dependency bump.
+
+V2 activates external plugins asynchronously. Wait for command registration before dispatching external jobs; otherwise initial recovery may encounter newly recorded job intent. Local configuration changes require host activation/reload to complete.
+
+Command registration can be visible before `plugin.list` publishes the active plugin. The installed-package probe also waits for that inventory entry before checking server/TUI features. This preserves the supported v2 mapping described in the [official plugin documentation](https://opencode.ai/v2/docs/build/plugins/); the ticket's proposed `@opencode-ai/plugin` import belongs to v1.
+
+## Session adapter
+
+`src/opencode/adapter.ts` accepts a narrow `AdapterHost`; `createAdapterClient` supplies it over the real v2 client and Ralph RPC. The plugin supplies the host's native session domain. V2 calls use flattened options and throw typed/transport failures rather than returning v1 `{ data, error, response }` envelopes.
+
+```ts
+const client = createAdapterClient(url, undefined, {
+  Authorization: `Basic ${btoa('opencode:' + password)}`,
+});
+const session = await client.session.create({
+  location: { directory }, title,
+  model: { providerID, id: modelID },
+});
+const receipt = await client.session.prompt({ sessionID: session.id, text });
+await client.session.wait({ sessionID: session.id });
+const history = await client.session.context({ sessionID: session.id });
+await client.session.interrupt({ sessionID: session.id });
+await client.session.command({ sessionID: session.id, name: 'ralph-status', text: runId });
+const commands = await client.command.list({ location: { directory } });
+for await (const event of client.event.subscribe({ signal })) { /* v2 event.data */ }
+```
+
+Job intent is durable before session creation; the returned session ID is durable before prompting. Workspace selection occurs at session creation; subsequent calls target that session ID. Model fields map from Ralph's `{ providerID, modelID }` contract to v2 `{ providerID, id }`.
+
+Prompt acknowledgment is not completion. The adapter waits, finds the delivered user message with the receipt's ID, and checks the subsequent turn. Success requires completed assistant text, `finish: 'stop'`, a successful idle record and no failed tools or session errors. Unexpected subsequent input makes correlation uncertain and returns missing output. Earlier failed/denied tools, including caught code-mode failures in tool metadata, cannot be erased by later assistant success.
+
+Cancellation is recorded before interruption. Journals retain the existing `session.abort` operation kind for compatibility with persisted state; v2 uses `session.interrupt` underneath. A late-created cancelled session is interrupted without prompting. Stale results cannot update superseded attempts.
+
+## Commands, observations and notifications
+
+Commands register with `context.command.transform`; tools register with `context.tool.transform`. Status/pause/resume/stop execute directly. The exact command output is queued as a synthetic inbox item with `resume: false`, and a status event notifies the TUI without waking the model. Pending output can be inspected with `client.session.inbox.list`; it is consumed on the next session execution. Status never depends on generated assistant text.
+
+V2 does not expose the plugin tool catalog as a public client endpoint. `src/opencode/bridge.ts` defines location-scoped Ralph RPC for tool discovery, observation preparation and status notification. Review sessions expose only `ralph_review_*` aliases of permitted observation tools. Aliases retain each original tool's permission action and execution function. Context filtering hides mutation tools and code-mode `execute`; the execution hook also rejects unapproved calls. Normal sessions retain their original tools and hide the observation aliases. Host denials are never changed to allows and no permissions are automatically approved.
+
+The TUI entry listens for `rpc.ralph.status` in its location and shows an informational toast; cleanup unsubscribes. Server-only consumers can subscribe to status RPC events and use the durable status/dashboard. Interactive TUI rendering has unit contract coverage; native interactive/platform validation remains pending.
+
+## Recovery and remaining limits
+
+The canonical Git common directory owns `<git-common-dir>/ralph/runs`. Its fsynced JSONL journal remains authoritative; snapshots use atomic rename and writers use ownership-verified locks. Linked worktrees share state. Multiple v2 locations in one server recover that state once and only the last location's cleanup stops shared work. Restart still requires explicit resume and never resets attempts or review budgets. No new state schema or migration is needed for existing journals.
+
+V2 exposes session forms, but Ralph's human-input/approval provenance workflow is still absent. `requestUserInput` remains explicitly unsupported; neither assistant text nor API-created user messages establish human approval. The command setup workflow now validates correlated host-supplied approvals and lifecycle execution in fixtures, with production execution permissions delegated to `ctx.permission.assert`. Production human approval remains unsupported. Deterministic installed-package coverage now includes setup, interview/PRD/graph approval, baseline, issue execution/integration and explicit dual-review coordination. The scheduler automatically starts code review only; functional lifecycle options must be supplied by a host. See [README](../README.md) and [package validation](package-validation.md).
+
+## Reproduce
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run lint
+bun run test
+OPENCODE_SMOKE=1 bun run test:smoke
+bun run test:package
+```
+
+On PowerShell set `$env:OPENCODE_SMOKE='1'` before running the smoke suite. The local probe uses an isolated test-only Basic-auth password. The separate live probe requires `OPENCODE_LIVE_SMOKE=1`, `OPENCODE_SMOKE_URL`, `OPENCODE_SMOKE_MODEL=provider/model` and the server's `OPENCODE_SMOKE_PASSWORD`; without its opt-in/endpoint/model it is skipped. Do not put credentials in package resources or fixture data.
+
+## Issue 1 verification — 2026-10-14
+
+- macOS arm64, Bun 1.4.3: typecheck and lint passed; all 19 issue-1 integration tests passed.
+- `OPENCODE_SMOKE=1 bun test tests/smoke/opencode.test.ts`: **2 passed, 1 skipped**. The fresh-source install uses only the manifest/lockfile and an empty package cache. The installed-package probe builds, packs and loads Ralph in real OpenCode 2.0.29, correlates its local model response through the public router/adapter, preserves permission denial, observes events and verifies status after host restart.
+- Red/green evidence: the empty-cache install failed with `ENOENT extracting tarball from opencode-ralph-plugin` before removing the accidental self-dependency from the manifest and regenerating the lockfile. It then passed. A warm cache had concealed the missing archive. Package installation must not depend on a previously built copy of itself.
+- The real probe initially failed on an unpublished plugin inventory entry; the probe now waits for active inventory independently of command registration, retaining its TUI assertion.
+- Fresh-install checks are gated because they download dependencies; the deterministic issue-1 suite requires neither network model access nor paid calls. Credentialed external-provider execution was skipped. Linux and Windows have CI jobs but were not run here; interactive TUI and human-response provenance remain unverified/unsupported as described above.
+
+## Packaged workflow verification — 2026-10-15
+
+macOS arm64, Bun 1.4.3 and the pinned OpenCode 2.0.29 combination passed the installed host smoke (3 passed across the smoke suite, 1 credentialed-provider skip), complete deterministic two-consumer setup-to-report test, six Chromium checks, typecheck/lint and the integration suite (194 passed, 1 separately gated browser smoke skipped). The demo performs real Git/TDD/integration and a real timeout omission; human responses and agent prose are supplied at the public adapter boundary. Full results, reproducible commands and remaining production/native-platform blockers are recorded in [package validation](package-validation.md). No Linux, native Windows or credentialed full-workflow success is claimed by these local results.
+# Project lifecycle commands
+
+## Summary
+`/ralph-commands` discovers a complete lifecycle in an independent read-only session,
+presents the full revision and content hash, then requires a correlated human approval
+before atomically replacing `.ralph/commands.json`. Verification runs only approved
+commands and records the exact hash and host platform in `.ralph/verification.json`.
+
+## Key behavior
+- Rejection, modified/stale approval, and an unavailable approval channel preserve the
+  previous configuration and verification. A repository-wide setup lock prevents
+  overlapping approval/save/verification; an interrupted lock requires reconciliation.
+- Supported platforms need checks; excluded platforms need explicit reasons. Startup
+  needs readiness. Phase ordering, IDs, relative paths, arguments, timeouts and variable
+  references are validated. Runtime checks reject cwd symlink escapes.
+- Every execution needs an adapter host permission assertion. Missing/denied permission
+  never falls back to spawning. Production permission checks use `ctx.permission.assert`.
+- Configurations contain environment variable names; referenced values are resolved at
+  runtime and redacted from captured output. Only system variables and approved references
+  reach children. Output is bounded and redacted after collection.
+- Wrappers own process groups on POSIX; Windows uses argument arrays and taskkill tree
+  cleanup. Setup/check errors, deadlines and partial startup still attempt cleanup.
+- Initial verification never skips timed-out checks. Failed phases and cleanup errors
+  remain visible. `assertProjectReady` checks status, hash, revision and platform.
+- Save intent/approval correlation and verification result use the durable RunStore.
+  Approved revisions are archived by hash under its `command-revisions` directory.
+  The saved file is the immutable command authority for a run; changing it invalidates
+  verification and subsequent command execution.
+
+## Code references
+- `src/config/commands.ts` — schema and exact revision hash.
+- `src/commands/project-setup.ts` — proposal, correlated approval, save and readiness gate.
+- `src/commands/router.ts`, `src/plugin.ts` — public command/status boundary.
+- `src/process/runner.ts`, `src/process/command-child.ts` — permission, runtime environment,
+  result classification and process ownership.
+- `src/process/environment.ts` — approved lifecycle implementation compatible with review.
+- `skills/command-discovery/SKILL.md` — bundled discovery instructions.
+- `tests/integration/02-project-commands.test.ts` — fixture approval and lifecycle evidence.
+
+## Notes
+Production `requestUserInput` remains explicitly unsupported from the predecessor
+compatibility spike: SDK-created messages and permission replies have no verified human
+provenance. Consequently production setup stops before saving; correlated fixture
+approvals demonstrate the workflow, not a live human approval channel. Native Linux and
+Windows execution are unrun locally. Interrupted setup locks are deliberately retained
+rather than silently stolen; automatic reconciliation is not implemented for this lock.
+
+## Last updated
+2026-10-15
+.agents/issues/2-discover-approve-and-verify-project-commands.md
+.agents/issues/6-execute-and-integrate-one-issue-with-tdd.md
+.agents/issues/11-review-completed-feature-code.md
+.agents/issues/3-interview-and-approve-feature-explanation.md
+.agents/issues/1-install-plugin-and-run-opencode-session.md
+.agents/issues/7-retry-failed-work-and-skip-hung-checks.md
+.agents/issues/4-generate-prd-and-approve-issue-graph.md
+.agents/issues/12-verify-acceptance-with-browser-and-http.md
+.agents/issues/9-resolve-executor-questions-in-opencode.md
+.agents/issues/13-repair-findings-within-three-review-rounds.md
+.agents/issues/8-execute-dependency-ready-issues-concurrently.md
+.agents/issues/10-observe-execution-in-read-only-dashboard.md
+.agents/issues/5-prepare-feature-branch-and-validate-baseline.md
+.agents/issues/15-verify-packaged-workflow-across-platforms.md
+.agents/issues/14-pause-stop-and-recover-interrupted-workflows.md
+src/process/runner.ts
+src/process/environment.ts
+ralph-logs/iter-2-1-install-plugin-and-run-opencode-session.log
+ralph-logs/iter-1-1-install-plugin-and-run-opencode-session.log
+ralph-logs/iter-1-2-discover-approve-and-verify-project-commands.log
+
+exec
+/bin/zsh -lc "cat .agents/issues/README.md; sed -n '1,130p' .agents/issues/1-install-plugin-and-run-opencode-session.md; rg -n 'form|provenance|human' node_modules/@opencode/client/dist/*.d.ts node_modules/@opencode/schema/dist/*.d.ts | head -65" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+cat: .agents/issues/README.md: No such file or directory
+# 1. Install the plugin and run an OpenCode session
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-8  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Deliver an installable TypeScript plugin whose /ralph-status command reports a durable local run/session result. Exercise a real OpenCode session through a typed adapter, including directory routing and inherited permission behavior. Establish the minimal store, test fixtures, and command dispatch path used by subsequent slices. Pin versions only after the installed package and cross-platform smoke probe demonstrate compatibility.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 101–152): OpenCode lifecycle, deterministic orchestration, persistence, and job identity.
+- `PRD.md` (lines 267–299): compatibility spike, permission policy, and configuration.
+- `PRD.md` (lines 303–351): command surface and durable records.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+
+- `package.json`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/plugin.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/opencode/adapter.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/core/types.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/state/run-store.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/commands/router.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+No implementation exists yet. Establish lower-kebab-case module filenames, named exports, strict TypeScript, and a small OpenCode adapter as the only SDK boundary. Keep feature policy outside SDK callbacks. Represent expected failures as typed results and persist operation intent before side effects; do not infer successful jobs from session.idle alone.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+**Additional constraint:** The compatibility spike is an explicit deliverable, not missing research that later tickets must repeat. Downstream module contracts below are proposed interfaces to establish here.
+
+## Step-by-step tasks
+
+### 1. Establish the runnable package and integration probe
+
+**Files:** `package.json`, `tsconfig.json`, `src/plugin.ts`, `docs/opencode-compatibility.md`
+
+- **IMPLEMENT:** Pin a tested OpenCode/plugin/SDK/Bun combination and expose a plugin entry point. Add typecheck, lint, build, test, test:browser, and test:smoke scripts; later slices supply their named tests. Demonstrate command registration, session creation/prompt/result/abort, workspace-directory routing, event delivery, user response provenance, and permission denial handling. Register a harmless status command through the supported configuration mechanism; do not invent a slash-command registration API.
+- **PATTERN:** Establish the greenfield adapter/state/test conventions above; see PRD.md:101 and PRD.md:148.
+- **IMPORTS:** Import type Plugin from @opencode-ai/plugin; use the supplied plugin client behind the adapter. Import external SDK types only in src/opencode/adapter.ts.
+- **GOTCHA:** Document exact installed versions and working API signatures. If an API requirement is unsupported, record the limitation and do not substitute a detached daemon or silently bypass permissions.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/01-plugin.test.ts`; add the tests below as this slice develops.
+
+### 2. Persist and display a correlated session result
+
+**Files:** `src/opencode/adapter.ts`, `src/core/types.ts`, `src/state/run-store.ts`, `src/commands/router.ts`
+
+- **IMPLEMENT:** Define OpenCodeAdapter with dispatchJob, cancelJob, requestUserInput, and publishStatus contracts. Define JobEnvelope, JobResult, RunRecord, and RunEvent with run/job/attempt/session/commit identities. Create openRunStore with atomic snapshots, append-only events, monotonically increasing revisions, and intent/result recording. /ralph-status returns phase, last result, and errors; persist and reload the same result after reopening the plugin.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; keep session effects behind the adapter.
+- **IMPORTS:** Export createOpenCodeAdapter and the OpenCodeAdapter type from the adapter; export openRunStore and RunStore from the store; import domain types with import type from src/core/types.ts.
+- **GOTCHA:** Resolve repository identity through git rev-parse --git-common-dir using argument arrays. Keep runtime files ignored and canonical across linked worktrees. The source repository currently has no initial commit; test fixtures must initialize their own repositories.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/01-plugin.test.ts`; add the tests below as this slice develops.
+
+### 3. Prove the command-to-session-to-status path
+
+**Files:** `tests/helpers/project.ts`, `tests/helpers/fake-opencode.ts`, `tests/integration/01-plugin.test.ts`, `tests/smoke/opencode.test.ts`
+
+- **IMPLEMENT:** Implement createTestProject for isolated temporary Git repositories and createFakeOpenCode for controllable jobs, approvals, and events. Add behavioral tests for persistent status, denied permissions, directory routing, duplicate events, and late results. Add an explicitly gated real OpenCode smoke probe and initial macOS/Linux/Windows CI coverage.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; keep session effects behind the adapter.
+- **IMPORTS:** Import test, expect, and describe from bun:test; use node:fs/promises, node:os, node:path, and node:child_process for fixtures.
+- **GOTCHA:** Never require paid model calls for the deterministic test suite. Missing live-smoke credentials must be reported as skipped rather than passed.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/01-plugin.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [ ] An installed package exposes /ralph-status and can correlate an actual session response with a persisted job.
+- [ ] A denied OpenCode operation remains denied; direct process execution is not used as a fallback.
+- [ ] Two linked worktrees resolve the same canonical run store; separate repositories do not.
+- [ ] Reopening the store returns identical job identity and ordered events; duplicate completion does not transition twice.
+- [ ] Exact versions, supported platform results, and usable adapter signatures are recorded in docs/opencode-compatibility.md.
+- [ ] This slice's behavioral regression tests pass: `bun test tests/integration/01-plugin.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [ ] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/01-plugin.test.ts
+
+```
+
+**Demonstration:** Install the built package in an isolated fixture, run the gated OpenCode smoke probe, invoke /ralph-status, and confirm the same persisted job result after reopening OpenCode.
+
+## Blocked by
+
+None — can start immediately.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+2026-10-14: Existing implementation retained and verified. Removed an accidental local tarball self-dependency and regenerated `bun.lock`, restoring fresh installation. Added an empty-cache, isolated manifest/lockfile install probe: red (`ENOENT extracting tarball from opencode-ralph-plugin`) before the fix, green afterward. Corrected an observed smoke race by waiting for active plugin inventory after command registration; both server/TUI entry-point assertions remain.
+
+Validation: `bun run typecheck` and `bun run lint` passed. `bun test tests/integration/01-plugin.test.ts`: 19 passed. `OPENCODE_SMOKE=1 bun test tests/smoke/opencode.test.ts`: 2 passed, 1 skipped on macOS arm64/Bun 1.4.3/OpenCode 2.0.29. The latter builds/packs/installs Ralph, runs a real OpenCode session with a local deterministic model, invokes status, and verifies the correlated result after restarting the host. Permission denial, directory routing, events and interruption are exercised.
+
+Exact v2 signatures, the departure from the proposed v1 package import, and results are in `docs/opencode-compatibility.md`; wiki updated in `docs/wiki/features/plugin-session-results.md`. Native Linux/Windows checks remain pending CI, credentialed live-provider execution was skipped, interactive TUI rendering remains unverified, and human-input provenance is explicitly unsupported. No publication or target-branch merge performed.
+node_modules/@opencode/schema/dist/config.d.ts:8:import { ConfigFormatter } from "./config/formatter.js";
+node_modules/@opencode/schema/dist/config.d.ts:68:    readonly formatter: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Union<readonly [Schema.Boolean, Schema.$Record<Schema.String, typeof ConfigFormatter.Entry>]>>>, Schema.optionalKey<Schema.Union<readonly [Schema.Boolean, Schema.$Record<Schema.String, typeof ConfigFormatter.Entry>]>>, never, never>;
+node_modules/@opencode/schema/dist/index.d.ts:8:export { Form } from "./form.js";
+node_modules/@opencode/schema/dist/form.d.ts:1:export * as Form from "./form.js";
+node_modules/@opencode/schema/dist/form.d.ts:25:    readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:161:    readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:281:    readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:402:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:554:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:692:        readonly type: Schema.Literal<"form.created">;
+node_modules/@opencode/schema/dist/form.d.ts:713:            readonly form: Schema.Struct<{
+node_modules/@opencode/schema/dist/form.d.ts:716:                    readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:842:        type: "form.created";
+node_modules/@opencode/schema/dist/form.d.ts:846:            readonly form: Schema.Struct<{
+node_modules/@opencode/schema/dist/form.d.ts:849:                    readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:981:        readonly type: Schema.Literal<"form.replied">;
+node_modules/@opencode/schema/dist/form.d.ts:1009:        type: "form.replied";
+node_modules/@opencode/schema/dist/form.d.ts:1026:        readonly type: Schema.Literal<"form.cancelled">;
+node_modules/@opencode/schema/dist/form.d.ts:1053:        type: "form.cancelled";
+node_modules/@opencode/schema/dist/form.d.ts:1069:        readonly type: Schema.Literal<"form.created">;
+node_modules/@opencode/schema/dist/form.d.ts:1090:            readonly form: Schema.Struct<{
+node_modules/@opencode/schema/dist/form.d.ts:1093:                    readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:1219:        type: "form.created";
+node_modules/@opencode/schema/dist/form.d.ts:1223:            readonly form: Schema.Struct<{
+node_modules/@opencode/schema/dist/form.d.ts:1226:                    readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/form.d.ts:1357:        readonly type: Schema.Literal<"form.replied">;
+node_modules/@opencode/schema/dist/form.d.ts:1385:        type: "form.replied";
+node_modules/@opencode/schema/dist/form.d.ts:1401:        readonly type: Schema.Literal<"form.cancelled">;
+node_modules/@opencode/schema/dist/form.d.ts:1428:        type: "form.cancelled";
+node_modules/@opencode/schema/dist/integration.d.ts:13:    readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:15:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:133:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:264:    readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:266:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:384:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:502:/** Saves a reference to credentials managed outside opencode, configured by the form answers. */
+node_modules/@opencode/schema/dist/integration.d.ts:509:    readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:511:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:629:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:757:    readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:759:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:877:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:1002:    readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:1004:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:1122:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:1243:    readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:1245:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:1363:        readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:1568:        readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:1570:            readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:1688:            readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:1813:        readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:1815:            readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:1933:            readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:2054:        readonly form: Schema.decodeTo<Schema.optional<Schema.toType<Schema.NonEmptyArray<Schema.Union<readonly [Schema.Struct<{
+node_modules/@opencode/schema/dist/integration.d.ts:2056:            readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/integration.d.ts:2174:            readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+node_modules/@opencode/schema/dist/session-provider-context.d.ts:32:    readonly provenance: Schema.Struct<{
+node_modules/@opencode/schema/dist/event-manifest.d.ts:3904:            readonly provenance: Schema.Struct<{
+node_modules/@opencode/schema/dist/event-manifest.d.ts:3927:            readonly provenance: Schema.Struct<{
+node_modules/@opencode/schema/dist/event-manifest.d.ts:4035:            readonly provenance: Schema.Struct<{
+node_modules/@opencode/schema/dist/event-manifest.d.ts:4058:            readonly provenance: Schema.Struct<{
+node_modules/@opencode/schema/dist/event-manifest.d.ts:5473:    readonly type: Schema.Literal<"form.created">;
+node_modules/@opencode/schema/dist/event-manifest.d.ts:5494:        readonly form: Schema.Struct<{
+node_modules/@opencode/schema/dist/event-manifest.d.ts:5497:                readonly format: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>>, Schema.optionalKey<Schema.Literals<readonly ["email", "uri", "date", "date-time"]>>, never, never>;
+
+exec
+/bin/zsh -lc 'bun test tests/integration/02-project-commands.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun --version; bun run typecheck' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 96ms:
+$ biome check src tests scripts
+Checked 98 files in 107ms. No fixes applied.
+
+ succeeded in 1490ms:
+1.4.3
+$ tsc --noEmit
+
+ succeeded in 4957ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/02-project-commands.test.ts:
+(pass) rejected proposal never saves executable configuration [179.34ms]
+(pass) approved exact revision is saved and verified through the command boundary [281.31ms]
+(pass) lifecycle preserves argv and environment, verifies HTTP readiness and cleans the child tree [964.35ms]
+(pass) failed check blocks readiness and still attempts cleanup [423.78ms]
+(pass) hung setup is timed out, never skipped during initial verification [360.22ms]
+(pass) hung check is timed out, never skipped during initial verification [340.53ms]
+(pass) denied execution is never bypassed, even after configuration approval [102.13ms]
+(pass) modified, stale and rejected replacement approvals preserve the verified configuration [302.06ms]
+(pass) overlapping setup cannot replace a pending approval [82.60ms]
+(pass) missing executable reports its cause and cleanup still runs [399.79ms]
+(pass) readiness deadline blocks setup and disposes the partially started service [540.88ms]
+(pass) public runner requires host execution permission and reports cancellation [322.37ms]
+(pass) invalid platform coverage, paths and ordering fail before approval [106.99ms]
+(pass) cleanup errors remain visible and invalidate readiness [408.24ms]
+(pass) registered OpenCode setup command discloses unavailable human approval and saves nothing [166.55ms]
+
+ 15 pass
+ 0 fail
+ 61 expect() calls
+Ran 15 tests across 1 file. [5.06s]
+
+codex
+The existing implementation passes all 15 command tests, and repository-wide typecheck and lint now pass. The approval blocker remains: the production adapter returns `unsupported` for human input, so setup stops before saving. I’ll record these results and leave that boundary intact.
+exec
+/bin/zsh -lc "sed -n '975,1025p' node_modules/@opencode/schema/dist/form.d.ts; rg -n 'reply|FormApi|form:' node_modules/@opencode/client/dist/session.d.ts | head -25; tail -12 .agents/issues/2-discover-approve-and-verify-project-commands.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+    Replied: Schema.Struct<{
+        readonly id: Schema.brand<Schema.String, "Event.ID"> & {
+            create: () => string & import("effect/Brand").Brand<"Event.ID">;
+        };
+        readonly created: Schema.Finite;
+        readonly metadata: Schema.decodeTo<Schema.optional<Schema.toType<Schema.$Record<Schema.String, Schema.Unknown>>>, Schema.optionalKey<Schema.$Record<Schema.String, Schema.Unknown>>, never, never>;
+        readonly type: Schema.Literal<"form.replied">;
+        readonly location: Schema.decodeTo<Schema.optional<Schema.toType<Schema.Struct<{
+            readonly directory: Schema.brand<Schema.String, "AbsolutePath">;
+            readonly workspaceID: Schema.decodeTo<Schema.optional<Schema.toType<Schema.brand<Schema.String, "Workspace.ID"> & {
+                ascending: (id?: string) => string & import("effect/Brand").Brand<"Workspace.ID">;
+                create: () => string & import("effect/Brand").Brand<"Workspace.ID">;
+            }>>, Schema.optionalKey<Schema.brand<Schema.String, "Workspace.ID"> & {
+                ascending: (id?: string) => string & import("effect/Brand").Brand<"Workspace.ID">;
+                create: () => string & import("effect/Brand").Brand<"Workspace.ID">;
+            }>, never, never>;
+        }>>>, Schema.optionalKey<Schema.Struct<{
+            readonly directory: Schema.brand<Schema.String, "AbsolutePath">;
+            readonly workspaceID: Schema.decodeTo<Schema.optional<Schema.toType<Schema.brand<Schema.String, "Workspace.ID"> & {
+                ascending: (id?: string) => string & import("effect/Brand").Brand<"Workspace.ID">;
+                create: () => string & import("effect/Brand").Brand<"Workspace.ID">;
+            }>>, Schema.optionalKey<Schema.brand<Schema.String, "Workspace.ID"> & {
+                ascending: (id?: string) => string & import("effect/Brand").Brand<"Workspace.ID">;
+                create: () => string & import("effect/Brand").Brand<"Workspace.ID">;
+            }>, never, never>;
+        }>>, never, never>;
+        readonly data: Schema.Struct<{
+            readonly id: Schema.brand<Schema.String, "Form.ID"> & {
+                create: (id?: string) => string & import("effect/Brand").Brand<"Form.ID">;
+            };
+            readonly sessionID: Schema.String;
+            readonly answer: Schema.$Record<Schema.String, Schema.Union<readonly [Schema.String, Schema.Number, Schema.Boolean, Schema.$Array<Schema.String>]>>;
+        }>;
+    }> & {
+        type: "form.replied";
+        durability: "ephemeral";
+        durable: undefined;
+        data: Schema.Struct<{
+            readonly id: Schema.brand<Schema.String, "Form.ID"> & {
+                create: (id?: string) => string & import("effect/Brand").Brand<"Form.ID">;
+            };
+            readonly sessionID: Schema.String;
+            readonly answer: Schema.$Record<Schema.String, Schema.Union<readonly [Schema.String, Schema.Number, Schema.Boolean, Schema.$Array<Schema.String>]>>;
+        }>;
+    };
+    Cancelled: Schema.Struct<{
+        readonly id: Schema.brand<Schema.String, "Event.ID"> & {
+            create: () => string & import("effect/Brand").Brand<"Event.ID">;
+        };
+        readonly created: Schema.Finite;
+        readonly metadata: Schema.decodeTo<Schema.optional<Schema.toType<Schema.$Record<Schema.String, Schema.Unknown>>>, Schema.optionalKey<Schema.$Record<Schema.String, Schema.Unknown>>, never, never>;
+rg: node_modules/@opencode/client/dist/session.d.ts: IO error for operation on node_modules/@opencode/client/dist/session.d.ts: No such file or directory (os error 2)
+No live human approval or native Linux/Windows execution was run. The ticket remains
+incomplete rather than treating fixture approvals as production approval evidence.
+
+Current repository-wide validation differs from the earlier evidence: typecheck
+fails on missing issue-6 `src/execution/execute-issue.ts` and
+`src/execution/integrate-issue.ts` imports. Lint reports seven errors and four warnings
+outside this slice's scoped check: formatting in `src/agents/results.ts`,
+`src/core/types.ts`, `src/git/worktrees.ts`, `src/state/run-store.ts`,
+`tests/browser/dashboard.test.ts`, and `tests/integration/06-single-issue.test.ts`,
+plus import ordering in `src/agents/results.ts` and non-null assertion warnings in
+the issue-6 test. These unrelated files were not changed. No wiki update was needed
+because this rerun changed no durable project behavior or approval contract.
+
+apply patch
+patch: completed
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/2-discover-approve-and-verify-project-commands.md
+diff --git a/.agents/issues/2-discover-approve-and-verify-project-commands.md b/.agents/issues/2-discover-approve-and-verify-project-commands.md
+index c9b7c9ae4b92d2c006d2cb7aede60bce7b54edb2..2f6f55ed3301c4cce63067fee8d65767d46277b4
+--- a/.agents/issues/2-discover-approve-and-verify-project-commands.md
++++ b/.agents/issues/2-discover-approve-and-verify-project-commands.md
+@@ -177,3 +177,22 @@
+ plus import ordering in `src/agents/results.ts` and non-null assertion warnings in
+ the issue-6 test. These unrelated files were not changed. No wiki update was needed
+ because this rerun changed no durable project behavior or approval contract.
++
++## Iteration 2 revalidation — 2026-10-15
++
++Existing implementation retained; no behavioral changes or new TDD evidence.
++On macOS with pinned Bun 1.4.3, `bun run typecheck` and `bun run lint` both
++passed (Biome checked 98 files). `bun test tests/integration/02-project-commands.test.ts`
++passed all 15 tests and 61 assertions, including HTTP readiness, argument/environment
++handling, process-tree cleanup, failure readiness gates, replacement preservation,
++and the registered command's refusal to save without supported human approval.
++These results supersede the repository-wide failures in the preceding revalidation.
++
++The predecessor's production approval blocker remains unchanged:
++`createOpenCodeAdapter.requestUserInput` returns `unsupported`. The pinned SDK's
++`form.replied` data identifies the form/session and answer but supplies no verified
++human responder origin. No replacement approval mechanism was inferred from that
++event. Production setup therefore still stops before saving executable JSON, and
++this ticket remains incomplete pending the prerequisite human-input contract.
++No live approval or native Linux/Windows execution was run. Only this ticket's
++evidence was updated; no runtime, wiki, or unrelated files were changed.
+
+diff --git a/.agents/issues/2-discover-approve-and-verify-project-commands.md b/.agents/issues/2-discover-approve-and-verify-project-commands.md
+index c9b7c9ae4b92d2c006d2cb7aede60bce7b54edb2..2f6f55ed3301c4cce63067fee8d65767d46277b4
+--- a/.agents/issues/2-discover-approve-and-verify-project-commands.md
++++ b/.agents/issues/2-discover-approve-and-verify-project-commands.md
+@@ -177,3 +177,22 @@
+ plus import ordering in `src/agents/results.ts` and non-null assertion warnings in
+ the issue-6 test. These unrelated files were not changed. No wiki update was needed
+ because this rerun changed no durable project behavior or approval contract.
++
++## Iteration 2 revalidation — 2026-10-15
++
++Existing implementation retained; no behavioral changes or new TDD evidence.
++On macOS with pinned Bun 1.4.3, `bun run typecheck` and `bun run lint` both
++passed (Biome checked 98 files). `bun test tests/integration/02-project-commands.test.ts`
++passed all 15 tests and 61 assertions, including HTTP readiness, argument/environment
++handling, process-tree cleanup, failure readiness gates, replacement preservation,
++and the registered command's refusal to save without supported human approval.
++These results supersede the repository-wide failures in the preceding revalidation.
++
++The predecessor's production approval blocker remains unchanged:
++`createOpenCodeAdapter.requestUserInput` returns `unsupported`. The pinned SDK's
++`form.replied` data identifies the form/session and answer but supplies no verified
++human responder origin. No replacement approval mechanism was inferred from that
++event. Production setup therefore still stops before saving executable JSON, and
++this ticket remains incomplete pending the prerequisite human-input contract.
++No live approval or native Linux/Windows execution was run. Only this ticket's
++evidence was updated; no runtime, wiki, or unrelated files were changed.
+
+codex
+Existing implementation revalidated: all 15 command tests, typecheck, and lint pass. Updated the ticket’s completion evidence; no runtime changes.
+
+The task remains incomplete: production human approval is unsupported, so `/ralph-commands` stops before saving. Live approval and native Linux/Windows checks remain unrun.
+diff --git a/.agents/issues/2-discover-approve-and-verify-project-commands.md b/.agents/issues/2-discover-approve-and-verify-project-commands.md
+index c9b7c9ae4b92d2c006d2cb7aede60bce7b54edb2..2f6f55ed3301c4cce63067fee8d65767d46277b4
+--- a/.agents/issues/2-discover-approve-and-verify-project-commands.md
++++ b/.agents/issues/2-discover-approve-and-verify-project-commands.md
+@@ -177,3 +177,22 @@
+ plus import ordering in `src/agents/results.ts` and non-null assertion warnings in
+ the issue-6 test. These unrelated files were not changed. No wiki update was needed
+ because this rerun changed no durable project behavior or approval contract.
++
++## Iteration 2 revalidation — 2026-10-15
++
++Existing implementation retained; no behavioral changes or new TDD evidence.
++On macOS with pinned Bun 1.4.3, `bun run typecheck` and `bun run lint` both
++passed (Biome checked 98 files). `bun test tests/integration/02-project-commands.test.ts`
++passed all 15 tests and 61 assertions, including HTTP readiness, argument/environment
++handling, process-tree cleanup, failure readiness gates, replacement preservation,
++and the registered command's refusal to save without supported human approval.
++These results supersede the repository-wide failures in the preceding revalidation.
++
++The predecessor's production approval blocker remains unchanged:
++`createOpenCodeAdapter.requestUserInput` returns `unsupported`. The pinned SDK's
++`form.replied` data identifies the form/session and answer but supplies no verified
++human responder origin. No replacement approval mechanism was inferred from that
++event. Production setup therefore still stops before saving executable JSON, and
++this ticket remains incomplete pending the prerequisite human-input contract.
++No live approval or native Linux/Windows execution was run. Only this ticket's
++evidence was updated; no runtime, wiki, or unrelated files were changed.
+
+tokens used
+25,361
+Existing implementation revalidated: all 15 command tests, typecheck, and lint pass. Updated the ticket’s completion evidence; no runtime changes.
+
+The task remains incomplete: production human approval is unsupported, so `/ralph-commands` stops before saving. Live approval and native Linux/Windows checks remain unrun.

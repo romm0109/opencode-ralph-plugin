@@ -1,0 +1,1364 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/14-pause-stop-and-recover-interrupted-workflows.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cd8-2c91-7ef1-9fd3-f763b481a403
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 14 of 15 — 14-pause-stop-and-recover-interrupted-workflows.md
+=== END METADATA ===
+
+TASK:
+# 14. Pause, stop, and recover interrupted workflows
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-8  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Expose /ralph-pause, /ralph-resume and /ralph-stop in OpenCode and recover interrupted workflows safely. Reconcile persisted intents with actual Git refs, worktrees, sessions, processes and validation evidence before presenting a recovery summary. Require an explicit resume instruction after restart. Cover execution, questions, merge publication and review repairs without repeating completed side effects or resetting budgets.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 101–115): OpenCode-owned lifecycle and waiting/blocked state.
+- `PRD.md` (lines 148–152): intent persistence and stale-result protection.
+- `PRD.md` (lines 257–265): controls and recovery.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 9: Resolve executor questions through OpenCode chat](9-resolve-executor-questions-in-opencode.md): predecessor contracts and the code delivered by that slice.
+- [Issue 13: Repair review findings within three review rounds](13-repair-findings-within-three-review-rounds.md): predecessor contracts and the code delivered by that slice.
+- `src/commands/control.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/recovery/reconcile.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/process/ownership.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/plugin.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Pause means stop new scheduling and let in-flight operations settle; stop cancels owned work while preserving artifacts. Recovery reads actual state and compares immutable identities before deciding which transition is complete. Do not trust a recorded PID alone because process identifiers can be reused.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Implement chat controls and shutdown ownership
+
+**Files:** `src/commands/control.ts`, `src/process/ownership.ts`, `src/plugin.ts`, `src/commands/router.ts`
+
+- **IMPLEMENT:** Register pause/resume/stop handlers and record human intent. Freeze dispatch while paused; cancel active agents and owned process trees on stop, await bounded cleanup and persist interruption. Tie dashboard and worker ownership to OpenCode lifetime. Use owner tokens, start times and workspace identity when tracking processes; prevent child services from running as an unintended daemon after parent death.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import OpenCodeAdapter.cancelJob, RunStore, scheduler control hooks and environment disposal; export handleControlCommand and inspectOwnedProcess.
+- **GOTCHA:** Do not kill unrelated processes or convert stop cancellation to command timeout skipping. Preserve required permission prompts. If graceful shutdown hooks are limited, implement parent-liveness handling in owned child wrappers.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/14-recovery.test.ts`; add the tests below as this slice develops.
+
+### 2. Reconcile durable state before explicit resume
+
+**Files:** `src/recovery/reconcile.ts`, `src/state/run-store.ts`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** Scan active-run state using the Git common repository root. Compare integration refs, recorded expected-old/new SHAs, candidate check evidence, worktree ownership, session status and attempt IDs. If an advance succeeded before its result write, record it once; if check completion is uncertain, rerun applicable validation before advancement. Mark ambiguous states blocked and present facts in OpenCode. Require resume after reconciliation and retain question/approval/review counters.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import Git inspection helpers, ValidationSummary, OpenCodeAdapter and persisted operation records; export reconcileRun and RecoverySummary.
+- **GOTCHA:** Resume is not an automatic reset of exhausted budgets. Any user-requested budget reset is a separately logged explicit action. A stale lock must be validated against owner liveness before replacement.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/14-recovery.test.ts`; add the tests below as this slice develops.
+
+### 3. Exercise interruptions at side-effect boundaries
+
+**Files:** `tests/integration/14-recovery.test.ts`
+
+- **IMPLEMENT:** Inject termination before/after worktree creation, check completion, integration ref update, state append, cleanup, question response and review repair dispatch. Verify pause settles active operations, stop prevents late results, restart does not resume automatically, approved revisions survive, and duplicate merge/repair dispatch cannot occur.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import existing fixtures, fake clock, public control/reconcile handlers and actual Git commands via the test helper.
+- **GOTCHA:** Include a live process ownership fixture and safe reused-PID simulation; full platform process-tree cases run in issue 15.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/14-recovery.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [ ] Pause starts no new issue or review work but lets current operations settle.
+- [ ] Stop cancels only owned work and preserves recovery artifacts.
+- [ ] Restart produces a recovery summary and waits for explicit resume.
+- [ ] A ref advance followed by a crash is not repeated, and uncertain validation is not treated as passed.
+- [ ] Retry/review counters and approvals survive restart unchanged.
+- [ ] Plugin exit does not leave an independent orchestrator or dashboard running.
+- [ ] This slice's behavioral regression tests pass: `bun test tests/integration/14-recovery.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [ ] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/14-recovery.test.ts
+
+```
+
+**Demonstration:** Interrupt immediately after a candidate ref advance but before its state result, restart OpenCode, inspect recovery, resume, and prove exactly one integration is recorded.
+
+## Blocked by
+
+- [9-resolve-executor-questions-in-opencode.md](9-resolve-executor-questions-in-opencode.md) — resolve executor questions through opencode chat supplies the prerequisite behavior/contracts.
+- [13-repair-findings-within-three-review-rounds.md](13-repair-findings-within-three-review-rounds.md) — repair review findings within three review rounds supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+### Implementation evidence — 2026-10-14
+
+Existing controls/reconciliation were verified and two stop/resume regressions
+were repaired with failing-then-passing public tests. Recovery facts now survive
+repeated stops; resume waits for bounded stop cleanup. Typecheck, lint and all
+16 recovery tests pass on Bun 1.4.3. The full integration suite passes 69 tests
+with one explicitly gated browser test skipped.
+
+See [recovery validation](../../docs/recovery-validation.md) and
+[project wiki](../../docs/wiki/features/workflow-recovery.md) for the exactly-once
+Git recovery demonstration and limitations. This slice is not fully accepted:
+issue 9 question/approval persistence and production execution/validation/active-run
+lock predecessors are absent. Their recovery integration remains pending.
+Linux/Windows process trees and live OpenCode lifecycle checks were not run.
+
+### Follow-up implementation evidence — 2026-10-15
+
+The predecessor absence noted above is superseded: execution, candidate validation,
+question persistence, approvals and active-run ownership now exist and are covered
+by this recovery integration. Fixed production pause settlement, recovered accepted
+integrations at three crash boundaries (including checkout synchronization), restored
+accepted issue state exactly once, renewed/republished pending questions on explicit
+resume, and retained answers, approvals and active-time budgets across restarts.
+Recovery checks accepted refs and logical active-run lock identities, freezes controls
+during inspection, and blocks ambiguous execution/merge/repair completion without
+repeating side effects. Local edits are preserved during checkout recovery.
+
+New fixes have failing-then-passing public behavioral tests. Additional local-edit
+and late-repair callback coverage verifies the safety guards without adding behavior;
+documentation/wiki edits are non-behavior work. Pinned Bun 1.4.3 results:
+`bun run typecheck` passed; `bun run lint` passed (97 files);
+`bun test tests/integration/14-recovery.test.ts` passed 33 tests / 185 assertions.
+
+The production-router demonstration interrupts immediately after Git ref advancement,
+reopens the common store, reconciles the accepted commit and checkout, rejects dispatch
+until explicit resume, and returns the same integrated attempt with no new SDK request.
+A second reconciliation records no duplicate integration. See the updated
+[validation evidence](../../docs/recovery-validation.md) and
+[wiki](../../docs/wiki/features/workflow-recovery.md).
+
+Production human provenance, native Linux/Windows process trees and live OpenCode
+shutdown remain unrun/unsupported as documented by the predecessors. Ambiguous
+publication/cleanup/repair states require explicit evidence-based resolution, and
+host-supplied functional review environment/surface/tool options are not reconstructed
+automatically. No package publication, external message or target-branch merge occurred.
+
+A final red/green held-read regression also prevents stop followed immediately by
+resume from reviving a paused integration callback; phase boundaries recheck the
+original control epoch before launching validation or advancing the ref.
+
+Final frozen-code full integration run: `bun test tests/integration` passed 194,
+skipped the existing gated real agent-browser test, failed 0 (1,232 assertions,
+15 files). Earlier development runs that loaded pre-fix modules are superseded by
+this final run. Final source checks remain typecheck/lint green and 33 recovery
+tests green. Wiki updated: workflow recovery and its open-questions entry.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing recovery implementation and run the acceptance checks to see whether this slice is already complete.
+
+exec
+/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*14*' -g '*recovery*' -g 'README.md' -g 'PRD.md' -g '.bun-version'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+.bun-version
+ralph-logs/iter-2-14-pause-stop-and-recover-interrupted-workflows.log
+ralph-logs/iter-1-14-pause-stop-and-recover-interrupted-workflows.log
+package.json
+README.md
+docs/recovery-validation.md
+docs/wiki/features/workflow-recovery.md
+tests/integration/14-recovery.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc "git status --short; cat package.json; cat .bun-version; rg --files src | sort; rg --files | rg '(14-pause|9-resolve|13-repair|AGENTS)'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+1.4.3
+src/agents/results.ts
+src/agents/skills.ts
+src/commands/control.ts
+src/commands/orchestrator.ts
+src/commands/project-setup.ts
+src/commands/router.ts
+src/config/commands.ts
+src/config/project.ts
+src/core/orchestrator.ts
+src/core/types.ts
+src/dashboard/projections.ts
+src/dashboard/server.ts
+src/dashboard/web/App.tsx
+src/dashboard/web/api.ts
+src/dashboard/web/index.html
+src/dashboard/web/main.tsx
+src/dashboard/web/style.css
+src/execution/attempts.ts
+src/execution/execute-issue.ts
+src/execution/executor-slots.ts
+src/execution/integrate-issue.ts
+src/execution/integration-queue.ts
+src/execution/preflight.ts
+src/execution/questions.ts
+src/execution/readiness.ts
+src/execution/scheduler.ts
+src/execution/validation.ts
+src/git/review-workspace.ts
+src/git/worktrees.ts
+src/opencode/adapter.ts
+src/opencode/bridge.ts
+src/planning/approvals.ts
+src/planning/artifacts.ts
+src/planning/generation.ts
+src/planning/graph.ts
+src/planning/interview.ts
+src/planning/issues.ts
+src/planning/prd.ts
+src/planning/types.ts
+src/plugin.ts
+src/process/command-child.ts
+src/process/environment.ts
+src/process/owned-child.ts
+src/process/ownership.ts
+src/process/runner.ts
+src/recovery/reconcile.ts
+src/reporting/completion.ts
+src/review/after-execution.ts
+src/review/code-review.ts
+src/review/coordinator.ts
+src/review/functional-results.ts
+src/review/functional-review.ts
+src/review/repair-context.ts
+src/review/repairs.ts
+src/review/snapshot.ts
+src/review/types.ts
+src/review/validate-result.ts
+src/roles/instructions.ts
+src/state/active-run.ts
+src/state/run-store.ts
+src/state/sanitize.ts
+src/tui.ts
+ralph-logs/iter-2-14-pause-stop-and-recover-interrupted-workflows.log
+ralph-logs/iter-3-9-resolve-executor-questions-in-opencode.log
+ralph-logs/iter-1-9-resolve-executor-questions-in-opencode.log
+ralph-logs/iter-1-14-pause-stop-and-recover-interrupted-workflows.log
+ralph-logs/iter-3-13-repair-findings-within-three-review-rounds.log
+ralph-logs/iter-2-13-repair-findings-within-three-review-rounds.log
+ralph-logs/iter-2-9-resolve-executor-questions-in-opencode.log
+ralph-logs/iter-1-13-repair-findings-within-three-review-rounds.log
+
+exec
+/bin/zsh -lc "sed -n '88,115p' PRD.md; sed -n '148,152p' PRD.md; sed -n '257,265p' PRD.md; cat docs/recovery-validation.md; cat docs/wiki/features/workflow-recovery.md; cat src/commands/control.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+
+## 6. Core Architecture & Patterns
+
+### 6.1 OpenCode integration
+
+The product runs as an OpenCode plugin. Slash commands enter the workflow. Agent jobs use separate OpenCode sessions where specified. Model selection defaults to the model used when the run starts; role overrides are captured with the run. Existing OpenCode permissions remain in force.
+
+The plugin owns the orchestration runtime and dashboard server. It does not launch an independent long-lived orchestration service. On graceful OpenCode shutdown it stops scheduling and terminates owned processes. After an unexpected exit, recovery checks reconcile any surviving processes and worktrees before continuation.
+
+### 6.2 Deterministic orchestration
+
+Use an explicit persistent state machine, not a long prompt that asks an agent to remember and enforce the whole flow. Agent messages and completion events are inputs to the state machine; they are not sufficient evidence that a merge or check passed.
+
+Major feature states:
+
+`interview → explanation approval → PRD → issue planning → execution approval → preflight/baseline → execution → final review → terminal result`
+
+Waiting, paused, interrupted, and blocked conditions are persisted separately from successful phase completion. Terminal results distinguish verified completion, completion with missing validation, incomplete functional review, unresolved review findings, and stopped execution.
+### 6.5 Durable job contracts
+
+Each dispatched job records role, run ID, issue ID when relevant, attempt, session, workspace, input artifact revisions, and starting commit. Results reference produced commits, logs, evidence, findings, or questions.
+
+Persist intent before externally visible Git/process operations, then persist their observed result. Recovery must detect already-completed operations and avoid duplicate integrations. Late results from cancelled or superseded attempts cannot advance workflow state.
+### 7.11 Dashboard and OpenCode controls
+
+The browser dashboard is read-only. Show phase, dependency graph, issue readiness, agent role/session, attempt number, integration queue, check status, skips, review findings, and streamed logs. Label running, blocked, skipped, failed, and passed states distinctly.
+
+Proposed OpenCode control commands are `/ralph-status`, `/ralph-pause`, `/ralph-resume`, and `/ralph-stop`. Pause stops new scheduling and lets in-flight operations settle; stop cancels owned work and preserves recovery artifacts. Any reset of an exhausted retry budget requires an explicit user action recorded in the run log. These command names are proposed defaults, not interview commitments.
+
+### 7.12 Recovery
+
+After OpenCode restarts, inspect recorded sessions, commits, candidate merges, worktrees, command processes, and the repository lock. Show a recovery summary and wait for a resume instruction. Do not automatically repeat a merge or trust an interrupted check as passed. Preserve validated commit identity and reconcile ambiguous state before advancing.
+# Workflow recovery validation — 2026-10-15
+
+The existing controls, process ownership and restart reconciliation were extended
+against the now-present execution, question and repair predecessors. All probes
+use pinned Bun 1.4.3, temporary real Git repositories and the public command router
+with the controllable OpenCode adapter.
+
+## Behavioral red/green evidence
+
+Each new fix began with its failing public regression, then passed after the
+corresponding change:
+
+- Crashes after integration ref advancement, before operation-result append or
+  issue-result append, previously blocked valid evidence or stranded `merging`.
+  Recovery now binds saved production validation to the exact merger envelope,
+  commit, command hash/revision and approval, records completion once, and restores
+  the issue to `integrated` without allocating another attempt or merger.
+- A stop immediately followed by resume could revive an integration waiting at a
+  paused boundary. A held-read regression first recorded an unexpected advance,
+  then passed after rechecking the original attempt epoch after each wait.
+  Validation also checks its original epoch before dispatching the next check.
+- A crash immediately after `update-ref` left the integration index/worktree on the
+  old tree. Recovery now finishes only a proven old-index/clean-worktree transition
+  using Git's two-tree merge. It refuses ambiguous indexes or local modifications.
+  The local-edit preservation case is additional coverage of this guard.
+- Restart previously left pending questions with an invalid control epoch. Explicit
+  resume renews unanswered request identities and republishes through the main
+  session adapter. Old callbacks cannot answer the new question. Answers already
+  persisted, authoritative approval records and the remaining active-time deadline
+  survive another reopen unchanged.
+- Pause previously rejected the active production executor's submission and turned
+  an active merger/check into a failed attempt. Existing attempt identities can now
+  settle while paused; the next merger/check/ref boundary waits for resume.
+- An SDK result without its issue append previously appeared resumable while the
+  executor remained `executing`. Uncertain execution/merge completion now blocks
+  with retained facts instead of silently stranding work or repeating dispatch.
+- Recovery previously ignored active-run lock identity and fully appended ref
+  advances. It now retains matching locks, blocks foreign/corrupt owner evidence,
+  and verifies the latest accepted integration ref even after its result was saved.
+
+Reconciliation marks its scan pending, rejects controls while inspecting external
+state, and compares its epoch/revision before publishing the final summary.
+Existing stop regression coverage retains blockers across repeated stops, rejects
+resume during bounded cleanup, cancels correlated sessions, and checks real process
+ownership plus simulated PID reuse.
+
+## Demonstration
+
+The production router executes a real TDD submission and merger. Injected host
+termination happens at three boundaries: immediately after the Git ref update,
+before its operation result, and before its issue result. Reopening the common Git
+store and reconciling repairs the checkout if necessary and records exactly one
+accepted integration. The public router rejects dispatch before explicit resume.
+After resume the issue returns the same accepted commit/attempt without another
+SDK request. A second reconciliation adds no duplicate integration result.
+
+Question coverage pauses after a real `needs_input` result, advances/reopens the
+control epoch, resumes, observes the republished request, rejects the old answer,
+and retains the new answer through another restart. The fake clock proves that
+five seconds of active execution leaves 25 seconds of the original 30-second
+budget. A separate in-flight repair interruption preserves the exact review round
+and reserved attempt; its late callback cannot update the workflow or dispatch a
+second repair. These last repair assertions extend existing behavior coverage and
+did not require a production change. Documentation changes are non-behavior work.
+
+## Limits
+
+Ambiguous publication, check output, repair dispatch or cleanup stays blocked for
+explicit evidence-based resolution. Recovery does not invent missing output, replay
+side effects, reset budgets or replace a logical active-run lock. Reconciled work
+is available to the public scheduler/review entrypoints; unanswered questions are
+republished by `/ralph-resume`. Automatic reconstruction of host-supplied functional
+review environment/surface/tool options is not implemented.
+
+Production human-input provenance remains unsupported by the predecessor adapter;
+these tests supply correlated human responses. No live-provider, native Linux/
+Windows process-tree or real OpenCode shutdown smoke was run in this slice. The
+existing platform declarations and gated tests remain intact. No package was
+published and no target branch was merged.
+
+## Final checks
+
+- `bun run typecheck`: passed.
+- `bun run lint`: passed (97 files).
+- `bun test tests/integration/14-recovery.test.ts`: 33 passed, 0 failed,
+  185 assertions.
+
+An earlier broad run overlapped test development and loaded the pre-fix modules;
+it reported the newly added ref-identity and in-flight-validation regressions as
+failures. That run is not final verification. The final broad run is recorded
+below after completion.
+
+Final frozen-code broad run: `bun test tests/integration` passed 194 tests,
+skipped the existing explicitly gated real agent-browser test, and failed none
+(1,232 assertions across 15 files). The full suite includes local tarball consumer
+and lifecycle fixtures; it does not establish native Linux/Windows or live-provider
+coverage. No source changes followed these final checks.
+# Workflow controls and recovery
+
+## Summary
+OpenCode registers pause/resume/stop commands and invokes reconciliation on restart.
+Recovery observes actual state, reports facts, and waits for explicit resume.
+
+## Key behavior
+- Pause rejects new jobs and suspends review scheduling while current jobs settle. Production executor submissions retain their attempt identity; mergers and successful in-flight checks wait at the next scheduling/ref boundary rather than becoming failed retries. Each resumed in-flight boundary rechecks the original epoch so stop followed by resume cannot revive a stale callback.
+- Stop cancels bound sessions, owned processes and registered environments with bounded cleanup. Late job results cannot advance stopped runs.
+- Process ownership requires PID birth identity, owner token, repository and workspace. Owned wrappers watch parent liveness; the dashboard stays in the plugin process.
+- Recovery shares the Git common-directory store across worktrees. Already advanced integration intents require exact SHA/check revision evidence and record completion once. Ambiguous operations block resume; validation without output never passes.
+- Stop retains existing recovery/cleanup blockers, including repeated stops. Resume cannot race pending stop cleanup. Reconciliation must resolve retained ambiguity.
+- Recovery binds production validation to the exact merger envelope, candidate, command hash/revision and approval. It restores the accepted issue result even if the ref or operation result was written before a crash. A proven old index/clean worktree is synchronized with a safe two-tree merge; local changes block recovery.
+- Review counters, attempt identities, approvals and artifact revisions are retained; controls do not reset budgets. Explicit resume renews and republishes unanswered main-session questions while preserving recorded answers and remaining active-time budgets.
+- Recovery holds a pending control marker through inspection and checks its epoch/revision before publishing. It verifies logical active-run lock identity and the latest accepted refs; uncertain execution/merge/repair completion blocks instead of repeating dispatch.
+- Journal locks are replaced only after inspecting their recorded owner birth identity. Missing or corrupt owner evidence does not authorize replacement.
+
+## Code references
+- `src/commands/control.ts` — dispatch gates and bounded stop cleanup.
+- `src/recovery/reconcile.ts`, `src/state/run-store.ts` — facts, guarded recovered-attempt writes and idempotent operation reconciliation.
+- `src/git/worktrees.ts` — safe synchronization after a ref update interrupted checkout synchronization.
+- `src/core/orchestrator.ts`, `src/execution/execute-issue.ts`, `src/execution/integrate-issue.ts`, `src/execution/validation.ts`, `src/commands/router.ts` — production pause boundaries and resumed question publication.
+- `src/process/ownership.ts`, `src/process/owned-child.ts` — owned process inspection and parent monitoring.
+- `src/plugin.ts` — startup recovery, controls and disposal.
+- `tests/integration/14-recovery.test.ts` — real Git recovery and lifecycle regressions.
+
+## Related
+- [Bounded review repairs](bounded-review-repairs.md)
+- [Validation evidence](../../recovery-validation.md)
+
+## Notes
+Question/approval persistence and production executor/validation recovery now have public-fixture coverage. Production human provenance, native Linux/Windows process trees and live OpenCode shutdown remain unverified. Ambiguous publication/cleanup/repair operations remain blocked; host-supplied functional review options are not reconstructed automatically. See the validation evidence for the public continuation boundary.
+
+## Last updated
+2026-10-15
+
+Issue 15 package testing found that a recovery toast awaited during plugin initialization deadlocked the real host. Startup now records reconciliation first and defers the SDK notification to the next event-loop turn; disposal cancels pending notifications. See `src/plugin.ts` and `tests/integration/15-package.test.ts`.
+import type { RunControl } from "../core/types.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { disposeRunEnvironments } from "../process/environment.js";
+import { terminateOwnedProcess } from "../process/ownership.js";
+import type { RunStore } from "../state/run-store.js";
+
+export async function assertDispatchAllowed(store: RunStore, runId: string) {
+  const run = await store.getRun(runId);
+  if (run?.control && run.control.status !== "active")
+    throw new Error(
+      `Run ${runId} is ${run.control.status}; explicit resume required`,
+    );
+}
+/** In-flight work settles; the next scheduling boundary waits for human resume. */
+export async function waitForDispatch(store: RunStore, runId: string) {
+  while ((await store.getRun(runId))?.control?.status === "paused")
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  await assertDispatchAllowed(store, runId);
+}
+export async function handleControlCommand(
+  command: "ralph-pause" | "ralph-resume" | "ralph-stop",
+  runId: string,
+  store: RunStore,
+  adapter?: OpenCodeAdapter,
+  options: {
+    source?: RunControl["source"];
+    cleanup?: () => Promise<void>;
+    timeoutMs?: number;
+  } = {},
+) {
+  const run = await store.getRun(runId);
+  if (!run) throw new Error("Unknown run");
+  if (run.control?.cleanupPending)
+    throw new Error("Stop cleanup is pending; wait or reconcile after restart");
+  if (
+    command === "ralph-pause" &&
+    run.control &&
+    !["active", "paused"].includes(run.control.status)
+  )
+    throw new Error(`Run is ${run.control.status}; reconcile or resume first`);
+  if (
+    command === "ralph-resume" &&
+    run.control?.status === "stopped" &&
+    run.control.facts?.length
+  )
+    throw new Error("Stop cleanup uncertain; recovery reconciliation required");
+  if (command === "ralph-resume" && run.control?.status === "blocked")
+    throw new Error(`Recovery blocked: ${run.control.facts?.join("; ")}`);
+  const status =
+    command === "ralph-pause"
+      ? "paused"
+      : command === "ralph-stop"
+        ? "stopped"
+        : "active";
+  // Stopping resources does not resolve an ambiguous recovery or prior cleanup.
+  const retainedFacts =
+    command === "ralph-stop" &&
+    ["blocked", "stopped"].includes(run.control?.status ?? "")
+      ? (run.control?.facts ?? [])
+      : [];
+  if (
+    !(await store.recordControl(
+      runId,
+      {
+        status,
+        source: options.source ?? "human",
+        facts: retainedFacts,
+        ...(command === "ralph-stop" ? { cleanupPending: true } : {}),
+      },
+      run.revision,
+    ))
+  )
+    throw new Error("Control state changed; retry command");
+  if (command === "ralph-stop") {
+    const current = await store.getRun(runId);
+    const cleanup = Promise.allSettled([
+      disposeRunEnvironments(runId, [
+        ...Object.values(current?.jobs ?? {}).map(
+          (job) => job.envelope.workspace,
+        ),
+        ...Object.values(current?.operations ?? {}).map(
+          (op) => op.job.workspace,
+        ),
+      ]),
+      ...Object.values(current?.jobs ?? {})
+        .filter((job) => job.status !== "terminal")
+        .map(async ({ envelope }) => {
+          if (adapter) {
+            const result = await adapter.cancelJob(envelope);
+            if (!result.ok)
+              throw new Error(result.error?.message ?? "Cancellation failed");
+          } else {
+            await store.recordResult({
+              ...envelope,
+              outcome: "cancelled",
+              evidence: [],
+              error: { code: "cancelled", message: "Stop requested" },
+            });
+          }
+        }),
+      ...Object.values(current?.operations ?? {})
+        .filter((op) => op.ownedProcess)
+        .map(async (op) => {
+          if (
+            op.ownedProcess &&
+            !(await terminateOwnedProcess(op.ownedProcess))
+          )
+            throw new Error(
+              `Process ownership/cleanup uncertain: ${op.operationId}`,
+            );
+        }),
+      ...(options.cleanup ? [options.cleanup()] : []),
+    ]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const settled = await Promise.race([
+        cleanup,
+        new Promise<undefined>((resolve) => {
+          timer = setTimeout(
+            () => resolve(undefined),
+            options.timeoutMs ?? 2000,
+          );
+        }),
+      ]);
+      const facts =
+        settled === undefined
+          ? [
+              "Cleanup deadline reached; retained resources require reconciliation",
+            ]
+          : settled
+              .filter((r) => r.status === "rejected")
+              .map((r) => String(r.reason));
+      const afterCleanup = await store.getRun(runId);
+      if (afterCleanup?.control?.status !== "stopped")
+        throw new Error(
+          "Control changed during cleanup; reconciliation required",
+        );
+      await store.recordControl(
+        runId,
+        {
+          status: "stopped",
+          source: options.source ?? "human",
+          facts: [...new Set([...retainedFacts, ...facts])],
+        },
+        afterCleanup.revision,
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return JSON.stringify((await store.getRun(runId))?.control);
+}
+
+exec
+/bin/zsh -lc 'bun --version; bun run typecheck; bun run lint; bun test tests/integration/14-recovery.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc "cat README.md; sed -n '1,200p' src/process/ownership.ts; sed -n '1,180p' src/plugin.ts; rg -n 'test\\(|it\\(' tests/integration/14-recovery.test.ts; rg -n 'ralph-(pause|resume|stop)|reconcileRun|recovery' src/commands/router.ts src/core/orchestrator.ts src/recovery/reconcile.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+# Ralph for OpenCode
+
+A locally installable OpenCode plugin with durable session jobs, independent code and functional review, bounded review repairs, a read-only dashboard, and interruption recovery. Exact tested dependencies and platform results are in [compatibility](docs/opencode-compatibility.md).
+
+The complete deterministic setup-to-report demonstration runs through the installed public command/adapter boundary. Production human answers and approvals remain blocked: the OpenCode adapter cannot yet verify their provenance. A host integration must supply correlated human responses. The automatic scheduler starts code review; a host must call `reviewFeature` with functional environment, surface and observation-tool options for the final dual review/report. Native Linux/Windows and credentialed full-workflow evidence remain release blockers. See [package validation](docs/package-validation.md).
+
+## Build and install locally
+
+Use Git and the Bun version in `.bun-version` (also pinned in `package.json`). From this source directory:
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run lint
+bun run pack:local
+```
+
+Copy `opencode-ralph-plugin-0.2.0.tgz` to each target repository, then run there:
+
+```sh
+bun add ./opencode-ralph-plugin-0.2.0.tgz
+bun -e 'console.log(require("node:url").pathToFileURL(require("node:fs").realpathSync("node_modules/opencode-ralph-plugin")).href)'
+```
+
+Add the generated, encoded URL to the repository's `opencode.json`, preserving any existing settings:
+
+```json
+{
+  "plugins": ["REPLACE_WITH_GENERATED_PACKAGE_DIRECTORY_URL"]
+}
+```
+
+Use the **entire** URL printed by the command. It points to the package directory, where OpenCode resolves `server.js` and `tui.js`; do not point it to `dist/plugin.js`. This handles Windows drives and spaces. The example uses single quotes around JavaScript for PowerShell and POSIX shells; native Windows results are pending CI. A relative tarball dependency is recommended; Bun 1.4.3 failed to install the tested percent-encoded absolute `file:` tarball URL with spaces. Each target must be a Git repository. The repository root need not have a commit just to load the plugin; feature/review operations need committed inputs.
+
+Start OpenCode **2.0.29** in that repository (see compatibility for the local binary path). Restart OpenCode after changing plugin configuration. No registry publication is required or performed by these scripts.
+
+## Commands and operation
+
+- `/ralph-commands` explores lifecycle commands in a read-only session, presents the exact revision/hash, and requires a correlated human approval before saving `.ralph/commands.json`. Production approval currently reports unsupported; a host adapter with verified input provenance is required to complete setup. Each execution also requires host permission.
+
+- `/ralph-orchestrator [feature]` requires verified project commands for the current configuration and host. It collects missing feature input, explores the repository in a read-only interview session, asks recommended questions in the main session, and persists the conversation. Reply `approve <revision>` to the presented explanation, or describe revisions. Approved explanations continue through PRD/graph generation and combined execution approval. Execution approval presents the starting SHA and runs baseline preflight when the checkout is clean; setup/check failures block, and check timeouts remain visible as run-local omissions. A passed baseline automatically schedules dependency-ready issues with two executor slots by default and one integration queue. The production adapter reports unavailable human-input provenance and leaves the request pending.
+
+- `/ralph-status [run-id]` reads durable status and the dashboard URL. With no argument it selects the latest run.
+- `/ralph-pause [run-id]` records pause intent and freezes new dispatch while active work settles.
+- `/ralph-resume [run-id]` records explicit resume intent after pause/recovery; preserved attempts and revisions remain in force. Blocked recovery requires resolving its disclosed facts first.
+- `/ralph-stop [run-id]` cancels correlated sessions and cleans up owned processes. Stale completions cannot advance the run.
+
+The dashboard URL includes an access token in its fragment. Open it locally; treat it as private. The listener uses loopback with an automatically allocated port, so independent repositories can run together. The browser is read-only; commands and approvals belong in OpenCode. State and write locks live under the repository's canonical Git common directory, `ralph/runs`, and are shared by linked worktrees. Independent repositories use independent stores. The plugin stays attached to the OpenCode server lifecycle; shutdown stops owned work and the dashboard. Restart reconciles facts and waits for explicit resume.
+
+The v2 package ships server and TUI entry points. Slash commands execute directly, emit a status notification, and queue their exact output as a synthetic inbox item without waking the model. The TUI displays Ralph status notifications; the dashboard and persisted store remain authoritative.
+
+The public `adapter`, `store`, `commands`, `types`, `review/*`, `reporting/completion` and `process` exports support typed host integration. `createCommandRouter(...).scheduleIssues(runId)` schedules the approved DAG; `executeIssue(runId, issueId)` executes/integrates one approved issue with at most three attempts and retained failure evidence; `answerExecutorQuestion(runId, issueId, response)` validates a host-provided correlated human response; `continuePlanning(runId)` presents and continues a pending execution approval; `runJob` dispatches a correlated session; `reviewFeature` coordinates the two reviewers and final report. `process` exposes ownership tracking/cleanup for approved command owners, not command approval. Tests and fixture code are excluded from runtime exports and the tarball.
+
+Code and functional reviewers load their bundled `skills/code-review` and `skills/functional-review` resources. Code-review options accept a `{ providerID, modelID }` model; functional review accepts its own model through `functionalOptions`. Executor jobs carry the same optional model field. Model/tool availability and OpenCode permissions remain host-owned; no permission is auto-approved. Command configuration validates lifecycle ordering, platform coverage (or explicit unsupported reasons), paths, timeouts, argument arrays, explicit shells and environment references. Role models and replacement skill paths are read from optional `.ralph/project.json` and captured with hashes on each run.
+
+## Interview settings
+
+Project replacements resolve relative to the workspace root. Omit `skillPaths.interview`
+to use the original bundled grill-me guidance. Omit `models.interview` to capture the main
+session's selected model; an unavailable selection produces an actionable error.
+
+```json
+{
+  "schemaVersion": 1,
+  "models": { "interview": { "providerID": "your-provider", "modelID": "your-model" } },
+  "skillPaths": { "interview": "skills/my-interview.md" },
+  "concurrency": 2,
+  "timeoutMs": 300000,
+  "agentTimeoutMs": 1800000
+}
+```
+
+Runs record model selections, skill paths and content hashes, the verified command hash,
+and timeout/concurrency defaults. Agent timeouts interrupt planning and retain the lock
+and evidence. Human answers do not time out. `agentTimeoutMs` separately controls executor and merger deadlines (default thirty minutes), and is recorded on the run and each issue attempt. One canonical repository lock includes
+planning; explanation approval retains it through execution. Terminal coordinated review releases the matching lock. Interrupted locks require reconciliation and explicit resume.
+
+## Concurrent execution resources
+
+Ready issues are selected in approved graph order. A submission waits in the integration
+queue; children start only after all parents integrate, including qualified integration
+with omitted checks. `/ralph-status` and durable events expose ready, pending, running,
+integration_queued, integrated, failed and blocked states plus queue order. The executor
+slot ends after submission cleanup; merger/validation work uses a separate serial queue.
+
+`/ralph-commands` may propose resource allocation in the exact approved configuration:
+
+```json
+{
+  "resources": {
+    "RALPH_PORT": "port",
+    "RALPH_NAMESPACE": "namespace",
+    "RALPH_DIRECTORY": "directory"
+  },
+  "exclusiveResources": ["shared-test-database"]
+}
+```
+
+Command `env` mappings reference these source names, for example
+`{"PORT":"RALPH_PORT","APP_NAMESPACE":"RALPH_NAMESPACE","APP_DATA":"RALPH_DIRECTORY"}`.
+Ports, namespaces and directories are allocated per lifecycle/job. Executor prompts
+receive the allocation; candidates receive fresh allocations. The runner executes only
+approved commands, using main-session permission before an executor session exists.
+Shared resource names serialize use within the repository. Startup without allocated
+ports also serializes use. Missing required references block setup; commands are never
+invented or rewritten to obtain isolation. Owned cleanup releases only that lifecycle's
+resources; cleanup failures retain ownership and diagnostics.
+
+## Executor questions
+
+An executor may return `{"kind":"needs_input","question":"...","recommendedAnswer":"...","affectedRequirement":"..."}`. Ralph persists the question on its run/issue/attempt and publishes it through the main-session adapter. The issue and descendants wait while independent issues continue. Human waiting consumes no executor capacity, agent deadline or retry. A correlated clarification resumes the same worktree and attempt with a new job identity and the remaining active-time budget.
+
+Hosts answer through the adapter's authenticated `UserInputResult` contract. The public router also accepts a later response via `answerExecutorQuestion`, followed by `scheduleIssues` for clarification or `continuePlanning` for revision approval. Stale requests, changed revisions, duplicate messages and unrelated sessions are rejected. The production adapter currently leaves human input pending because verified provenance is unavailable.
+
+For scope changes, a correlated user answer can carry JSON `{"kind":"revise_scope","prd":"complete PRD text","graph":<complete graph>,"files":<issue-path to Markdown map>}`. Ralph compares content, validates and publishes a new draft, presents affected work and preserved integrated evidence, and requires the normal combined execution approval. Adapter-delivered answers present that gate automatically. Revised artifacts cannot execute under the previous approval. Answers and approvals have no browser mutation endpoint.
+
+## Validation semantics
+
+Three **total issue attempts** include the first submission and two retries; an expected failing TDD red test does not consume an attempt. Three **total review rounds** apply to the final dual review; each generated repair task has its own three-attempt limit. Functional infrastructure retries have a separate three-attempt budget. Issue repair limits are enforced through the public single-issue entrypoint; the dependency scheduler preserves independent progress when an issue exhausts its budget.
+
+The validation policy skips only timed-out validation checks for the current run, never setup/readiness timeouts, permission denials, cancellations or completed failures. Those omissions must remain in the report and must not rewrite approved commands. The baseline runs on an isolated clean checkout before implementation. Check timeouts are run-local omissions; setup failures and timeouts block readiness. Retain failed worktrees and their evidence for diagnosis; clean successful worktrees only after validated integration. Recovery does not silently discard retained resources.
+
+A completed agent job is not proof of a verified feature. Reports distinguish `verified`, `incomplete-validation` (including skipped checks), `unverified` (missing review evidence) and `unresolved` (blocking issues/findings). Inspect the report's commit, checks, unavailable review and cleanup/resource fields. No workflow script publishes, pushes, creates a PR or merges into a target branch.
+
+## Reproduce the package demonstration
+
+```sh
+bun test tests/integration/15-package.test.ts
+bun run test:package
+bun test tests/e2e/full-workflow.test.ts
+bun run test:browser
+bun run test:smoke
+```
+
+The package probe builds a clean distribution, packs it, installs it into two committed temporary repositories with spaces in their paths, and loads the installed plugin. It checks bundled skills/dashboard assets, separate stores and dashboard data, concurrent ports, argv preservation, local readiness, child cleanup and pause/resume. The workflow demo approves discovered commands, interviews, generates and approves a PRD/issue graph, prepares a clean baseline, executes real red/green addition tests, commits through the executor/merger worktrees, and dispatches independent reviewers through the fake SDK HTTP boundary. The second repository really times out its approved validation check; no execution state is seeded. The host explicitly supplies functional review options to the public coordinator after scheduling. Reports are `verified` for the passing-evidence fixture and `incomplete-validation` for the skipped-evidence fixture. These are deterministic fixture verdicts, not live-agent evidence. Temporary repositories are removed; `test:package` prints platform, runtime, outcomes and blockers. Set `PACKAGE_EVIDENCE_PATH` to retain JSON evidence.
+
+For the real installed OpenCode server probe, enable `OPENCODE_SMOKE=1` (PowerShell: `$env:OPENCODE_SMOKE='1'`) before `bun run test:smoke`. It uses a local deterministic model. The separate credentialed session probe requires `OPENCODE_LIVE_SMOKE=1`, `OPENCODE_SMOKE_URL` and `OPENCODE_SMOKE_MODEL=provider/model`; without them it reports SKIPPED. The credentialed probe covers a model session, not the complete workflow; production human provenance and automatic functional-review wiring remain blockers. A v2 server also requires authentication: set `OPENCODE_SMOKE_PASSWORD` for the live probe. Credentials remain in the configured server; do not copy them into fixtures or package assets.
+
+See [troubleshooting](docs/troubleshooting.md). CI runs the required suites on macOS, Ubuntu and native Windows and retains per-platform package evidence. A green fixture demo does not remove the production-host or unrun-platform blockers.
+import { execFile, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import type { JobEnvelope } from "../core/types.js";
+import type { RunStore } from "../state/run-store.js";
+
+const exec = promisify(execFile);
+export interface OwnedProcess {
+  pid: number;
+  startedAt: string;
+  ownerToken: string;
+  workspace: string;
+  repositoryId: string;
+}
+export async function processIdentity(
+  pid: number,
+): Promise<{ startedAt: string; command: string } | undefined> {
+  if (!Number.isSafeInteger(pid) || pid < 1) throw new Error("Invalid PID");
+  try {
+    if (process.platform === "win32") {
+      const result = await exec("powershell.exe", [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `$p = Get-CimInstance Win32_Process -Filter 'ProcessId = ${pid}'; if ($p) { @{ startedAt = $p.CreationDate.ToUniversalTime().ToString('o'); command = $p.CommandLine } | ConvertTo-Json -Compress }`,
+      ]);
+      return result.stdout.trim() ? JSON.parse(result.stdout) : undefined;
+    }
+    const startedAt = (
+      await exec("ps", ["-p", String(pid), "-o", "lstart="])
+    ).stdout.trim();
+    const command = (
+      await exec("ps", ["-ww", "-p", String(pid), "-o", "command="])
+    ).stdout.trim();
+    return startedAt ? { startedAt, command } : undefined;
+  } catch (cause) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return undefined;
+    }
+    throw cause; // Inspection failure is never proof of ownership or death.
+  }
+}
+export async function inspectOwnedProcess(
+  record: OwnedProcess,
+): Promise<{ status: "owned" | "gone" | "unrelated" | "unknown" }> {
+  try {
+    const actual = await processIdentity(record.pid);
+    if (!actual) return { status: "gone" };
+    return {
+      status:
+        actual.startedAt === record.startedAt &&
+        actual.command.includes(record.ownerToken) &&
+        actual.command.includes(record.workspace) &&
+        actual.command.includes(record.repositoryId)
+          ? "owned"
+          : "unrelated",
+    };
+  } catch {
+    return { status: "unknown" };
+  }
+}
+export async function terminateOwnedProcess(
+  record: OwnedProcess,
+): Promise<boolean> {
+  const state = await inspectOwnedProcess(record);
+  if (state.status === "gone") return true;
+  if (state.status !== "owned") return false;
+  try {
+    if (process.platform === "win32")
+      await exec("taskkill.exe", ["/PID", String(record.pid), "/T", "/F"]);
+    else process.kill(-record.pid, "SIGTERM");
+    for (let i = 0; i < 40; i++) {
+      if ((await inspectOwnedProcess(record)).status === "gone") return true;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    if ((await inspectOwnedProcess(record)).status !== "owned") return false;
+    if (process.platform !== "win32") process.kill(-record.pid, "SIGKILL");
+    return (await inspectOwnedProcess(record)).status === "gone";
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ESRCH";
+  }
+}
+/** Called only by approved command/environment owners. Intent precedes launch. */
+export async function startOwnedProcess(
+  store: RunStore,
+  job: JobEnvelope,
+  executable: string,
+  args: string[],
+): Promise<OwnedProcess> {
+  const parent = await processIdentity(process.pid);
+  if (!parent) throw new Error("Parent identity unavailable");
+  const ownerToken = randomUUID();
+  const operation = {
+    operationId: `process-${ownerToken}`,
+    kind: "process.spawn" as const,
+    job,
+    status: "intent" as const,
+  };
+  if (!(await store.recordOperation(operation)))
+    throw new Error("Duplicate process intent");
+  const child = spawn(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL(
+          import.meta.url.endsWith(".ts")
+            ? "./owned-child.ts"
+            : "./owned-child.js",
+          import.meta.url,
+        ),
+      ),
+      String(process.pid),
+      parent.startedAt,
+      ownerToken,
+      job.workspace,
+      store.repositoryId,
+      executable,
+      ...args,
+    ],
+    {
+      cwd: job.workspace,
+      detached: process.platform !== "win32",
+      stdio: "ignore",
+    },
+  );
+  await new Promise<void>((resolve, reject) => {
+    child.once("spawn", resolve);
+    child.once("error", reject);
+  });
+  if (!child.pid) throw new Error("Owned child has no PID");
+  const identity = await processIdentity(child.pid);
+  if (!identity) throw new Error("Owned child exited during launch");
+  const ownedProcess = {
+    pid: child.pid,
+    startedAt: identity.startedAt,
+    ownerToken,
+    workspace: job.workspace,
+    repositoryId: store.repositoryId,
+  };
+  child.unref();
+  await store.recordOperation({
+    ...operation,
+    status: "completed",
+    ownedProcess,
+  });
+  const control = (await store.getRun(job.runId))?.control;
+  if (control && !["active", "paused"].includes(control.status)) {
+    await terminateOwnedProcess(ownedProcess);
+    throw new Error("Process launch interrupted; artifacts retained");
+  }
+  return ownedProcess;
+}
+import { Plugin } from "@opencode/plugin";
+import type { Registration } from "@opencode/plugin/promise/registration";
+import { z } from "zod";
+import { handleControlCommand } from "./commands/control.js";
+import { createCommandRouter } from "./commands/router.js";
+import { startDashboard } from "./dashboard/server.js";
+import {
+  createOpenCodeAdapter,
+  reviewToolAlias,
+  reviewTools,
+} from "./opencode/adapter.js";
+import { ralphBridge } from "./opencode/bridge.js";
+import { reconcileRun } from "./recovery/reconcile.js";
+import { openRunStore } from "./state/run-store.js";
+
+// Linked worktrees activate separate OpenCode locations in the same server.
+// Recover shared state once; tearing down one location must not stop another.
+const repositories = new Map<
+  string,
+  { instances: number; ready: Promise<void>; error?: unknown }
+>();
+
+export const RalphPlugin = Plugin.define({
+  id: "ralph",
+  async setup(ctx) {
+    const directory = ctx.location.directory;
+    const store = await openRunStore(directory);
+    const existing = repositories.get(store.root);
+    let activate: () => void = () => {};
+    const repository = existing ?? {
+      instances: 0,
+      ready: new Promise<void>((resolve) => {
+        activate = resolve;
+      }),
+    };
+    repositories.set(store.root, repository);
+    repository.instances++;
+    const registrations: Registration[] = [];
+    const observationAliases = new Set<string>();
+    async function prepareReview(_workspace: string, allowed: string[]) {
+      const catalog = await ctx.tool.list();
+      const selected = catalog.filter(
+        (tool) => allowed.includes(tool.id) && !observationAliases.has(tool.id),
+      );
+      if (!selected.length) return;
+      registrations.push(
+        await ctx.tool.transform((editor) => {
+          for (const tool of selected)
+            editor.add({
+              name: reviewToolAlias(tool.id),
+              description: tool.description,
+              input: tool.input,
+              ...(tool.output ? { output: tool.output } : {}),
+              options: {
+                codemode: false,
+                permission: tool.options?.permission ?? tool.id,
+              },
+              execute: tool.execute,
+            });
+        }),
+      );
+      for (const tool of selected) observationAliases.add(tool.id);
+      await ctx.tool.reload();
+    }
+    let statusEvents:
+      | Awaited<ReturnType<typeof ctx.rpc.register<typeof ralphBridge>>>
+      | undefined;
+    const adapter = createOpenCodeAdapter(
+      {
+        session: ctx.session,
+        assertCommandPermission: async (sessionId, command, hash) => {
+          await ctx.permission.assert({
+            sessionID: sessionId,
+            action: "shell",
+            resources: [
+              JSON.stringify({
+                executable: command.executable,
+                args: command.args,
+                cwd: command.cwd,
+                shell: command.shell,
+              }),
+            ],
+            metadata: { ralphCommandHash: hash, commandId: command.id },
+          });
+        },
+        tools: async () => (await ctx.tool.list()).map((tool) => tool.id),
+        prepareReview,
+        notify: async (_workspace, text) => {
+          await statusEvents?.events.emit("status", { text });
+        },
+      },
+      store,
+    );
+    const recoveryNotifications: string[] = [];
+    try {
+      if (existing) {
+        await repository.ready;
+        if (repository.error) throw repository.error;
+      } else
+        for (const run of await store.listRuns()) {
+          if (
+            run.reviewWorkflow?.status === "terminal" &&
+            Object.values(run.operations).every((op) => op.status !== "intent")
+          )
+            continue;
+          recoveryNotifications.push(
+            JSON.stringify(
+              await reconcileRun({
+                store,
+                directory,
+                runId: run.runId,
+                adapter,
+              }),
+            ),
+          );
+        }
+    } catch (cause) {
+      repository.error = cause;
+      if (--repository.instances === 0) repositories.delete(store.root);
+      throw cause;
+    } finally {
+      activate();
+    }
+    let dashboard: Awaited<ReturnType<typeof startDashboard>>;
+    try {
+      dashboard = await startDashboard(store);
+    } catch (cause) {
+      if (--repository.instances === 0) repositories.delete(store.root);
+      throw cause;
+    }
+    const router = createCommandRouter(
+      store,
+      adapter,
+      dashboard.url,
+      directory,
+    );
+    const eventsAbort = new AbortController();
+    let disposed = false;
+    let notification: ReturnType<typeof setImmediate> | undefined;
+    async function reviewJob(sessionID: string) {
+      for (const run of await store.listRuns()) {
+        const entry = Object.values(run.jobs).find(
+          (job) => job.envelope.sessionId === sessionID,
+        );
+        if (entry?.envelope.readOnly) return entry.envelope;
+      }
+    }
+    async function dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (notification) clearImmediate(notification);
+      eventsAbort.abort();
+      const lastInstance = --repository.instances === 0;
+      if (lastInstance) repositories.delete(store.root);
+      try {
+        if (lastInstance)
+          for (const run of await store.listRuns()) {
+            if (
+              (run.control?.status === "stopped" ||
+                run.reviewWorkflow?.status === "terminal") &&
+              !Object.values(run.operations).some((op) => op.ownedProcess)
+            )
+              continue;
+            await handleControlCommand(
+              "ralph-stop",
+              run.runId,
+              store,
+              adapter,
+              {
+                source: "shutdown",
+              },
+            );
+            const current = await store.getRun(run.runId);
+            await store.recordControl(run.runId, {
+              status: "interrupted",
+              source: "shutdown",
+              facts: current?.control?.facts ?? [],
+            });
+          }
+      } finally {
+52:test("pause freezes dispatch while the active attempt settles; resume preserves revisions", async () => {
+85:test("stop cancels the bound session and rejects late completion without skipping validation", async () => {
+112:test("restart recognizes an already advanced ref exactly once and requires resume", async () => {
+116:    await git("git", ["-C", f.directory, "add", "."]);
+117:    await git("git", ["-C", f.directory, "commit", "-m", "candidate"]);
+119:      await git("git", ["-C", f.directory, "rev-parse", "HEAD"])
+122:    await git("git", ["-C", f.directory, "update-ref", ref, f.commit]);
+141:    await git("git", [
+185:test("uncertain validation remains blocked until an approved complete rerun", async () => {
+188:    await git("git", [
+252:test("owned live process is terminated but a reused PID identity is never signalled", async () => {
+284:test("pause after reviewer settlement prevents repair dispatch until explicit resume", async () => {
+300:    await git("git", ["-C", f.directory, "add", "."]);
+301:    await git("git", ["-C", f.directory, "commit", "-m", "requirements"]);
+303:      await git("git", ["-C", f.directory, "rev-parse", "HEAD"])
+404:test("v2 restart reports recovery, registers controls, and cleanup preserves interruption", async () => {
+427:test("a blocked recovery cannot be bypassed by pause then resume", async () => {
+449:test("journal recovery replaces only a lock whose recorded owner is proven dead", async () => {
+469:test("stop disposes a partially starting approved environment exactly once", async () => {
+509:test("worktree creation interruptions reconcile actual ownership and retain revisions", async () => {
+531:      (await git("git", ["-C", f.directory, "worktree", "list", "--porcelain"]))
+534:    await git("git", [
+591:test("stop cannot erase recovery blockers or make an ambiguous run resumable", async () => {
+620:test("resume waits for stop cleanup to settle", async () => {
+684:      await git("git", [
+742:        await git("git", ["-C", f.workspace, "status", "--porcelain"])
+782:test("restart renews an unanswered question identity and retains approval and active-time budget", async () => {
+882:test("pause lets a production executor save its submission without scheduling a merger", async () => {
+935:    await git("git", [
+969:test("an executor result missing its attempt append blocks recovery instead of silently stranding work", async () => {
+1013:test("pause settles the active merger and defers candidate checks until resume", async () => {
+1056:test("recovery retains and reports a matching active-run lock, blocking foreign ownership", async () => {
+1101:test("restart blocks when an already recorded integration ref no longer matches", async () => {
+1114:    await git("git", [
+1173:              args: ["-e", "process.exit(0)"],
+1243:test("restart during repair dispatch retains the round and attempt and rejects the late callback", async () => {
+1257:    await git("git", ["-C", f.directory, "add", "."]);
+1258:    await git("git", ["-C", f.directory, "commit", "-m", "requirements"]);
+1260:      await git("git", ["-C", f.directory, "rev-parse", "HEAD"])
+1376:test("stop followed by immediate resume cannot revive a merger waiting at a pause boundary", async () => {
+1419:        await git("git", ["-C", f.workspace, "rev-parse", "HEAD"])
+src/commands/router.ts:180:      if (["ralph-pause", "ralph-resume", "ralph-stop"].includes(command)) {
+src/commands/router.ts:184:          command as "ralph-pause" | "ralph-resume" | "ralph-stop",
+src/commands/router.ts:189:        if (command === "ralph-resume" && adapter) {
+src/recovery/reconcile.ts:84:export async function reconcileRun(
+src/recovery/reconcile.ts:102:      { status: "interrupted", source: "recovery", cleanupPending: true },
+src/recovery/reconcile.ts:402:    "Counters, artifact revisions, approvals and recorded results retained. Explicit /ralph-resume required.",
+src/recovery/reconcile.ts:408:    latest.control.source !== "recovery" ||
+src/recovery/reconcile.ts:414:        source: "recovery",
+
+ succeeded in 14686ms:
+1.4.3
+$ tsc --noEmit
+$ biome check src tests scripts
+Checked 98 files in 73ms. No fixes applied.
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/14-recovery.test.ts:
+(pass) pause freezes dispatch while the active attempt settles; resume preserves revisions [95.91ms]
+(pass) stop cancels the bound session and rejects late completion without skipping validation [88.67ms]
+(pass) restart recognizes an already advanced ref exactly once and requires resume [205.88ms]
+(pass) uncertain validation remains blocked until an approved complete rerun [166.62ms]
+(pass) owned live process is terminated but a reused PID identity is never signalled [356.74ms]
+(pass) pause after reviewer settlement prevents repair dispatch until explicit resume [446.66ms]
+(pass) v2 restart reports recovery, registers controls, and cleanup preserves interruption [99.21ms]
+(pass) a blocked recovery cannot be bypassed by pause then resume [65.40ms]
+(pass) journal recovery replaces only a lock whose recorded owner is proven dead [91.14ms]
+(pass) stop disposes a partially starting approved environment exactly once [66.69ms]
+(pass) worktree creation interruptions reconcile actual ownership and retain revisions [141.25ms]
+(pass) uncertain validation.check is disclosed and never repeated [80.21ms]
+(pass) uncertain review.cleanup is disclosed and never repeated [83.05ms]
+(pass) uncertain review.publish is disclosed and never repeated [84.64ms]
+(pass) stop cannot erase recovery blockers or make an ambiguous run resumable [86.03ms]
+(pass) resume waits for stop cleanup to settle [73.45ms]
+(pass) production integration recovers after ref advance before checkout synchronization without redispatch [929.09ms]
+(pass) production integration recovers after ref advance before checkout synchronization with local edits without redispatch [900.87ms]
+(pass) production integration recovers after ref advance before operation result without redispatch [979.48ms]
+(pass) production integration recovers after ref advance before attempt result without redispatch [1001.98ms]
+(pass) restart renews an unanswered question identity and retains approval and active-time budget [268.99ms]
+(pass) pause lets a production executor save its submission without scheduling a merger [873.64ms]
+(pass) recovery observes completed baseline.workspace creation without recreating it [164.34ms]
+(pass) recovery observes completed issue.workspace creation without recreating it [156.95ms]
+(pass) recovery observes completed candidate.workspace creation without recreating it [148.47ms]
+(pass) an executor result missing its attempt append blocks recovery instead of silently stranding work [306.30ms]
+(pass) pause settles the active merger and defers candidate checks until resume [1079.69ms]
+(pass) recovery retains and reports a matching active-run lock, blocking foreign ownership [100.11ms]
+(pass) restart blocks when an already recorded integration ref no longer matches [895.92ms]
+(pass) pause retains a successful in-flight candidate check and waits before advancing the ref (another check: %s) [883.46ms]
+(pass) pause retains a successful in-flight candidate check and waits before advancing the ref (another check: %s) [1213.99ms]
+(pass) restart during repair dispatch retains the round and attempt and rejects the late callback [281.91ms]
+(pass) stop followed by immediate resume cannot revive a merger waiting at a pause boundary [666.89ms]
+
+ 33 pass
+ 0 fail
+ 185 expect() calls
+Ran 33 tests across 1 file. [13.19s]
+
+codex
+This slice is already implemented; no changes were needed.
+
+Verified with pinned Bun 1.4.3:
+
+- Typecheck and lint passed.
+- Recovery tests: 33 passed, 0 failed, 185 assertions.
+- Crash-after-ref-advance tests confirm exactly-once recovery and explicit resume.
+
+Native Linux/Windows process-tree and live OpenCode shutdown checks remain unverified, as documented.
+tokens used
+23,142
+This slice is already implemented; no changes were needed.
+
+Verified with pinned Bun 1.4.3:
+
+- Typecheck and lint passed.
+- Recovery tests: 33 passed, 0 failed, 185 assertions.
+- Crash-after-ref-advance tests confirm exactly-once recovery and explicit resume.
+
+Native Linux/Windows process-tree and live OpenCode shutdown checks remain unverified, as documented.

@@ -1,0 +1,2809 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/1-install-plugin-and-run-opencode-session.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13ccf-afe8-71f0-9995-86ba84f77cc0
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 1 of 15 — 1-install-plugin-and-run-opencode-session.md
+=== END METADATA ===
+
+TASK:
+# 1. Install the plugin and run an OpenCode session
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-8  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Deliver an installable TypeScript plugin whose /ralph-status command reports a durable local run/session result. Exercise a real OpenCode session through a typed adapter, including directory routing and inherited permission behavior. Establish the minimal store, test fixtures, and command dispatch path used by subsequent slices. Pin versions only after the installed package and cross-platform smoke probe demonstrate compatibility.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 101–152): OpenCode lifecycle, deterministic orchestration, persistence, and job identity.
+- `PRD.md` (lines 267–299): compatibility spike, permission policy, and configuration.
+- `PRD.md` (lines 303–351): command surface and durable records.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+
+- `package.json`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/plugin.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/opencode/adapter.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/core/types.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/state/run-store.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/commands/router.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+No implementation exists yet. Establish lower-kebab-case module filenames, named exports, strict TypeScript, and a small OpenCode adapter as the only SDK boundary. Keep feature policy outside SDK callbacks. Represent expected failures as typed results and persist operation intent before side effects; do not infer successful jobs from session.idle alone.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+**Additional constraint:** The compatibility spike is an explicit deliverable, not missing research that later tickets must repeat. Downstream module contracts below are proposed interfaces to establish here.
+
+## Step-by-step tasks
+
+### 1. Establish the runnable package and integration probe
+
+**Files:** `package.json`, `tsconfig.json`, `src/plugin.ts`, `docs/opencode-compatibility.md`
+
+- **IMPLEMENT:** Pin a tested OpenCode/plugin/SDK/Bun combination and expose a plugin entry point. Add typecheck, lint, build, test, test:browser, and test:smoke scripts; later slices supply their named tests. Demonstrate command registration, session creation/prompt/result/abort, workspace-directory routing, event delivery, user response provenance, and permission denial handling. Register a harmless status command through the supported configuration mechanism; do not invent a slash-command registration API.
+- **PATTERN:** Establish the greenfield adapter/state/test conventions above; see PRD.md:101 and PRD.md:148.
+- **IMPORTS:** Import type Plugin from @opencode-ai/plugin; use the supplied plugin client behind the adapter. Import external SDK types only in src/opencode/adapter.ts.
+- **GOTCHA:** Document exact installed versions and working API signatures. If an API requirement is unsupported, record the limitation and do not substitute a detached daemon or silently bypass permissions.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/01-plugin.test.ts`; add the tests below as this slice develops.
+
+### 2. Persist and display a correlated session result
+
+**Files:** `src/opencode/adapter.ts`, `src/core/types.ts`, `src/state/run-store.ts`, `src/commands/router.ts`
+
+- **IMPLEMENT:** Define OpenCodeAdapter with dispatchJob, cancelJob, requestUserInput, and publishStatus contracts. Define JobEnvelope, JobResult, RunRecord, and RunEvent with run/job/attempt/session/commit identities. Create openRunStore with atomic snapshots, append-only events, monotonically increasing revisions, and intent/result recording. /ralph-status returns phase, last result, and errors; persist and reload the same result after reopening the plugin.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; keep session effects behind the adapter.
+- **IMPORTS:** Export createOpenCodeAdapter and the OpenCodeAdapter type from the adapter; export openRunStore and RunStore from the store; import domain types with import type from src/core/types.ts.
+- **GOTCHA:** Resolve repository identity through git rev-parse --git-common-dir using argument arrays. Keep runtime files ignored and canonical across linked worktrees. The source repository currently has no initial commit; test fixtures must initialize their own repositories.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/01-plugin.test.ts`; add the tests below as this slice develops.
+
+### 3. Prove the command-to-session-to-status path
+
+**Files:** `tests/helpers/project.ts`, `tests/helpers/fake-opencode.ts`, `tests/integration/01-plugin.test.ts`, `tests/smoke/opencode.test.ts`
+
+- **IMPLEMENT:** Implement createTestProject for isolated temporary Git repositories and createFakeOpenCode for controllable jobs, approvals, and events. Add behavioral tests for persistent status, denied permissions, directory routing, duplicate events, and late results. Add an explicitly gated real OpenCode smoke probe and initial macOS/Linux/Windows CI coverage.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; keep session effects behind the adapter.
+- **IMPORTS:** Import test, expect, and describe from bun:test; use node:fs/promises, node:os, node:path, and node:child_process for fixtures.
+- **GOTCHA:** Never require paid model calls for the deterministic test suite. Missing live-smoke credentials must be reported as skipped rather than passed.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/01-plugin.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [ ] An installed package exposes /ralph-status and can correlate an actual session response with a persisted job.
+- [ ] A denied OpenCode operation remains denied; direct process execution is not used as a fallback.
+- [ ] Two linked worktrees resolve the same canonical run store; separate repositories do not.
+- [ ] Reopening the store returns identical job identity and ordered events; duplicate completion does not transition twice.
+- [ ] Exact versions, supported platform results, and usable adapter signatures are recorded in docs/opencode-compatibility.md.
+- [ ] This slice's behavioral regression tests pass: `bun test tests/integration/01-plugin.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [ ] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/01-plugin.test.ts
+
+```
+
+**Demonstration:** Install the built package in an isolated fixture, run the gated OpenCode smoke probe, invoke /ralph-status, and confirm the same persisted job result after reopening OpenCode.
+
+## Blocked by
+
+None — can start immediately.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+2026-10-14: Existing implementation retained and verified. Removed an accidental local tarball self-dependency and regenerated `bun.lock`, restoring fresh installation. Added an empty-cache, isolated manifest/lockfile install probe: red (`ENOENT extracting tarball from opencode-ralph-plugin`) before the fix, green afterward. Corrected an observed smoke race by waiting for active plugin inventory after command registration; both server/TUI entry-point assertions remain.
+
+Validation: `bun run typecheck` and `bun run lint` passed. `bun test tests/integration/01-plugin.test.ts`: 19 passed. `OPENCODE_SMOKE=1 bun test tests/smoke/opencode.test.ts`: 2 passed, 1 skipped on macOS arm64/Bun 1.4.3/OpenCode 2.0.29. The latter builds/packs/installs Ralph, runs a real OpenCode session with a local deterministic model, invokes status, and verifies the correlated result after restarting the host. Permission denial, directory routing, events and interruption are exercised.
+
+Exact v2 signatures, the departure from the proposed v1 package import, and results are in `docs/opencode-compatibility.md`; wiki updated in `docs/wiki/features/plugin-session-results.md`. Native Linux/Windows checks remain pending CI, credentialed live-provider execution was skipped, interactive TUI rendering remains unverified, and human-input provenance is explicitly unsupported. No publication or target-branch merge performed.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing implementation and completion evidence, then run this slice’s required checks to confirm whether any work remains.
+exec
+/bin/zsh -lc "pwd; git status --short; rg --files -g AGENTS.md -g package.json -g '*compatibility*' -g '*01-plugin*' -g '*1-install*' -g README.md -g PRD.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+ralph-logs/iter-2-1-install-plugin-and-run-opencode-session.log
+ralph-logs/iter-1-1-install-plugin-and-run-opencode-session.log
+package.json
+README.md
+docs/opencode-compatibility.md
+tests/integration/01-plugin.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc 'cat src/plugin.ts; cat src/opencode/adapter.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+import { Plugin } from "@opencode/plugin";
+import type { Registration } from "@opencode/plugin/promise/registration";
+import { z } from "zod";
+import { handleControlCommand } from "./commands/control.js";
+import { createCommandRouter } from "./commands/router.js";
+import { startDashboard } from "./dashboard/server.js";
+import {
+  createOpenCodeAdapter,
+  reviewToolAlias,
+  reviewTools,
+} from "./opencode/adapter.js";
+import { ralphBridge } from "./opencode/bridge.js";
+import { reconcileRun } from "./recovery/reconcile.js";
+import { openRunStore } from "./state/run-store.js";
+
+// Linked worktrees activate separate OpenCode locations in the same server.
+// Recover shared state once; tearing down one location must not stop another.
+const repositories = new Map<
+  string,
+  { instances: number; ready: Promise<void>; error?: unknown }
+>();
+
+export const RalphPlugin = Plugin.define({
+  id: "ralph",
+  async setup(ctx) {
+    const directory = ctx.location.directory;
+    const store = await openRunStore(directory);
+    const existing = repositories.get(store.root);
+    let activate: () => void = () => {};
+    const repository = existing ?? {
+      instances: 0,
+      ready: new Promise<void>((resolve) => {
+        activate = resolve;
+      }),
+    };
+    repositories.set(store.root, repository);
+    repository.instances++;
+    const registrations: Registration[] = [];
+    const observationAliases = new Set<string>();
+    async function prepareReview(_workspace: string, allowed: string[]) {
+      const catalog = await ctx.tool.list();
+      const selected = catalog.filter(
+        (tool) => allowed.includes(tool.id) && !observationAliases.has(tool.id),
+      );
+      if (!selected.length) return;
+      registrations.push(
+        await ctx.tool.transform((editor) => {
+          for (const tool of selected)
+            editor.add({
+              name: reviewToolAlias(tool.id),
+              description: tool.description,
+              input: tool.input,
+              ...(tool.output ? { output: tool.output } : {}),
+              options: {
+                codemode: false,
+                permission: tool.options?.permission ?? tool.id,
+              },
+              execute: tool.execute,
+            });
+        }),
+      );
+      for (const tool of selected) observationAliases.add(tool.id);
+      await ctx.tool.reload();
+    }
+    let statusEvents:
+      | Awaited<ReturnType<typeof ctx.rpc.register<typeof ralphBridge>>>
+      | undefined;
+    const adapter = createOpenCodeAdapter(
+      {
+        session: ctx.session,
+        assertCommandPermission: async (sessionId, command, hash) => {
+          await ctx.permission.assert({
+            sessionID: sessionId,
+            action: "shell",
+            resources: [
+              JSON.stringify({
+                executable: command.executable,
+                args: command.args,
+                cwd: command.cwd,
+                shell: command.shell,
+              }),
+            ],
+            metadata: { ralphCommandHash: hash, commandId: command.id },
+          });
+        },
+        tools: async () => (await ctx.tool.list()).map((tool) => tool.id),
+        prepareReview,
+        notify: async (_workspace, text) => {
+          await statusEvents?.events.emit("status", { text });
+        },
+      },
+      store,
+    );
+    const recoveryNotifications: string[] = [];
+    try {
+      if (existing) {
+        await repository.ready;
+        if (repository.error) throw repository.error;
+      } else
+        for (const run of await store.listRuns()) {
+          if (
+            run.reviewWorkflow?.status === "terminal" &&
+            Object.values(run.operations).every((op) => op.status !== "intent")
+          )
+            continue;
+          recoveryNotifications.push(
+            JSON.stringify(
+              await reconcileRun({
+                store,
+                directory,
+                runId: run.runId,
+                adapter,
+              }),
+            ),
+          );
+        }
+    } catch (cause) {
+      repository.error = cause;
+      if (--repository.instances === 0) repositories.delete(store.root);
+      throw cause;
+    } finally {
+      activate();
+    }
+    let dashboard: Awaited<ReturnType<typeof startDashboard>>;
+    try {
+      dashboard = await startDashboard(store);
+    } catch (cause) {
+      if (--repository.instances === 0) repositories.delete(store.root);
+      throw cause;
+    }
+    const router = createCommandRouter(
+      store,
+      adapter,
+      dashboard.url,
+      directory,
+    );
+    const eventsAbort = new AbortController();
+    let disposed = false;
+    let notification: ReturnType<typeof setImmediate> | undefined;
+    async function reviewJob(sessionID: string) {
+      for (const run of await store.listRuns()) {
+        const entry = Object.values(run.jobs).find(
+          (job) => job.envelope.sessionId === sessionID,
+        );
+        if (entry?.envelope.readOnly) return entry.envelope;
+      }
+    }
+    async function dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (notification) clearImmediate(notification);
+      eventsAbort.abort();
+      const lastInstance = --repository.instances === 0;
+      if (lastInstance) repositories.delete(store.root);
+      try {
+        if (lastInstance)
+          for (const run of await store.listRuns()) {
+            if (
+              (run.control?.status === "stopped" ||
+                run.reviewWorkflow?.status === "terminal") &&
+              !Object.values(run.operations).some((op) => op.ownedProcess)
+            )
+              continue;
+            await handleControlCommand(
+              "ralph-stop",
+              run.runId,
+              store,
+              adapter,
+              {
+                source: "shutdown",
+              },
+            );
+            const current = await store.getRun(run.runId);
+            await store.recordControl(run.runId, {
+              status: "interrupted",
+              source: "shutdown",
+              facts: current?.control?.facts ?? [],
+            });
+          }
+      } finally {
+        await Promise.allSettled(
+          registrations.map((registration) => registration.dispose()),
+        );
+        await dashboard.stop();
+      }
+    }
+    try {
+      statusEvents = await ctx.rpc.register(ralphBridge, {
+        tools: async () => (await ctx.tool.list()).map((tool) => tool.id),
+        prepareReview: async ({ tools }) => {
+          await prepareReview(directory, tools);
+          return { ok: true };
+        },
+        publishStatus: async ({ text }) => {
+          await statusEvents?.events.emit("status", { text });
+          return { ok: true };
+        },
+      });
+      registrations.push(statusEvents);
+      registrations.push(
+        await ctx.command.transform((editor) => {
+          for (const name of [
+            "ralph-status",
+            "ralph-commands",
+            "ralph-orchestrator",
+            "ralph-pause",
+            "ralph-resume",
+            "ralph-stop",
+          ]) {
+            editor.add({
+              name,
+              description:
+                name === "ralph-status"
+                  ? "Read durable Ralph run status"
+                  : `${name.slice(6)} the durable Ralph run`,
+              async execute(input) {
+                const text = await router.dispatch(
+                  name,
+                  input.prompt.text.trim(),
+                  { workspace: directory, sessionId: input.sessionID },
+                );
+                await adapter.publishStatus(input.sessionID, directory, text);
+                await ctx.session.synthetic({
+                  sessionID: input.sessionID,
+                  text,
+                  description: "Ralph command result",
+                  resume: false,
+                });
+              },
+            });
+          }
+        }),
+      );
+      registrations.push(
+        await ctx.tool.transform((editor) => {
+          editor.add({
+            name: "ralph_status",
+            description:
+              "Read persisted Ralph phase, correlated job result, errors and dashboard URL.",
+            input: z.object({ runId: z.string().optional() }),
+            options: { codemode: false },
+            async execute({ runId }) {
+              return {
+                content: await router.status(runId?.trim() || undefined),
+              };
+            },
+          });
+          editor.add({
+            name: "ralph_control",
+            description:
+              "Pause, resume or stop a durable Ralph run. Use slash commands for explicit user intent.",
+            input: z.object({
+              action: z.enum(["pause", "resume", "stop"]),
+              runId: z.string().optional(),
+            }),
+            options: { codemode: false },
+            async execute({ action, runId }) {
+              return {
+                content: await router.dispatch(
+                  `ralph-${action}`,
+                  runId?.trim() ?? "",
+                ),
+              };
+            },
+          });
+        }),
+      );
+      registrations.push(
+        await ctx.session.hook("context", async (input) => {
+          const job = await reviewJob(input.sessionID);
+          const allowed = job
+            ? new Set([...reviewTools(job)].map(reviewToolAlias))
+            : undefined;
+          for (const name of Object.keys(input.tools)) {
+            if (allowed ? !allowed.has(name) : name.startsWith("ralph_review_"))
+              delete input.tools[name];
+          }
+        }),
+      );
+      // Execution checks also cover tools reached through code mode or renamed
+      // definitions. Never change a host denial into an allow.
+      registrations.push(
+        await ctx.tool.hook("execute.before", async (input) => {
+          const job = await reviewJob(input.sessionID);
+          if (
+            job &&
+            !new Set([...reviewTools(job)].map(reviewToolAlias)).has(input.tool)
+          )
+            throw new Error(
+              `Permission denied: Ralph review cannot execute ${input.tool}`,
+            );
+        }),
+      );
+      const events = ctx.event.subscribe({ signal: eventsAbort.signal });
+      void (async () => {
+        try {
+          for await (const event of events) {
+            if (disposed) break;
+            await adapter.receiveEvent(event);
+          }
+        } catch (cause) {
+          if (!eventsAbort.signal.aborted)
+            console.error("Ralph event subscription failed", cause);
+        }
+      })();
+      // Host activation must finish before emitting notifications.
+      notification = setImmediate(async () => {
+        for (const text of recoveryNotifications) {
+          if (disposed) break;
+          await adapter.publishStatus("", directory, text);
+        }
+      });
+      notification.unref();
+      return dispose;
+    } catch (cause) {
+      await dispose();
+      throw cause;
+    }
+  },
+});
+export default RalphPlugin;
+import { randomUUID } from "node:crypto";
+import {
+  OpenCode,
+  type OpenCodeClient,
+  type SessionApi,
+  type V2Event,
+} from "@opencode/client";
+import { executorQuestionSchema } from "../agents/results.js";
+import type {
+  Failure,
+  JobEnvelope,
+  JobResult,
+  UserInputRequest,
+  UserInputResult,
+} from "../core/types.js";
+import type { RunStore } from "../state/run-store.js";
+import { ralphBridge } from "./bridge.js";
+
+export interface OpenCodeAdapter {
+  getSessionModel?(sessionId: string): Promise<JobEnvelope["model"]>;
+  /** Explicit host permission; no SDK denial may fall back to direct execution. */
+  authorizeCommand?(request: {
+    job: JobEnvelope;
+    command: import("../config/commands.js").CommandSpec;
+    hash: string;
+  }): Promise<{ ok: boolean; error?: Failure }>;
+  inspectSession?(
+    job: JobEnvelope,
+  ): Promise<"idle" | "busy" | "missing" | "unknown">;
+  discoverTools?(workspace: string): Promise<string[]>;
+  dispatchJob(job: JobEnvelope): Promise<JobResult>;
+  cancelJob(job: JobEnvelope): Promise<{ ok: boolean; error?: Failure }>;
+  requestUserInput(request: UserInputRequest): Promise<UserInputResult>;
+  publishStatus(
+    sessionId: string,
+    workspace: string,
+    text: string,
+  ): Promise<{ ok: boolean; error?: Failure }>;
+  receiveEvent(event: V2Event): Promise<void>;
+}
+
+export interface AdapterHost {
+  assertCommandPermission?(
+    sessionId: string,
+    command: import("../config/commands.js").CommandSpec,
+    hash: string,
+  ): Promise<void>;
+  session: Pick<
+    SessionApi,
+    "create" | "get" | "prompt" | "wait" | "context" | "interrupt"
+  > &
+    Partial<Pick<SessionApi, "active">>;
+  tools(workspace: string): Promise<string[]>;
+  prepareReview(workspace: string, tools: string[]): Promise<void>;
+  notify(workspace: string, text: string): Promise<void>;
+}
+
+export function createAdapterClient(
+  baseUrl: string,
+  fetch?: (input: Request) => Promise<Response>,
+  headers?: RequestInit["headers"],
+): OpenCodeClient & AdapterHost {
+  const client = OpenCode.make({
+    baseUrl,
+    ...(headers ? { headers } : {}),
+    ...(fetch
+      ? {
+          fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
+            fetch(new Request(input, init))) as typeof globalThis.fetch,
+        }
+      : {}),
+  });
+  const bridge = client.rpc(ralphBridge);
+  return Object.assign(client, {
+    tools: (workspace: string) =>
+      bridge.tools({}, { location: { directory: workspace } }),
+    prepareReview: async (workspace: string, tools: string[]) => {
+      await bridge.prepareReview(
+        { tools },
+        { location: { directory: workspace } },
+      );
+    },
+    notify: async (workspace: string, text: string) => {
+      await bridge.publishStatus(
+        { text },
+        { location: { directory: workspace } },
+      );
+    },
+  });
+}
+
+function statusOf(cause: unknown): number | undefined {
+  if (!cause || typeof cause !== "object") return undefined;
+  const value = cause as { status?: number; cause?: unknown };
+  return (
+    value.status ?? (value.cause !== cause ? statusOf(value.cause) : undefined)
+  );
+}
+function failure(cause: unknown): Failure {
+  const message =
+    cause instanceof Error
+      ? cause.message
+      : (JSON.stringify(cause) ?? "Unknown SDK failure");
+  return {
+    code:
+      statusOf(cause) === 403 ||
+      /permission.*(denied|rejected)|PermissionDenied|not allowed|declined/i.test(
+        message,
+      )
+        ? "permission-denied"
+        : "sdk-error",
+    message,
+    cause:
+      cause instanceof Error
+        ? { name: cause.name, message: cause.message, status: statusOf(cause) }
+        : cause,
+  };
+}
+
+// Only observation tools may execute in review sessions. Shell and delegation
+// remain excluded even if supplied as observation tools.
+export function reviewTools(job: JobEnvelope): Set<string> {
+  return new Set([
+    "read",
+    "glob",
+    "grep",
+    "list",
+    ...(job.role === "functional-review"
+      ? (job.observationTools ?? []).filter(
+          (name) =>
+            ![
+              "edit",
+              "write",
+              "patch",
+              "apply_patch",
+              "bash",
+              "shell",
+              "subagent",
+              "opencode",
+              "execute",
+              "ralph_control",
+            ].includes(name),
+        )
+      : []),
+  ]);
+}
+export function reviewToolAlias(name: string) {
+  return `ralph_review_${name}`;
+}
+
+export function createOpenCodeAdapter(
+  client: AdapterHost,
+  store: RunStore,
+): OpenCodeAdapter {
+  async function finish(job: JobEnvelope, error: Failure): Promise<JobResult> {
+    const result: JobResult = {
+      ...job,
+      outcome: error.code === "permission-denied" ? "denied" : "failed",
+      error,
+      evidence: [],
+    };
+    await store.recordResult(result);
+    const current = (await store.getRun(job.runId))?.jobs[job.jobId];
+    return current?.envelope.attempt === job.attempt && current.result
+      ? current.result
+      : { ...job, outcome: "cancelled", evidence: [] };
+  }
+  async function abortSession(
+    job: JobEnvelope,
+  ): Promise<{ ok: boolean; error?: Failure }> {
+    if (!job.sessionId) return { ok: true };
+    // Keep the durable operation name so old journals remain readable.
+    const operation = {
+      operationId: randomUUID(),
+      kind: "session.abort" as const,
+      job,
+      status: "intent" as const,
+    };
+    await store.recordOperation(operation);
+    let error: Failure | undefined;
+    try {
+      await client.session.interrupt({ sessionID: job.sessionId });
+    } catch (cause) {
+      error = failure(cause);
+    }
+    await store.recordOperation({
+      ...operation,
+      status: error ? "failed" : "completed",
+      ...(error ? { error } : {}),
+    });
+    return error ? { ok: false, error } : { ok: true };
+  }
+  return {
+    async authorizeCommand({ job, command, hash }) {
+      if (!job.sessionId || !client.assertCommandPermission)
+        return {
+          ok: false,
+          error: {
+            code: "unsupported",
+            message: "Host command permission assertion is unavailable",
+          },
+        };
+      try {
+        await client.assertCommandPermission(job.sessionId, command, hash);
+        return { ok: true };
+      } catch (cause) {
+        return { ok: false, error: failure(cause) };
+      }
+    },
+    async inspectSession(job) {
+      if (!job.sessionId) return "missing";
+      try {
+        const session = await client.session.get({ sessionID: job.sessionId });
+        if (client.session.active) {
+          const active = await client.session.active();
+          return active[job.sessionId] ? "busy" : "idle";
+        }
+        return session.outcome ? "idle" : "unknown";
+      } catch (cause) {
+        return statusOf(cause) === 404 ? "missing" : "unknown";
+      }
+    },
+    async getSessionModel(sessionId) {
+      const session = await client.session.get({ sessionID: sessionId });
+      return session.model
+        ? { providerID: session.model.providerID, modelID: session.model.id }
+        : undefined;
+    },
+    discoverTools: (workspace) => client.tools(workspace),
+    async dispatchJob(job) {
+      if (!(await store.recordIntent(job))) {
+        const existing = (await store.getRun(job.runId))?.jobs[job.jobId];
+        if (existing?.envelope.attempt === job.attempt && existing.result)
+          return existing.result;
+        return {
+          ...job,
+          outcome: "failed",
+          error: {
+            code: "sdk-error",
+            message: "Duplicate or stale dispatch; no side effect performed",
+          },
+          evidence: [],
+        };
+      }
+      let bound = job;
+      try {
+        if (job.readOnly)
+          await client.prepareReview(job.workspace, [...reviewTools(job)]);
+        const created = await client.session.create({
+          location: { directory: job.workspace },
+          title: `Ralph ${job.runId}/${job.jobId}/${job.attempt}`,
+          ...(job.model
+            ? {
+                model: {
+                  providerID: job.model.providerID,
+                  id: job.model.modelID,
+                },
+              }
+            : {}),
+          metadata: {
+            ralph: { runId: job.runId, jobId: job.jobId, attempt: job.attempt },
+          },
+        });
+        bound = { ...job, sessionId: created.id };
+        if (!(await store.attachSession(job, created.id))) {
+          const abort = await abortSession(bound);
+          return {
+            ...bound,
+            outcome: "cancelled",
+            evidence: [],
+            ...(abort.error ? { error: abort.error } : {}),
+          };
+        }
+        const textInput = job.readOnly
+          ? `${job.prompt}\nUse the observation tools prefixed ralph_review_ (for example ralph_review_read). Other tools are unavailable in this review session.`
+          : job.prompt;
+        const prompt = await client.session.prompt({
+          sessionID: created.id,
+          text: textInput,
+        });
+        if (prompt.sessionID !== created.id)
+          return finish(bound, {
+            code: "missing-output",
+            message: "OpenCode returned an uncorrelated prompt receipt",
+          });
+        // v2 acknowledges the inbox item immediately. Waiting is a barrier, not
+        // success evidence; inspect the completed turn behind the same receipt.
+        await client.session.wait({ sessionID: created.id });
+        const history = await client.session.context({ sessionID: created.id });
+        const start = history.findIndex(
+          (message) => message.id === prompt.id && message.type === "user",
+        );
+        if (start < 0)
+          return finish(bound, {
+            code: "missing-output",
+            message: "No correlated delivered prompt in session context",
+          });
+        const turn = history.slice(start + 1);
+        if (
+          turn.some(
+            (message) =>
+              message.type === "user" || message.type === "synthetic",
+          )
+        )
+          return finish(bound, {
+            code: "missing-output",
+            message: "Session received another input before result collection",
+          });
+        const assistants = turn.filter(
+          (message) => message.type === "assistant",
+        );
+        const tools = assistants
+          .flatMap((message) => message.content)
+          .filter((part) => part.type === "tool");
+        const denied = tools.find(
+          (part) =>
+            part.state.status === "error" &&
+            failure(part.state.error).code === "permission-denied",
+        );
+        if (denied && denied.state.status === "error")
+          return finish(bound, failure(denied.state.error));
+        const failedTool = tools.find(
+          (part) =>
+            part.state.status === "error" ||
+            part.name === "invalid" ||
+            (part.state.status === "completed" &&
+              (part.state.metadata?.error === true ||
+                (Array.isArray(part.state.metadata?.toolCalls) &&
+                  part.state.metadata.toolCalls.some(
+                    (call) =>
+                      call &&
+                      typeof call === "object" &&
+                      "status" in call &&
+                      call.status === "error",
+                  )))),
+        );
+        if (failedTool)
+          return finish(bound, {
+            code: "sdk-error",
+            message:
+              failedTool.state.status === "error"
+                ? failedTool.state.error.message
+                : "OpenCode reported an invalid or failed tool call",
+            cause: failedTool,
+          });
+        const idle = [...turn]
+          .reverse()
+          .find((message) => message.type === "idle");
+        if (idle?.type === "idle" && idle.outcome !== "succeeded")
+          return finish(
+            bound,
+            idle.error
+              ? failure(idle.error)
+              : {
+                  code:
+                    idle.outcome === "interrupted" ? "cancelled" : "sdk-error",
+                  message: `OpenCode session ${idle.outcome}`,
+                },
+          );
+        const assistant = assistants.at(-1);
+        if (assistant?.error) return finish(bound, failure(assistant.error));
+        const text = assistant?.content
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n")
+          .trim();
+        if (
+          !assistant?.time.completed ||
+          !text ||
+          assistant.finish !== "stop" ||
+          idle?.type !== "idle" ||
+          idle.outcome !== "succeeded"
+        )
+          return finish(bound, {
+            code: "missing-output",
+            message: "No completed correlated assistant text response",
+          });
+        let question: JobResult["question"];
+        if (job.role === "executor") {
+          let raw: unknown;
+          try {
+            raw = JSON.parse(text);
+          } catch {
+            /* Submission parsing owns other output validation. */
+          }
+          if (
+            raw &&
+            typeof raw === "object" &&
+            "kind" in raw &&
+            raw.kind === "needs_input"
+          )
+            question = executorQuestionSchema.parse(raw);
+        }
+        const result: JobResult = {
+          ...bound,
+          outcome: question ? "needs_input" : "completed",
+          ...(question ? { question } : {}),
+          text,
+          evidence: [assistant.id],
+        };
+        await store.recordResult(result);
+        const current = (await store.getRun(job.runId))?.jobs[job.jobId];
+        return current?.envelope.attempt === job.attempt && current.result
+          ? current.result
+          : { ...bound, outcome: "cancelled", evidence: [] };
+      } catch (cause) {
+        return finish(bound, failure(cause));
+      }
+    },
+    async cancelJob(job) {
+      const entry = (await store.getRun(job.runId))?.jobs[job.jobId];
+      if (!entry || entry.envelope.attempt !== job.attempt)
+        return {
+          ok: false,
+          error: { code: "sdk-error", message: "Unknown or stale job" },
+        };
+      if (entry.status === "terminal") return { ok: true };
+      await store.recordResult({
+        ...entry.envelope,
+        outcome: "cancelled",
+        evidence: [],
+        error: { code: "cancelled", message: "Cancellation requested" },
+      });
+      return abortSession(entry.envelope);
+    },
+    async requestUserInput(_request) {
+      return {
+        ok: false,
+        error: {
+          code: "unsupported",
+          message:
+            "Ralph has no verified human approval/provenance channel yet. No assistant or API-created message is accepted as approval.",
+        },
+      };
+    },
+    async publishStatus(_sessionId, workspace, text) {
+      try {
+        await client.notify(workspace, text);
+        return { ok: true };
+      } catch (cause) {
+        return { ok: false, error: failure(cause) };
+      }
+    },
+    async receiveEvent(event) {
+      if (event.type !== "permission.replied" || event.data.reply !== "reject")
+        return;
+      for (const run of await store.listRuns()) {
+        for (const entry of Object.values(run.jobs)) {
+          if (
+            entry.status !== "terminal" &&
+            entry.envelope.sessionId === event.data.sessionID
+          )
+            await finish(entry.envelope, {
+              code: "permission-denied",
+              message: "OpenCode permission rejected",
+              cause: event.data,
+            });
+        }
+      }
+    },
+  };
+}
+
+exec
+/bin/zsh -lc 'cat package.json; cat .bun-version; cat docs/opencode-compatibility.md' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'cat src/core/types.ts; cat src/state/run-store.ts; cat src/commands/router.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc "sed -n '88,152p' PRD.md; sed -n '267,351p' PRD.md; cat README.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+1.4.3
+# OpenCode compatibility
+
+## Supported combination
+
+This package targets **OpenCode 2.0.29**. Its server/TUI definitions and typed adapter use the v2 API; v1 hosts are no longer supported. Version 0.2.0 replaces the earlier 1.19.0 integration.
+
+| Component | Exact version |
+| --- | --- |
+| `@opencode/cli` (development/test CLI) | 2.0.29 |
+| `@opencode/plugin`, `@opencode/client`, `@opencode/schema` | 2.0.29 |
+| Bun | 1.4.3 |
+| TypeScript / Biome | 5.9.3 / 2.4.6 |
+
+The real-server smoke probe builds, packs, installs and loads the package in an isolated Git repository. On macOS arm64 it exercises completed sessions, direct commands without model calls, event subscription, denied shell execution, linked-worktree observation restrictions, persistence, restart, explicit resume, interruption and status RPC. The deterministic local model proves the host boundary, not credentialed external-provider behavior. Native Linux/Windows results remain pending CI.
+
+## Installation and entry points
+
+Follow [README](../README.md). Configure `plugins` with the installed **package directory**, preferably a canonical, encoded file URL. Do not use the old `plugin` entry pointing to `dist/plugin.js`. OpenCode resolves `server.js` and `tui.js` from that directory; both have default definitions with `id: 'ralph'` and `setup(context)`. Package imports also expose `/server` and `/tui`.
+
+Tests use `node_modules/@opencode/cli/bin/opencode.exe`, including on macOS/Linux. The manifest trusts this pinned CLI's postinstall script. Version changes require new runtime evidence, not just a dependency bump.
+
+V2 activates external plugins asynchronously. Wait for command registration before dispatching external jobs; otherwise initial recovery may encounter newly recorded job intent. Local configuration changes require host activation/reload to complete.
+
+Command registration can be visible before `plugin.list` publishes the active plugin. The installed-package probe also waits for that inventory entry before checking server/TUI features. This preserves the supported v2 mapping described in the [official plugin documentation](https://opencode.ai/v2/docs/build/plugins/); the ticket's proposed `@opencode-ai/plugin` import belongs to v1.
+
+## Session adapter
+
+`src/opencode/adapter.ts` accepts a narrow `AdapterHost`; `createAdapterClient` supplies it over the real v2 client and Ralph RPC. The plugin supplies the host's native session domain. V2 calls use flattened options and throw typed/transport failures rather than returning v1 `{ data, error, response }` envelopes.
+
+```ts
+const client = createAdapterClient(url, undefined, {
+  Authorization: `Basic ${btoa('opencode:' + password)}`,
+});
+const session = await client.session.create({
+  location: { directory }, title,
+  model: { providerID, id: modelID },
+});
+const receipt = await client.session.prompt({ sessionID: session.id, text });
+await client.session.wait({ sessionID: session.id });
+const history = await client.session.context({ sessionID: session.id });
+await client.session.interrupt({ sessionID: session.id });
+await client.session.command({ sessionID: session.id, name: 'ralph-status', text: runId });
+const commands = await client.command.list({ location: { directory } });
+for await (const event of client.event.subscribe({ signal })) { /* v2 event.data */ }
+```
+
+Job intent is durable before session creation; the returned session ID is durable before prompting. Workspace selection occurs at session creation; subsequent calls target that session ID. Model fields map from Ralph's `{ providerID, modelID }` contract to v2 `{ providerID, id }`.
+
+Prompt acknowledgment is not completion. The adapter waits, finds the delivered user message with the receipt's ID, and checks the subsequent turn. Success requires completed assistant text, `finish: 'stop'`, a successful idle record and no failed tools or session errors. Unexpected subsequent input makes correlation uncertain and returns missing output. Earlier failed/denied tools, including caught code-mode failures in tool metadata, cannot be erased by later assistant success.
+
+Cancellation is recorded before interruption. Journals retain the existing `session.abort` operation kind for compatibility with persisted state; v2 uses `session.interrupt` underneath. A late-created cancelled session is interrupted without prompting. Stale results cannot update superseded attempts.
+
+## Commands, observations and notifications
+
+Commands register with `context.command.transform`; tools register with `context.tool.transform`. Status/pause/resume/stop execute directly. The exact command output is queued as a synthetic inbox item with `resume: false`, and a status event notifies the TUI without waking the model. Pending output can be inspected with `client.session.inbox.list`; it is consumed on the next session execution. Status never depends on generated assistant text.
+
+V2 does not expose the plugin tool catalog as a public client endpoint. `src/opencode/bridge.ts` defines location-scoped Ralph RPC for tool discovery, observation preparation and status notification. Review sessions expose only `ralph_review_*` aliases of permitted observation tools. Aliases retain each original tool's permission action and execution function. Context filtering hides mutation tools and code-mode `execute`; the execution hook also rejects unapproved calls. Normal sessions retain their original tools and hide the observation aliases. Host denials are never changed to allows and no permissions are automatically approved.
+
+The TUI entry listens for `rpc.ralph.status` in its location and shows an informational toast; cleanup unsubscribes. Server-only consumers can subscribe to status RPC events and use the durable status/dashboard. Interactive TUI rendering has unit contract coverage; native interactive/platform validation remains pending.
+
+## Recovery and remaining limits
+
+The canonical Git common directory owns `<git-common-dir>/ralph/runs`. Its fsynced JSONL journal remains authoritative; snapshots use atomic rename and writers use ownership-verified locks. Linked worktrees share state. Multiple v2 locations in one server recover that state once and only the last location's cleanup stops shared work. Restart still requires explicit resume and never resets attempts or review budgets. No new state schema or migration is needed for existing journals.
+
+V2 exposes session forms, but Ralph's human-input/approval provenance workflow is still absent. `requestUserInput` remains explicitly unsupported; neither assistant text nor API-created user messages establish human approval. The command setup workflow now validates correlated host-supplied approvals and lifecycle execution in fixtures, with production execution permissions delegated to `ctx.permission.assert`. Production human approval remains unsupported. Deterministic installed-package coverage now includes setup, interview/PRD/graph approval, baseline, issue execution/integration and explicit dual-review coordination. The scheduler automatically starts code review only; functional lifecycle options must be supplied by a host. See [README](../README.md) and [package validation](package-validation.md).
+
+## Reproduce
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run lint
+bun run test
+OPENCODE_SMOKE=1 bun run test:smoke
+bun run test:package
+```
+
+On PowerShell set `$env:OPENCODE_SMOKE='1'` before running the smoke suite. The local probe uses an isolated test-only Basic-auth password. The separate live probe requires `OPENCODE_LIVE_SMOKE=1`, `OPENCODE_SMOKE_URL`, `OPENCODE_SMOKE_MODEL=provider/model` and the server's `OPENCODE_SMOKE_PASSWORD`; without its opt-in/endpoint/model it is skipped. Do not put credentials in package resources or fixture data.
+
+## Issue 1 verification — 2026-10-14
+
+- macOS arm64, Bun 1.4.3: typecheck and lint passed; all 19 issue-1 integration tests passed.
+- `OPENCODE_SMOKE=1 bun test tests/smoke/opencode.test.ts`: **2 passed, 1 skipped**. The fresh-source install uses only the manifest/lockfile and an empty package cache. The installed-package probe builds, packs and loads Ralph in real OpenCode 2.0.29, correlates its local model response through the public router/adapter, preserves permission denial, observes events and verifies status after host restart.
+- Red/green evidence: the empty-cache install failed with `ENOENT extracting tarball from opencode-ralph-plugin` before removing the accidental self-dependency from the manifest and regenerating the lockfile. It then passed. A warm cache had concealed the missing archive. Package installation must not depend on a previously built copy of itself.
+- The real probe initially failed on an unpublished plugin inventory entry; the probe now waits for active inventory independently of command registration, retaining its TUI assertion.
+- Fresh-install checks are gated because they download dependencies; the deterministic issue-1 suite requires neither network model access nor paid calls. Credentialed external-provider execution was skipped. Linux and Windows have CI jobs but were not run here; interactive TUI and human-response provenance remain unverified/unsupported as described above.
+
+## Packaged workflow verification — 2026-10-15
+
+macOS arm64, Bun 1.4.3 and the pinned OpenCode 2.0.29 combination passed the installed host smoke (3 passed across the smoke suite, 1 credentialed-provider skip), complete deterministic two-consumer setup-to-report test, six Chromium checks, typecheck/lint and the integration suite (194 passed, 1 separately gated browser smoke skipped). The demo performs real Git/TDD/integration and a real timeout omission; human responses and agent prose are supplied at the public adapter boundary. Full results, reproducible commands and remaining production/native-platform blockers are recorded in [package validation](package-validation.md). No Linux, native Windows or credentialed full-workflow success is claimed by these local results.
+
+ succeeded in 0ms:
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+
+## 6. Core Architecture & Patterns
+
+### 6.1 OpenCode integration
+
+The product runs as an OpenCode plugin. Slash commands enter the workflow. Agent jobs use separate OpenCode sessions where specified. Model selection defaults to the model used when the run starts; role overrides are captured with the run. Existing OpenCode permissions remain in force.
+
+The plugin owns the orchestration runtime and dashboard server. It does not launch an independent long-lived orchestration service. On graceful OpenCode shutdown it stops scheduling and terminates owned processes. After an unexpected exit, recovery checks reconcile any surviving processes and worktrees before continuation.
+
+### 6.2 Deterministic orchestration
+
+Use an explicit persistent state machine, not a long prompt that asks an agent to remember and enforce the whole flow. Agent messages and completion events are inputs to the state machine; they are not sufficient evidence that a merge or check passed.
+
+Major feature states:
+
+`interview → explanation approval → PRD → issue planning → execution approval → preflight/baseline → execution → final review → terminal result`
+
+Waiting, paused, interrupted, and blocked conditions are persisted separately from successful phase completion. Terminal results distinguish verified completion, completion with missing validation, incomplete functional review, unresolved review findings, and stopped execution.
+
+### 6.3 Responsibilities
+
+| Component | Responsibility |
+| --- | --- |
+| OpenCode adapter | Commands, chat questions and approvals, session creation, agent invocation, permissions, and events |
+| Orchestrator | Phase transitions, approval revisions, scheduling, attempt accounting, recovery, and repository lock |
+| Git integration service | Worktrees, branches, candidate merges, commit verification, and sequential branch advancement |
+| Command runner | Approved lifecycle commands, timeouts, process trees, logs, and run-local skipped-check list |
+| Agent roles | Interview, command discovery, PRD authoring, issue planning, execution, merging, and two reviews |
+| State store | Atomic state updates, append-only events, artifacts, and session/commit references |
+| Dashboard | Read-only snapshots, event streaming, graph, logs, and final outcome |
+
+### 6.4 Local artifacts
+
+Proposed layout; these paths are implementation defaults rather than user-prescribed names:
+
+```text
+.ralph/
+  commands.json                  # Approved project lifecycle/check configuration
+  config.json                    # Models, concurrency, timeouts, skill overrides
+  features/<feature-id>/
+    PRD.md
+    issues/<issue-id>-<title>.md
+    graph.json                   # Machine-readable dependencies and issue references
+  runs/<run-id>/                  # Local runtime state, events, logs, reports
+```
+
+Keep configuration and approved requirements suitable for version control. Ignore runtime logs, transient state, process metadata, and credentials. Store canonical run state in a location shared by the repository's linked worktrees; do not create independent schedulers from copies of tracked files. Use the repository's Git common directory to identify its lock and canonical runtime root.
+
+The bundled `to-issues` workflow is adapted to the per-feature issue directory. This intentionally differs from its standalone `.agents/issues/` default, keeping separate feature graphs unambiguous.
+
+### 6.5 Durable job contracts
+
+Each dispatched job records role, run ID, issue ID when relevant, attempt, session, workspace, input artifact revisions, and starting commit. Results reference produced commits, logs, evidence, findings, or questions.
+
+Persist intent before externally visible Git/process operations, then persist their observed result. Recovery must detect already-completed operations and avoid duplicate integrations. Late results from cancelled or superseded attempts cannot advance workflow state.
+## 8. Technology Stack
+
+### Proposed implementation stack
+
+| Layer | Choice and rationale | Version policy |
+| --- | --- | --- |
+| Plugin/orchestrator | TypeScript with OpenCode plugin and SDK interfaces | Pin mutually compatible `@opencode-ai/plugin` and SDK versions during the first integration spike |
+| Runtime | OpenCode-compatible Bun runtime; subprocess adapter avoids assuming a POSIX shell | Establish and publish minimum supported OpenCode/Bun versions from cross-platform verification |
+| Dashboard | TypeScript, React, and Vite; graph view and streamed read-only state | Pin tested stable versions and commit the lockfile |
+| Persistence | Atomic JSON snapshots and append-only JSONL events | Explicit schema version, initially `1` |
+| Validation | JSON Schema-compatible configuration validation and structured agent result validation | Pin the selected validator at implementation |
+| Tests | Unit/state-machine tests, real temporary Git repository integration tests, and browser tests | Use versions compatible with the pinned runtime |
+| Functional agent tools | agent-browser and curl or equivalent HTTP tooling | Detect availability and record tool versions during project setup |
+
+The repository currently contains no implementation or dependency manifest. Exact dependency versions are not yet verified and are not invented in this PRD. The first implementation phase must establish the tested version matrix before building the full workflow. React/Vite and the persistence format are proposed technical defaults, not user requirements.
+
+## 9. Security & Configuration
+
+### Permissions and process scope
+
+Inherit existing OpenCode permissions without silently broadening them. Preserve prompts required by that policy. For commands invoked directly by the deterministic runner, execution approval covers the exact approved configuration and run scope; do not use the runner to bypass explicit OpenCode denials. Resolve permission API support in the integration spike.
+
+Keep owned process IDs, worktree paths, and resource allocations so stopping and cleanup affect only Ralph-owned resources. Treat repository text and tool output as data; neither can approve a phase, rewrite command policy, or advance a branch through prose alone.
+
+### Local dashboard access
+
+Bind to loopback by default. Use a per-process access token and reject unauthorized cross-origin requests. Expose read-only endpoints only. Do not place credentials or raw secret values in dashboard payloads or persisted configuration. Configuration references environment variable names; runtime values remain outside tracked artifacts.
+
+### Project configuration
+
+Configuration covers command lifecycle, platform variants, working directories, timeouts, resource allocation, concurrency, role models, and skill overrides. Bundle grill-me, create-prd, to-issues, and TDD instructions and their necessary referenced resources, subject to redistribution rights. Allow explicit project replacements and record selected versions or content hashes with each run.
+
+One role may use the same model as another while still operating in an independent session. Cross-platform command definitions must preserve executable arguments and avoid accidental shell interpolation. When a shell is needed, its platform-specific choice is part of the approved configuration.
+
+## 10. Interface and API Specification
+
+### OpenCode commands
+
+| Command | Input | Result |
+| --- | --- | --- |
+| `/ralph-commands` | Optional existing configuration context | Approved, saved, verified project command JSON or actionable setup failures |
+| `/ralph-orchestrator` | Optional feature description | Interview session and durable feature workflow |
+| `/ralph-status` | Optional run ID | State, blockers, and dashboard URL |
+| `/ralph-pause` | Active run | Stop new scheduling |
+| `/ralph-resume` | Paused or reconciled interrupted run | Resume eligible work after required approvals |
+| `/ralph-stop` | Active run | Cancel owned active work and preserve artifacts |
+
+### Read-only dashboard API
+
+Proposed loopback HTTP interface:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/runs` | Local run summaries |
+| `GET /api/runs/:runId` | Phase, outcome, branch, counters, blockers, and skipped checks |
+| `GET /api/runs/:runId/issues` | Issue graph and per-issue execution status |
+| `GET /api/runs/:runId/events` | Server-sent events with sequence IDs and reconnect support |
+| `GET /api/runs/:runId/logs/:logId` | Bounded log retrieval from known run-owned logs |
+
+Require the local access token. Missing or invalid authentication returns `401`; unknown run/log IDs return `404`. Do not accept arbitrary filesystem paths or browser-originated mutation requests.
+
+Illustrative run snapshot:
+
+```json
+{
+  "schemaVersion": 1,
+  "runId": "feature-001",
+  "phase": "execution",
+  "integrationBranch": "ralph/feature-001",
+  "verification": "incomplete",
+  "skippedChecks": [
+    { "id": "integration-tests", "reason": "timeout", "attempt": 1 }
+  ]
+}
+```
+
+### Minimum internal records
+
+- **Run:** approved artifact revisions, configuration revision, branch/commit, phase, repository identity, skip list, review round, outcome.
+- **Issue:** stable ID, artifact reference, dependencies, status, attempt, branch/worktree, session, submission and integration commit.
+- **Check result:** configured check ID, candidate commit, exit status or timeout, timestamps, log reference.
+- **Finding:** reviewer, reviewed commit, severity, criterion, evidence, repair task, disposition.
+- **Approval:** phase, artifact revision, user response, timestamp. Stale approvals cannot authorize changed artifacts.
+
+These are behavioral contracts; exact SDK calls and transport details must be validated against the pinned OpenCode release.
+# Ralph for OpenCode
+
+A locally installable OpenCode plugin with durable session jobs, independent code and functional review, bounded review repairs, a read-only dashboard, and interruption recovery. Exact tested dependencies and platform results are in [compatibility](docs/opencode-compatibility.md).
+
+The complete deterministic setup-to-report demonstration runs through the installed public command/adapter boundary. Production human answers and approvals remain blocked: the OpenCode adapter cannot yet verify their provenance. A host integration must supply correlated human responses. The automatic scheduler starts code review; a host must call `reviewFeature` with functional environment, surface and observation-tool options for the final dual review/report. Native Linux/Windows and credentialed full-workflow evidence remain release blockers. See [package validation](docs/package-validation.md).
+
+## Build and install locally
+
+Use Git and the Bun version in `.bun-version` (also pinned in `package.json`). From this source directory:
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run lint
+bun run pack:local
+```
+
+Copy `opencode-ralph-plugin-0.2.0.tgz` to each target repository, then run there:
+
+```sh
+bun add ./opencode-ralph-plugin-0.2.0.tgz
+bun -e 'console.log(require("node:url").pathToFileURL(require("node:fs").realpathSync("node_modules/opencode-ralph-plugin")).href)'
+```
+
+Add the generated, encoded URL to the repository's `opencode.json`, preserving any existing settings:
+
+```json
+{
+  "plugins": ["REPLACE_WITH_GENERATED_PACKAGE_DIRECTORY_URL"]
+}
+```
+
+Use the **entire** URL printed by the command. It points to the package directory, where OpenCode resolves `server.js` and `tui.js`; do not point it to `dist/plugin.js`. This handles Windows drives and spaces. The example uses single quotes around JavaScript for PowerShell and POSIX shells; native Windows results are pending CI. A relative tarball dependency is recommended; Bun 1.4.3 failed to install the tested percent-encoded absolute `file:` tarball URL with spaces. Each target must be a Git repository. The repository root need not have a commit just to load the plugin; feature/review operations need committed inputs.
+
+Start OpenCode **2.0.29** in that repository (see compatibility for the local binary path). Restart OpenCode after changing plugin configuration. No registry publication is required or performed by these scripts.
+
+## Commands and operation
+
+- `/ralph-commands` explores lifecycle commands in a read-only session, presents the exact revision/hash, and requires a correlated human approval before saving `.ralph/commands.json`. Production approval currently reports unsupported; a host adapter with verified input provenance is required to complete setup. Each execution also requires host permission.
+
+- `/ralph-orchestrator [feature]` requires verified project commands for the current configuration and host. It collects missing feature input, explores the repository in a read-only interview session, asks recommended questions in the main session, and persists the conversation. Reply `approve <revision>` to the presented explanation, or describe revisions. Approved explanations continue through PRD/graph generation and combined execution approval. Execution approval presents the starting SHA and runs baseline preflight when the checkout is clean; setup/check failures block, and check timeouts remain visible as run-local omissions. A passed baseline automatically schedules dependency-ready issues with two executor slots by default and one integration queue. The production adapter reports unavailable human-input provenance and leaves the request pending.
+
+- `/ralph-status [run-id]` reads durable status and the dashboard URL. With no argument it selects the latest run.
+- `/ralph-pause [run-id]` records pause intent and freezes new dispatch while active work settles.
+- `/ralph-resume [run-id]` records explicit resume intent after pause/recovery; preserved attempts and revisions remain in force. Blocked recovery requires resolving its disclosed facts first.
+- `/ralph-stop [run-id]` cancels correlated sessions and cleans up owned processes. Stale completions cannot advance the run.
+
+The dashboard URL includes an access token in its fragment. Open it locally; treat it as private. The listener uses loopback with an automatically allocated port, so independent repositories can run together. The browser is read-only; commands and approvals belong in OpenCode. State and write locks live under the repository's canonical Git common directory, `ralph/runs`, and are shared by linked worktrees. Independent repositories use independent stores. The plugin stays attached to the OpenCode server lifecycle; shutdown stops owned work and the dashboard. Restart reconciles facts and waits for explicit resume.
+
+The v2 package ships server and TUI entry points. Slash commands execute directly, emit a status notification, and queue their exact output as a synthetic inbox item without waking the model. The TUI displays Ralph status notifications; the dashboard and persisted store remain authoritative.
+
+The public `adapter`, `store`, `commands`, `types`, `review/*`, `reporting/completion` and `process` exports support typed host integration. `createCommandRouter(...).scheduleIssues(runId)` schedules the approved DAG; `executeIssue(runId, issueId)` executes/integrates one approved issue with at most three attempts and retained failure evidence; `answerExecutorQuestion(runId, issueId, response)` validates a host-provided correlated human response; `continuePlanning(runId)` presents and continues a pending execution approval; `runJob` dispatches a correlated session; `reviewFeature` coordinates the two reviewers and final report. `process` exposes ownership tracking/cleanup for approved command owners, not command approval. Tests and fixture code are excluded from runtime exports and the tarball.
+
+Code and functional reviewers load their bundled `skills/code-review` and `skills/functional-review` resources. Code-review options accept a `{ providerID, modelID }` model; functional review accepts its own model through `functionalOptions`. Executor jobs carry the same optional model field. Model/tool availability and OpenCode permissions remain host-owned; no permission is auto-approved. Command configuration validates lifecycle ordering, platform coverage (or explicit unsupported reasons), paths, timeouts, argument arrays, explicit shells and environment references. Role models and replacement skill paths are read from optional `.ralph/project.json` and captured with hashes on each run.
+
+## Interview settings
+
+Project replacements resolve relative to the workspace root. Omit `skillPaths.interview`
+to use the original bundled grill-me guidance. Omit `models.interview` to capture the main
+session's selected model; an unavailable selection produces an actionable error.
+
+```json
+{
+  "schemaVersion": 1,
+  "models": { "interview": { "providerID": "your-provider", "modelID": "your-model" } },
+  "skillPaths": { "interview": "skills/my-interview.md" },
+  "concurrency": 2,
+  "timeoutMs": 300000,
+  "agentTimeoutMs": 1800000
+}
+```
+
+Runs record model selections, skill paths and content hashes, the verified command hash,
+and timeout/concurrency defaults. Agent timeouts interrupt planning and retain the lock
+and evidence. Human answers do not time out. `agentTimeoutMs` separately controls executor and merger deadlines (default thirty minutes), and is recorded on the run and each issue attempt. One canonical repository lock includes
+planning; explanation approval retains it through execution. Terminal coordinated review releases the matching lock. Interrupted locks require reconciliation and explicit resume.
+
+## Concurrent execution resources
+
+Ready issues are selected in approved graph order. A submission waits in the integration
+queue; children start only after all parents integrate, including qualified integration
+with omitted checks. `/ralph-status` and durable events expose ready, pending, running,
+integration_queued, integrated, failed and blocked states plus queue order. The executor
+slot ends after submission cleanup; merger/validation work uses a separate serial queue.
+
+`/ralph-commands` may propose resource allocation in the exact approved configuration:
+
+```json
+{
+  "resources": {
+    "RALPH_PORT": "port",
+    "RALPH_NAMESPACE": "namespace",
+    "RALPH_DIRECTORY": "directory"
+  },
+  "exclusiveResources": ["shared-test-database"]
+}
+```
+
+Command `env` mappings reference these source names, for example
+`{"PORT":"RALPH_PORT","APP_NAMESPACE":"RALPH_NAMESPACE","APP_DATA":"RALPH_DIRECTORY"}`.
+Ports, namespaces and directories are allocated per lifecycle/job. Executor prompts
+receive the allocation; candidates receive fresh allocations. The runner executes only
+approved commands, using main-session permission before an executor session exists.
+Shared resource names serialize use within the repository. Startup without allocated
+ports also serializes use. Missing required references block setup; commands are never
+invented or rewritten to obtain isolation. Owned cleanup releases only that lifecycle's
+resources; cleanup failures retain ownership and diagnostics.
+
+## Executor questions
+
+An executor may return `{"kind":"needs_input","question":"...","recommendedAnswer":"...","affectedRequirement":"..."}`. Ralph persists the question on its run/issue/attempt and publishes it through the main-session adapter. The issue and descendants wait while independent issues continue. Human waiting consumes no executor capacity, agent deadline or retry. A correlated clarification resumes the same worktree and attempt with a new job identity and the remaining active-time budget.
+
+Hosts answer through the adapter's authenticated `UserInputResult` contract. The public router also accepts a later response via `answerExecutorQuestion`, followed by `scheduleIssues` for clarification or `continuePlanning` for revision approval. Stale requests, changed revisions, duplicate messages and unrelated sessions are rejected. The production adapter currently leaves human input pending because verified provenance is unavailable.
+
+For scope changes, a correlated user answer can carry JSON `{"kind":"revise_scope","prd":"complete PRD text","graph":<complete graph>,"files":<issue-path to Markdown map>}`. Ralph compares content, validates and publishes a new draft, presents affected work and preserved integrated evidence, and requires the normal combined execution approval. Adapter-delivered answers present that gate automatically. Revised artifacts cannot execute under the previous approval. Answers and approvals have no browser mutation endpoint.
+
+## Validation semantics
+
+Three **total issue attempts** include the first submission and two retries; an expected failing TDD red test does not consume an attempt. Three **total review rounds** apply to the final dual review; each generated repair task has its own three-attempt limit. Functional infrastructure retries have a separate three-attempt budget. Issue repair limits are enforced through the public single-issue entrypoint; the dependency scheduler preserves independent progress when an issue exhausts its budget.
+
+The validation policy skips only timed-out validation checks for the current run, never setup/readiness timeouts, permission denials, cancellations or completed failures. Those omissions must remain in the report and must not rewrite approved commands. The baseline runs on an isolated clean checkout before implementation. Check timeouts are run-local omissions; setup failures and timeouts block readiness. Retain failed worktrees and their evidence for diagnosis; clean successful worktrees only after validated integration. Recovery does not silently discard retained resources.
+
+A completed agent job is not proof of a verified feature. Reports distinguish `verified`, `incomplete-validation` (including skipped checks), `unverified` (missing review evidence) and `unresolved` (blocking issues/findings). Inspect the report's commit, checks, unavailable review and cleanup/resource fields. No workflow script publishes, pushes, creates a PR or merges into a target branch.
+
+## Reproduce the package demonstration
+
+```sh
+bun test tests/integration/15-package.test.ts
+bun run test:package
+bun test tests/e2e/full-workflow.test.ts
+bun run test:browser
+bun run test:smoke
+```
+
+The package probe builds a clean distribution, packs it, installs it into two committed temporary repositories with spaces in their paths, and loads the installed plugin. It checks bundled skills/dashboard assets, separate stores and dashboard data, concurrent ports, argv preservation, local readiness, child cleanup and pause/resume. The workflow demo approves discovered commands, interviews, generates and approves a PRD/issue graph, prepares a clean baseline, executes real red/green addition tests, commits through the executor/merger worktrees, and dispatches independent reviewers through the fake SDK HTTP boundary. The second repository really times out its approved validation check; no execution state is seeded. The host explicitly supplies functional review options to the public coordinator after scheduling. Reports are `verified` for the passing-evidence fixture and `incomplete-validation` for the skipped-evidence fixture. These are deterministic fixture verdicts, not live-agent evidence. Temporary repositories are removed; `test:package` prints platform, runtime, outcomes and blockers. Set `PACKAGE_EVIDENCE_PATH` to retain JSON evidence.
+
+For the real installed OpenCode server probe, enable `OPENCODE_SMOKE=1` (PowerShell: `$env:OPENCODE_SMOKE='1'`) before `bun run test:smoke`. It uses a local deterministic model. The separate credentialed session probe requires `OPENCODE_LIVE_SMOKE=1`, `OPENCODE_SMOKE_URL` and `OPENCODE_SMOKE_MODEL=provider/model`; without them it reports SKIPPED. The credentialed probe covers a model session, not the complete workflow; production human provenance and automatic functional-review wiring remain blockers. A v2 server also requires authentication: set `OPENCODE_SMOKE_PASSWORD` for the live probe. Credentials remain in the configured server; do not copy them into fixtures or package assets.
+
+See [troubleshooting](docs/troubleshooting.md). CI runs the required suites on macOS, Ubuntu and native Windows and retains per-platform package evidence. A green fixture demo does not remove the production-host or unrun-platform blockers.
+
+ succeeded in 0ms:
+import type { OwnedProcess } from "../process/ownership.js";
+import type { ReviewWorkflow } from "../reporting/completion.js";
+import type { StoredReview } from "../review/types.js";
+export type CheckStatus =
+  | "waiting"
+  | "running"
+  | "failed"
+  | "skipped"
+  | "passed";
+/** Evidence supplied by execution; the dashboard never computes scheduler policy. */
+export interface ExecutionEvidence {
+  /** Execution must attest that the required validation set is complete. */
+  verification?: "incomplete" | "failed" | "passed";
+  /** Scheduler attestation: checks settled; final review is still pending. */
+  reviewPending?: boolean;
+  issues: {
+    id: string;
+    title: string;
+    dependencies: string[];
+    status:
+      | "pending"
+      | "ready"
+      | "running"
+      | "integration_queued"
+      | "integrated"
+      | "blocked"
+      | "failed";
+    blockers: string[];
+  }[];
+  integrationQueue: string[];
+  checks: {
+    id: string;
+    status: CheckStatus;
+    reason?: string;
+    attempt: number;
+    candidateCommit: string;
+    commandRevision: number;
+  }[];
+}
+export interface JobEnvelope {
+  runId: string;
+  jobId: string;
+  attempt: number;
+  role: string;
+  issueId?: string;
+  sessionId?: string;
+  workspace: string;
+  inputRevisions: Record<string, number>;
+  baseCommit: string;
+  prompt: string;
+  readOnly?: boolean;
+  observationTools?: string[];
+  /** Values allocated by the approved lifecycle for this owned job. */
+  environment?: Record<string, string>;
+  model?: { providerID: string; modelID: string };
+}
+export interface Failure {
+  code:
+    | "agent-timeout"
+    | "setup-failed"
+    | "baseline-blocked"
+    | "invalid-review"
+    | "permission-denied"
+    | "sdk-error"
+    | "missing-output"
+    | "unsupported"
+    | "cancelled";
+  message: string;
+  cause?: unknown;
+}
+export interface JobResult extends JobEnvelope {
+  outcome: "completed" | "needs_input" | "failed" | "denied" | "cancelled";
+  question?: {
+    kind: "needs_input";
+    question: string;
+    recommendedAnswer: string;
+    affectedRequirement: string;
+  };
+  text?: string;
+  evidence: string[];
+  producedCommit?: string;
+  error?: Failure;
+}
+export interface RunControl {
+  epoch?: number;
+  cleanupPending?: boolean;
+  status: "active" | "paused" | "stopped" | "interrupted" | "blocked";
+  source: "human" | "shutdown" | "recovery";
+  facts?: string[];
+}
+export interface RunOperation {
+  operationId: string;
+  kind:
+    | "issue.workspace"
+    | "candidate.workspace"
+    | "issue.cleanup"
+    | "candidate.cleanup"
+    | "baseline.workspace"
+    | "baseline.cleanup"
+    | "project.commands"
+    | "process.spawn"
+    | "integration.advance"
+    | "validation.check"
+    | "session.abort"
+    | "run.release"
+    | "review.pin"
+    | "review.workspace"
+    | "review.publish"
+    | "execution.environment"
+    | "execution.environment.cleanup"
+    | "review.environment"
+    | "review.cleanup";
+  job: JobEnvelope;
+  status: "intent" | "completed" | "failed";
+  error?: Failure;
+  ownedProcess?: OwnedProcess;
+  environment?: {
+    ownerId: string;
+    directory: string;
+    values: Record<string, string>;
+    exclusiveResources: string[];
+  };
+  ref?: string;
+  expectedOld?: string;
+  expectedNew?: string;
+  checks?: ExecutionEvidence["checks"];
+}
+export interface RunRecord {
+  issueAttempts?: Record<
+    string,
+    import("../execution/execute-issue.js").IssueAttempt
+  >;
+  baseline?: import("../execution/preflight.js").BaselineState;
+  validationSkips?: string[];
+  planning?: import("../planning/types.js").PlanningState;
+  schemaVersion: 1;
+  runId: string;
+  repositoryId: string;
+  revision: number;
+  phase: "ready" | "running" | "completed" | "failed" | "cancelled";
+  jobs: Record<
+    string,
+    {
+      envelope: JobEnvelope;
+      status: "intent" | "running" | "terminal";
+      result?: JobResult;
+    }
+  >;
+  control?: RunControl;
+  execution?: ExecutionEvidence;
+  review?: StoredReview;
+  reviewWorkflow?: ReviewWorkflow;
+  lastResult?: JobResult;
+  errors: Failure[];
+  operations: Record<string, RunOperation>;
+}
+export interface RunEvent {
+  schemaVersion: 1;
+  runId: string;
+  sequence: number;
+  revision: number;
+  eventId: string;
+  type:
+    | "issue.changed"
+    | "baseline.changed"
+    | "planning.changed"
+    | "run.control"
+    | "review.workflow"
+    | "review.snapshot"
+    | "review.result"
+    | "execution.observed"
+    | "run.created"
+    | "job.intent"
+    | "job.session"
+    | "job.result"
+    | "operation.intent"
+    | "operation.result";
+  timestamp: string;
+  jobId?: string;
+  attempt?: number;
+  sessionId?: string;
+  commit?: string;
+  snapshot: RunRecord;
+}
+export interface UserInputRequest {
+  runId: string;
+  sessionId: string;
+  workspace: string;
+  requestId: string;
+  revision: number;
+  question: string;
+}
+export type UserInputResult =
+  | {
+      ok: true;
+      requestId: string;
+      revision: number;
+      sessionId: string;
+      messageId: string;
+      text: string;
+      source: "user";
+    }
+  | { ok: false; error: Failure };
+import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import {
+  access,
+  mkdir,
+  open,
+  readFile,
+  realpath,
+  rename,
+  rm,
+} from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { isDeepStrictEqual, promisify } from "node:util";
+import type {
+  ExecutionEvidence,
+  JobEnvelope,
+  JobResult,
+  RunControl,
+  RunEvent,
+  RunOperation,
+  RunRecord,
+} from "../core/types.js";
+import { reconcileReadiness } from "../execution/readiness.js";
+import { explanationHash, issueBundleHash } from "../planning/artifacts.js";
+import { validateIssueGraph } from "../planning/graph.js";
+import { processIdentity } from "../process/ownership.js";
+import type { ReviewWorkflow } from "../reporting/completion.js";
+import type { FunctionalReviewResult } from "../review/functional-results.js";
+import type { ReviewResult, StoredReview } from "../review/types.js";
+import {
+  runtimeSecretValues,
+  sanitizeDisplay,
+  sanitizeValue,
+} from "./sanitize.js";
+
+const exec = promisify(execFile);
+const id = (value: string) => {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value))
+    throw new Error("Invalid run/job ID");
+  return value;
+};
+export interface RunStore {
+  readonly root: string;
+  readonly repositoryId: string;
+  createRun(runId: string): Promise<RunRecord>;
+  getRun(runId: string): Promise<RunRecord | undefined>;
+  listRuns(): Promise<RunRecord[]>;
+  events(runId: string): Promise<RunEvent[]>;
+  recordIssueAttempt(
+    runId: string,
+    revision: number,
+    attempt: import("../execution/execute-issue.js").IssueAttempt,
+  ): Promise<boolean>;
+  recoverIssueAttempt(
+    runId: string,
+    revision: number,
+    issueId: string,
+    advanceId: string,
+  ): Promise<boolean>;
+  recordBaseline(
+    runId: string,
+    revision: number,
+    baseline: NonNullable<RunRecord["baseline"]>,
+    skips: string[],
+  ): Promise<boolean>;
+  recordPlanning(
+    runId: string,
+    revision: number,
+    planning: import("../planning/types.js").PlanningState,
+  ): Promise<boolean>;
+  recordControl(
+    runId: string,
+    control: RunControl,
+    revision?: number,
+  ): Promise<boolean>;
+  recordReviewWorkflow(
+    runId: string,
+    revision: number,
+    workflow: ReviewWorkflow,
+  ): Promise<boolean>;
+  recordExecution(
+    runId: string,
+    revision: number,
+    execution: ExecutionEvidence,
+  ): Promise<boolean>;
+  recordReviewSnapshot(
+    runId: string,
+    revision: number,
+    review: StoredReview,
+  ): Promise<boolean>;
+  recordReviewResult(
+    runId: string,
+    snapshot: StoredReview["snapshot"],
+    result: ReviewResult,
+    summary: string,
+  ): Promise<boolean>;
+  recordIntent(job: JobEnvelope): Promise<boolean>;
+  attachSession(job: JobEnvelope, sessionId: string): Promise<boolean>;
+  recordResult(result: JobResult): Promise<boolean>;
+  recordFunctionalReviewResult(
+    runId: string,
+    snapshot: StoredReview["snapshot"],
+    result: FunctionalReviewResult,
+  ): Promise<boolean>;
+  recordOperation(operation: RunOperation): Promise<boolean>;
+}
+export async function openRunStore(
+  directory: string,
+  options: { secrets?: readonly string[] } = {},
+): Promise<RunStore> {
+  const secrets = [...runtimeSecretValues(), ...(options.secrets ?? [])];
+  const common = (
+    await exec("git", ["-C", directory, "rev-parse", "--git-common-dir"])
+  ).stdout.trim();
+  const repositoryId = await realpath(resolve(directory, common));
+  const root = join(repositoryId, "ralph", "runs");
+  await mkdir(root, { recursive: true });
+  const journal = join(root, "events.jsonl");
+  const owner = await processIdentity(process.pid);
+  if (!owner) throw new Error("Run store owner identity unavailable");
+  const ownerStart = owner.startedAt;
+  async function recoverLock(lock: string) {
+    const guard = `${lock}.recovery`;
+    try {
+      await mkdir(guard);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "EEXIST") return;
+      throw e;
+    }
+    try {
+      const raw = await readFile(join(lock, "owner.json"), "utf8");
+      const recorded = JSON.parse(raw) as {
+        pid: number;
+        startedAt: string;
+        repositoryId: string;
+        token: string;
+      };
+      if (
+        recorded.repositoryId !== repositoryId ||
+        !recorded.startedAt ||
+        !recorded.token
+      )
+        return;
+      const live = await processIdentity(recorded.pid);
+      if (live && live.startedAt === recorded.startedAt) return;
+      if ((await readFile(join(lock, "owner.json"), "utf8")) !== raw) return;
+      await rm(lock, { recursive: true });
+    } catch {
+      /* Missing/corrupt owner or unavailable inspection is ambiguous; never steal. */
+    } finally {
+      await rm(guard, { recursive: true });
+    }
+  }
+  async function readEvents(): Promise<RunEvent[]> {
+    let raw: string;
+    try {
+      raw = await readFile(journal, "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw e;
+    }
+    // A torn final append is not committed. Writers truncate it under the lock.
+    const lines = raw
+      .slice(0, raw.lastIndexOf("\n") + 1)
+      .split("\n")
+      .filter(Boolean);
+    const events = lines.map((line) => JSON.parse(line) as RunEvent);
+    for (const [index, event] of events.entries()) {
+      if (
+        event.sequence !== index + 1 ||
+        event.schemaVersion !== 1 ||
+        event.snapshot.repositoryId !== repositoryId
+      )
+        throw new Error("Invalid run journal");
+    }
+    return events;
+  }
+  async function update(
+    runId: string,
+    type: RunEvent["type"],
+    apply: (run: RunRecord | undefined) => RunRecord | undefined,
+    job?: JobEnvelope,
+  ) {
+    id(runId);
+    const lock = join(root, "write.lock");
+    // Cross-instance serialization; replacement requires a proven dead birth identity.
+    for (let retry = 0; ; retry++) {
+      try {
+        try {
+          await access(`${lock}.recovery`);
+          if (retry >= 100) throw new Error("Lock recovery owner uncertain");
+          await new Promise((r) => setTimeout(r, 20));
+          continue;
+        } catch (e) {
+          if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+        }
+        await mkdir(lock);
+        const metadata = await open(join(lock, "owner.json"), "wx");
+        try {
+          await metadata.writeFile(
+            JSON.stringify({
+              pid: process.pid,
+              startedAt: ownerStart,
+              repositoryId,
+              token: randomUUID(),
+            }),
+          );
+          await metadata.sync();
+        } finally {
+          await metadata.close();
+        }
+        break;
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "EEXIST" || retry >= 100)
+          throw e;
+        await recoverLock(lock);
+        await new Promise((r) => setTimeout(r, 20));
+      }
+    }
+    try {
+      const events = await readEvents();
+      const previous = events.filter((e) => e.runId === runId).at(-1)?.snapshot;
+      const next = apply(previous ? structuredClone(previous) : undefined);
+      if (!next) return false;
+      next.revision = (previous?.revision ?? 0) + 1;
+      const event: RunEvent = {
+        schemaVersion: 1,
+        runId,
+        sequence: events.length + 1,
+        revision: next.revision,
+        eventId: randomUUID(),
+        type,
+        timestamp: new Date().toISOString(),
+        snapshot: next,
+        ...(job
+          ? {
+              jobId: job.jobId,
+              attempt: job.attempt,
+              commit: job.baseCommit,
+              ...(job.sessionId ? { sessionId: job.sessionId } : {}),
+            }
+          : {}),
+      };
+      const file = await open(journal, "a+");
+      try {
+        const raw = await file.readFile("utf8");
+        const committedBytes = Buffer.byteLength(
+          raw.slice(0, raw.lastIndexOf("\n") + 1),
+        );
+        await file.truncate(committedBytes);
+        await file.write(`${JSON.stringify(event)}\n`);
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      const temp = join(root, `${runId}.${randomUUID()}.tmp`);
+      const snapshot = await open(temp, "wx");
+      try {
+        await snapshot.writeFile(JSON.stringify(next));
+        await snapshot.sync();
+      } finally {
+        await snapshot.close();
+      }
+      await rename(temp, join(root, `${runId}.json`));
+      return true;
+    } finally {
+      await rm(lock, { recursive: true });
+    }
+  }
+  const store: RunStore = {
+    root,
+    repositoryId,
+    async getRun(runId) {
+      id(runId);
+      return (await readEvents()).filter((e) => e.runId === runId).at(-1)
+        ?.snapshot;
+    },
+    async listRuns() {
+      return [
+        ...new Map(
+          (await readEvents()).map((e) => [e.runId, e.snapshot]),
+        ).values(),
+      ];
+    },
+    async events(runId) {
+      return (await readEvents()).filter((e) => e.runId === runId);
+    },
+    async createRun(runId) {
+      await update(runId, "run.created", (run) =>
+        run
+          ? undefined
+          : {
+              schemaVersion: 1,
+              runId,
+              repositoryId,
+              revision: 0,
+              phase: "ready",
+              jobs: {},
+              errors: [],
+              operations: {},
+            },
+      );
+      const run = await store.getRun(runId);
+      if (!run) throw new Error("Run creation failed");
+      return run;
+    },
+    recordIssueAttempt(runId, revision, attempt) {
+      return update(runId, "issue.changed", (run) => {
+        if (
+          !run ||
+          run.revision !== revision ||
+          (run.control && !["active", "paused"].includes(run.control.status)) ||
+          (run.control?.status === "paused" &&
+            (run.issueAttempts?.[attempt.issueId]?.operationId !==
+              attempt.operationId ||
+              run.issueAttempts?.[attempt.issueId]?.job.jobId !==
+                attempt.job.jobId ||
+              run.issueAttempts?.[attempt.issueId]?.attempt !==
+                attempt.attempt))
+        )
+          return undefined;
+        run.issueAttempts ??= {};
+        run.issueAttempts[attempt.issueId] = sanitizeValue(attempt, secrets);
+        if (run.execution && run.planning?.graph && run.planning.prd)
+          run.execution = reconcileReadiness(
+            run,
+            run.execution.integrationQueue,
+          );
+        run.phase = "running";
+        return run;
+      });
+    },
+    recoverIssueAttempt(runId, revision, issueId, advanceId) {
+      return update(runId, "issue.changed", (run) => {
+        const attempt = run?.issueAttempts?.[issueId];
+        const advance = run?.operations[advanceId];
+        if (
+          !run ||
+          run.revision !== revision ||
+          run.control?.status !== "interrupted" ||
+          !run.control.cleanupPending ||
+          !attempt ||
+          attempt.status !== "merging" ||
+          advance?.kind !== "integration.advance" ||
+          advance.status !== "completed" ||
+          advance.job.jobId !== attempt.candidate?.job.jobId ||
+          advance.job.attempt !== attempt.attempt ||
+          !advance.expectedNew ||
+          advance.expectedNew !== attempt.candidate?.commit
+        )
+          return undefined;
+        attempt.status = "integrated";
+        attempt.integratedCommit = advance.expectedNew;
+        if (run.execution && run.planning?.graph && run.planning.prd)
+          run.execution = reconcileReadiness(run, []);
+        return run;
+      });
+    },
+    recordBaseline(runId, revision, baseline, skips) {
+      return update(runId, "baseline.changed", (run) => {
+        if (
+          !run ||
+          run.revision !== revision ||
+          (run.control && run.control.status !== "active")
+        )
+          return undefined;
+        run.baseline = sanitizeValue(baseline, secrets);
+        run.validationSkips = [
+          ...new Set([...(run.validationSkips ?? []), ...skips]),
+        ];
+        return run;
+      });
+    },
+    recordPlanning(runId, revision, planning) {
+      return update(runId, "planning.changed", (run) => {
+        if (
+          !run ||
+          run.revision !== revision ||
+          (run.control && run.control.status !== "active")
+        )
+          return undefined;
+        const next = sanitizeValue(planning, [
+          ...secrets,
+          ...runtimeSecretValues(),
+        ]);
+        if (next.explanation) {
+          next.explanation.hash = explanationHash(next.explanation);
+          const old = run.planning?.explanation;
+          if (
+            old &&
+            (old.hash !== next.explanation.hash ||
+              old.revision !== next.explanation.revision)
+          ) {
+            next.explanation.revision = Math.max(
+              next.explanation.revision,
+              old.revision + 1,
+            );
+            delete next.approval;
+            delete next.executionApproval;
+            delete next.prd;
+            delete next.graph;
+            next.phase = "explanation_approval";
+            if (next.pending?.requestId === run.planning?.pending?.requestId)
+              delete next.pending;
+          }
+          if (
+            next.approval &&
+            (next.approval.hash !== next.explanation.hash ||
+              next.approval.revision !== next.explanation.revision)
+          )
+            delete next.approval;
+        } else delete next.approval;
+        if (next.phase === "explanation_approved" && !next.approval)
+          next.phase = "explanation_approval";
+        if (!next.approval) delete next.executionApproval;
+        if (next.graph && next.prd) {
+          next.graph.hash = issueBundleHash(next.graph.value, next.graph.files);
+          const oldGraph = run.planning?.graph;
+          const oldPrd = run.planning?.prd;
+          if (
+            (oldGraph &&
+              (oldGraph.hash !== next.graph.hash ||
+                oldGraph.revision !== next.graph.revision)) ||
+            (oldPrd &&
+              (oldPrd.hash !== next.prd.hash ||
+                oldPrd.revision !== next.prd.revision ||
+                oldPrd.artifactPath !== next.prd.artifactPath))
+          ) {
+            delete next.executionApproval;
+            if (next.phase === "execution_approved")
+              next.phase = "execution_approval";
+            if (next.pending?.requestId === run.planning?.pending?.requestId)
+              delete next.pending;
+            if (
+              oldGraph &&
+              (oldGraph.hash !== next.graph.hash ||
+                oldGraph.revision !== next.graph.revision)
+            )
+              next.graph.revision = Math.max(
+                next.graph.revision,
+                oldGraph.revision + 1,
+              );
+          }
+          if (next.executionApproval) {
+            validateIssueGraph(next.graph.value, next.graph.files, next.prd);
+            if (
+              next.executionApproval.prdHash !== next.prd.hash ||
+              next.executionApproval.graphHash !== next.graph.hash ||
+              next.executionApproval.revision !== next.graph.revision
+            )
+              delete next.executionApproval;
+          }
+        } else delete next.executionApproval;
+        if (next.phase === "execution_approved" && !next.executionApproval)
+          next.phase = "execution_approval";
+        run.planning = next;
+        run.phase = "running";
+        return run;
+      });
+    },
+    recordControl(runId, control, revision) {
+      return update(runId, "run.control", (run) => {
+        if (!run || (revision !== undefined && run.revision !== revision))
+          return undefined;
+        // A restart/stop invalidates outstanding callbacks. Explicit resume creates
+        // fresh human-input identities without changing answers or attempt budgets.
+        if (
+          control.status === "active" &&
+          ["interrupted", "stopped"].includes(run.control?.status ?? "")
+        ) {
+          for (const attempt of Object.values(run.issueAttempts ?? {})) {
+            if (
+              attempt.status === "waiting" &&
+              attempt.question &&
+              !attempt.question.answer
+            ) {
+              attempt.question.epoch = run.control?.epoch ?? 0;
+              attempt.question.request.requestId = randomUUID();
+              delete attempt.question.error;
+            }
+          }
+        }
+        run.control = {
+          ...structuredClone(control),
+          epoch:
+            (run.control?.epoch ?? 0) +
+            (["stopped", "interrupted", "blocked"].includes(control.status)
+              ? 1
+              : 0),
+        };
+        return run;
+      });
+    },
+    recordReviewWorkflow(runId, revision, workflow) {
+      return update(runId, "review.workflow", (run) => {
+        if (
+          !run ||
+          ["stopped", "interrupted", "blocked"].includes(
+            run.control?.status ?? "",
+          ) ||
+          run.revision !== revision ||
+          run.reviewWorkflow?.status === "terminal" ||
+          (run.reviewWorkflow &&
+            run.reviewWorkflow.ownerId !== workflow.ownerId) ||
+          workflow.rounds.length > 3 ||
+          workflow.rounds.some(
+            (round, index) => round.snapshot.round !== index + 1,
+          )
+        )
+          return undefined;
+        run.reviewWorkflow = sanitizeValue(workflow, [
+          ...secrets,
+          ...runtimeSecretValues(),
+        ]);
+        run.phase =
+          workflow.status === "terminal"
+            ? workflow.report?.outcome === "unresolved"
+              ? "failed"
+              : "completed"
+            : "running";
+        return run;
+      });
+    },
+    recordExecution(runId, revision, execution) {
+      return update(runId, "execution.observed", (run) => {
+        if (
+          !run ||
+          run.revision !== revision ||
+          ["stopped", "interrupted", "blocked"].includes(
+            run.control?.status ?? "",
+          )
+        )
+          return undefined;
+        run.execution = structuredClone(execution);
+        // Any new execution evidence supersedes the frozen review round.
+        if (run.review) run.review.superseded = true;
+        for (const check of run.execution.checks)
+          if (check.reason)
+            check.reason = sanitizeDisplay(check.reason, secrets);
+        for (const issue of run.execution.issues)
+          issue.title = sanitizeDisplay(issue.title, secrets);
+        return run;
+      });
+    },
+    recordReviewSnapshot(runId, revision, review) {
+      return update(runId, "review.snapshot", (run) => {
+        if (
+          !run ||
+          ["stopped", "interrupted", "blocked"].includes(
+            run.control?.status ?? "",
+          ) ||
+          run.revision !== revision ||
+          (run.review && run.review.snapshot.round >= review.snapshot.round)
+        )
+          return undefined;
+        run.review = structuredClone(review);
+        if (run.execution) run.execution.verification = "incomplete";
+        run.phase = "running";
+        return run;
+      });
+    },
+    recordReviewResult(runId, snapshot, result, summary) {
+      return update(runId, "review.result", (run) => {
+        const current = run?.review;
+        const job = run?.jobs[`code-review-${snapshot.round}`];
+        if (
+          !run ||
+          !current ||
+          ["stopped", "interrupted", "blocked"].includes(
+            run.control?.status ?? "",
+          ) ||
+          current.superseded ||
+          current.result ||
+          !isDeepStrictEqual(current.snapshot, snapshot) ||
+          result.reviewedCommit !== snapshot.commit ||
+          result.round !== snapshot.round ||
+          job?.status !== "terminal" ||
+          job.envelope.sessionId !== result.sessionId
+        )
+          return undefined;
+        current.result = structuredClone(result);
+        for (const finding of current.result.findings) {
+          finding.criterion = sanitizeDisplay(finding.criterion, secrets);
+          finding.suggestedRepair = sanitizeDisplay(
+            finding.suggestedRepair,
+            secrets,
+          );
+          finding.evidence = finding.evidence.map((ref) =>
+            sanitizeDisplay(ref, secrets),
+          );
+        }
+        current.result.evidenceRefs = current.result.evidenceRefs.map((ref) =>
+          sanitizeDisplay(ref, secrets),
+        );
+        if (current.result.error) {
+          current.result.error.message = sanitizeDisplay(
+            current.result.error.message,
+            secrets,
+          );
+          run.errors.push(current.result.error);
+        }
+        current.summary = sanitizeDisplay(summary, secrets);
+        run.phase = "running";
+        return run;
+      });
+    },
+    recordFunctionalReviewResult(runId, snapshot, result) {
+      return update(runId, "review.result", (run) => {
+        if (
+          !run?.review ||
+          ["stopped", "interrupted", "blocked"].includes(
+            run.control?.status ?? "",
+          ) ||
+          run.review.superseded ||
+          run.review.functionalResult ||
+          !isDeepStrictEqual(run.review.snapshot, snapshot) ||
+          result.reviewedCommit !== snapshot.commit ||
+          result.round !== snapshot.round ||
+          (result.sessionId !== undefined &&
+            (run.jobs[`functional-review-${snapshot.round}`]?.status !==
+              "terminal" ||
+              run.jobs[`functional-review-${snapshot.round}`]?.envelope
+                .sessionId !== result.sessionId))
+        )
+          return undefined;
+        run.review.functionalResult = sanitizeValue(result, [
+          ...secrets,
+          ...runtimeSecretValues(),
+        ]);
+        return run;
+      });
+    },
+    recordIntent(job) {
+      id(job.jobId);
+      return update(
+        job.runId,
+        "job.intent",
+        (run) => {
+          if (!run) throw new Error("Unknown run");
+          if (run.control && run.control.status !== "active") return undefined;
+          if (
+            ["code-review", "functional-review"].includes(job.role) &&
+            (!run.review ||
+              run.review.superseded ||
+              run.review.snapshot.round !== job.inputRevisions.round ||
+              run.review.snapshot.commit !== job.baseCommit)
+          )
+            return undefined;
+          const previous = run.jobs[job.jobId];
+          if (
+            previous &&
+            (previous.envelope.attempt >= job.attempt ||
+              previous.status !== "terminal")
+          )
+            return undefined;
+          run.jobs[job.jobId] = { envelope: job, status: "intent" };
+          run.phase = "running";
+          return run;
+        },
+        job,
+      );
+    },
+    attachSession(job, sessionId) {
+      return update(
+        job.runId,
+        "job.session",
+        (run) => {
+          const entry = run?.jobs[job.jobId];
+          if (
+            ["code-review", "functional-review"].includes(job.role) &&
+            (!run?.review ||
+              run.review.superseded ||
+              run.review.snapshot.round !== job.inputRevisions.round ||
+              run.review.snapshot.commit !== job.baseCommit)
+          )
+            return undefined;
+          if (
+            !run ||
+            !entry ||
+            entry.envelope.attempt !== job.attempt ||
+            entry.status !== "intent" ||
+            ["stopped", "interrupted", "blocked"].includes(
+              run.control?.status ?? "",
+            )
+          )
+            return undefined;
+          entry.envelope.sessionId = sessionId;
+          entry.status = "running";
+          return run;
+        },
+        { ...job, sessionId },
+      );
+    },
+    recordOperation(operation) {
+      id(operation.operationId);
+      return update(
+        operation.job.runId,
+        operation.status === "intent" ? "operation.intent" : "operation.result",
+        (run) => {
+          if (!run) throw new Error("Unknown run");
+          if (
+            operation.status === "intent" &&
+            run.control &&
+            run.control.status !== "active" &&
+            ![
+              "session.abort",
+              "review.cleanup",
+              "baseline.cleanup",
+              "execution.environment.cleanup",
+            ].includes(operation.kind)
+          )
+            return undefined;
+          const existing = run.operations[operation.operationId];
+          if (
+            existing &&
+            (existing.status !== "intent" ||
+              (operation.status === "intent" &&
+                !(
+                  existing.kind === "process.spawn" &&
+                  operation.kind === "process.spawn" &&
+                  !existing.ownedProcess &&
+                  operation.ownedProcess
+                )))
+          )
+            return undefined;
+          if (!existing && operation.status !== "intent")
+            throw new Error("Operation has no intent");
+          if (
+            existing &&
+            (!isDeepStrictEqual(existing.job, operation.job) ||
+              existing.kind !== operation.kind ||
+              existing.ref !== operation.ref ||
+              existing.expectedOld !== operation.expectedOld ||
+              existing.expectedNew !== operation.expectedNew)
+          )
+            return undefined;
+          run.operations[operation.operationId] = operation;
+          if (operation.error) run.errors.push(operation.error);
+          return run;
+        },
+        operation.job,
+      );
+    },
+    recordResult(result) {
+      result = structuredClone(result);
+      if (result.text !== undefined)
+        result.text = sanitizeDisplay(result.text, secrets);
+      if (result.error)
+        result.error.message = sanitizeDisplay(result.error.message, secrets);
+      result.evidence = result.evidence.map((value) =>
+        sanitizeDisplay(value, secrets),
+      );
+      return update(
+        result.runId,
+        "job.result",
+        (run) => {
+          const entry = run?.jobs[result.jobId];
+          if (
+            ["code-review", "functional-review"].includes(result.role) &&
+            (!run?.review ||
+              run.review.superseded ||
+              run.review.snapshot.round !== result.inputRevisions.round ||
+              run.review.snapshot.commit !== result.baseCommit)
+          )
+            return undefined;
+          if (
+            !run ||
+            !entry ||
+            entry.status === "terminal" ||
+            (result.outcome !== "cancelled" &&
+              ["stopped", "interrupted", "blocked"].includes(
+                run.control?.status ?? "",
+              )) ||
+            entry.envelope.attempt !== result.attempt ||
+            entry.envelope.sessionId !== result.sessionId
+          )
+            return undefined;
+          if (
+            result.baseCommit !== entry.envelope.baseCommit ||
+            result.workspace !== entry.envelope.workspace
+          )
+            return undefined;
+          entry.status = "terminal";
+          entry.result = result;
+          run.lastResult = result;
+          run.phase =
+            ["code-review", "functional-review"].includes(result.role) ||
+            (!!result.issueId &&
+              !!run.issueAttempts?.[result.issueId] &&
+              ["executor", "merger"].includes(result.role))
+              ? "running"
+              : result.outcome === "needs_input"
+                ? "running"
+                : result.outcome === "denied"
+                  ? "failed"
+                  : result.outcome;
+          if (result.error) run.errors.push(result.error);
+          return run;
+        },
+        result,
+      );
+    },
+  };
+  return store;
+}
+import {
+  continuePlanning,
+  reviewCompletedCode,
+  runIssue,
+  scheduleReadyIssues,
+} from "../core/orchestrator.js";
+import type { JobEnvelope, JobResult, UserInputResult } from "../core/types.js";
+import type { AttemptOptions } from "../execution/attempts.js";
+import {
+  answerExecutorQuestion,
+  handleExecutorQuestion,
+} from "../execution/questions.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { CodeReviewOptions } from "../review/code-review.js";
+import {
+  coordinateReviewRound,
+  type ReviewCoordinatorOptions,
+} from "../review/coordinator.js";
+import {
+  type FunctionalReviewOptions,
+  runFunctionalReview,
+} from "../review/functional-review.js";
+import type { ReviewSnapshot } from "../review/types.js";
+import type { RunStore } from "../state/run-store.js";
+import { assertDispatchAllowed, handleControlCommand } from "./control.js";
+import { orchestrateFeature } from "./orchestrator.js";
+import {
+  type ProjectSetupOptions,
+  projectStatus,
+  setupProject,
+} from "./project-setup.js";
+export function createCommandRouter(
+  store: RunStore,
+  adapter?: OpenCodeAdapter,
+  dashboardUrl?: string,
+  workspace?: string,
+) {
+  return {
+    projectStatus,
+    async continuePlanning(runId: string) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      return continuePlanning(store, adapter, runId);
+    },
+    async answerExecutorQuestion(
+      runId: string,
+      issueId: string,
+      response: UserInputResult,
+    ) {
+      return answerExecutorQuestion(store, runId, issueId, response);
+    },
+    async scheduleIssues(runId: string, options: AttemptOptions = {}) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      await assertDispatchAllowed(store, runId);
+      return scheduleReadyIssues(store, adapter, runId, options);
+    },
+    async executeIssue(
+      runId: string,
+      issueId: string,
+      options: AttemptOptions = {},
+    ) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      await assertDispatchAllowed(store, runId);
+      return runIssue(store, adapter, runId, issueId, options);
+    },
+    async setupProject(options: ProjectSetupOptions) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      return setupProject({ ...options, store, adapter });
+    },
+    async reviewFeature(
+      options: Omit<ReviewCoordinatorOptions, "store" | "adapter">,
+    ) {
+      await assertDispatchAllowed(store, options.runId);
+      return coordinateReviewRound({
+        ...options,
+        store,
+        ...(adapter ? { adapter } : {}),
+      });
+    },
+    async reviewFunctional(
+      snapshot: ReviewSnapshot,
+      options: Omit<FunctionalReviewOptions, "store" | "adapter">,
+    ) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      await assertDispatchAllowed(store, snapshot.runId);
+      return runFunctionalReview(snapshot, { ...options, store, adapter });
+    },
+    async reviewCode(
+      snapshot: ReviewSnapshot,
+      options: Omit<CodeReviewOptions, "store" | "adapter">,
+    ) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      await assertDispatchAllowed(store, snapshot.runId);
+      return reviewCompletedCode(snapshot, { ...options, store, adapter });
+    },
+    async runJob(job: JobEnvelope): Promise<JobResult> {
+      if (!adapter)
+        return {
+          ...job,
+          outcome: "failed",
+          evidence: [],
+          error: {
+            code: "unsupported",
+            message: "No OpenCode adapter supplied",
+          },
+        };
+      await store.createRun(job.runId);
+      await assertDispatchAllowed(store, job.runId);
+      return adapter.dispatchJob(job);
+    },
+    async status(runId?: string): Promise<string> {
+      const projectSetup = workspace
+        ? await projectStatus(workspace)
+        : undefined;
+      const run = runId
+        ? await store.getRun(runId)
+        : (await store.listRuns()).at(-1);
+      return run
+        ? JSON.stringify(
+            {
+              ...(dashboardUrl ? { dashboardUrl } : {}),
+              ...(projectSetup ? { projectSetup } : {}),
+              runId: run.runId,
+              revision: run.revision,
+              phase: run.phase,
+              control: run.control ?? null,
+              lastResult: run.lastResult ?? null,
+              ...(run.review ? { review: run.review } : {}),
+              ...(run.reviewWorkflow
+                ? { reviewWorkflow: run.reviewWorkflow }
+                : {}),
+              ...(run.planning ? { planning: run.planning } : {}),
+              ...(run.baseline
+                ? {
+                    baseline: run.baseline,
+                    validationSkips: run.validationSkips ?? [],
+                  }
+                : {}),
+              issueAttempts: run.issueAttempts ?? {},
+              ...(run.execution ? { execution: run.execution } : {}),
+              errors: run.errors,
+            },
+            null,
+            2,
+          )
+        : dashboardUrl
+          ? JSON.stringify({
+              dashboardUrl,
+              ...(projectSetup ? { projectSetup } : {}),
+              message: "No Ralph run found.",
+            })
+          : projectSetup
+            ? JSON.stringify({ projectSetup, message: "No Ralph run found." })
+            : "No Ralph run found.";
+    },
+    async dispatch(command: string, args = "", context?: ProjectSetupOptions) {
+      if (command === "ralph-orchestrator") {
+        if (!context)
+          throw new Error(
+            "Feature planning requires the main session and workspace",
+          );
+        if (!adapter) throw new Error("No OpenCode adapter supplied");
+        return JSON.stringify(
+          await orchestrateFeature({
+            ...context,
+            feature: args,
+            store,
+            adapter,
+          }),
+          null,
+          2,
+        );
+      }
+      if (command === "ralph-commands") {
+        if (!context)
+          throw new Error(
+            "Project setup requires the main session and workspace",
+          );
+        return JSON.stringify(await this.setupProject(context), null, 2);
+      }
+      if (["ralph-pause", "ralph-resume", "ralph-stop"].includes(command)) {
+        const runId = args.trim() || (await store.listRuns()).at(-1)?.runId;
+        if (!runId) throw new Error("No Ralph run found");
+        const result = await handleControlCommand(
+          command as "ralph-pause" | "ralph-resume" | "ralph-stop",
+          runId,
+          store,
+          adapter,
+        );
+        if (command === "ralph-resume" && adapter) {
+          const run = await store.getRun(runId);
+          for (const attempt of Object.values(run?.issueAttempts ?? {}))
+            if (
+              attempt.status === "waiting" &&
+              attempt.question &&
+              !attempt.question.answer
+            )
+              handleExecutorQuestion(
+                store,
+                adapter,
+                runId,
+                attempt.issueId,
+                attempt.question.request.requestId,
+              );
+        }
+        return result;
+      }
+      if (command !== "ralph-status")
+        throw new Error(`Unknown Ralph command: ${command}`);
+      return this.status(args.trim() || undefined);
+    },
+  };
+}
+
+exec
+/bin/zsh -lc 'bun --version; bun run typecheck; bun run lint; bun test tests/integration/01-plugin.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 3686ms:
+1.4.3
+$ tsc --noEmit
+$ biome check src tests scripts
+Checked 98 files in 66ms. No fixes applied.
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/01-plugin.test.ts:
+(pass) durable local session result > status returns the same correlated result after reopening [205.08ms]
+(pass) adapter persists intent before dispatch and routes both calls to the job workspace [90.79ms]
+(pass) v2 plugin registers direct commands and reads durable state without a model [102.53ms]
+(pass) cancelling during session creation aborts the newly created session without prompting it [96.31ms]
+(pass) a denied operation persists as denied and has no process fallback [91.47ms]
+(pass) duplicate permission events and late success cannot transition twice [91.30ms]
+(pass) missing output is failed and user questions disclose unsupported API [81.40ms]
+(pass) linked worktrees share a canonical store but separate repositories do not [204.75ms]
+(pass) an earlier denied tool remains denied even when the final assistant message succeeds [75.57ms]
+(pass) a late empty response cannot replace a cancelled result [105.66ms]
+(pass) an unavailable tool cannot be reported as a completed job [78.88ms]
+(pass) abort denial is recorded durably without losing cancellation [93.39ms]
+(pass) concurrent stores commit one result and reject superseded attempt completions [155.50ms]
+(pass) the committed journal recovers a missing snapshot and discards a torn final append [88.43ms]
+(pass) the public router starts a session job and status exposes its persisted response [85.12ms]
+(pass) v2 observation aliases preserve permissions and exclude mutation and code-mode tools [93.32ms]
+(pass) a caught v2 code-mode tool failure cannot be erased by later assistant success [76.20ms]
+(pass) a second v2 location neither recovers nor stops another location's active job [103.97ms]
+(pass) v2 TUI status notifications are scoped and their subscription is disposed [0.68ms]
+
+ 19 pass
+ 0 fail
+ 62 expect() calls
+Ran 19 tests across 1 file. [2.03s]
+
+exec
+/bin/zsh -lc "rg -n 'test\\(|skip|OPENCODE_SMOKE|OPENCODE_LIVE' tests/smoke/opencode.test.ts; cat .github/workflows/ci.yml" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+13:const smoke = process.env.OPENCODE_SMOKE === "1" ? test : test.skip;
+466:  process.env.OPENCODE_LIVE_SMOKE === "1" &&
+467:  process.env.OPENCODE_SMOKE_URL &&
+468:  process.env.OPENCODE_SMOKE_MODEL
+470:    : test.skip;
+479:        process.env.OPENCODE_SMOKE_MODEL as string
+482:        throw new Error("Set OPENCODE_SMOKE_MODEL=provider/model");
+485:          process.env.OPENCODE_SMOKE_URL as string,
+487:          process.env.OPENCODE_SMOKE_PASSWORD
+489:                Authorization: `Basic ${btoa(`opencode:${process.env.OPENCODE_SMOKE_PASSWORD}`)}`,
+name: Compatibility
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  plugin:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run test
+      - run: bun run build
+      - run: bunx --no-install playwright install --with-deps chromium
+      - run: bun run test:browser
+      - run: bun run test:smoke
+        env:
+          OPENCODE_SMOKE: '1'
+      - run: bun test tests/e2e/full-workflow.test.ts
+      - run: bun run test:package
+        env:
+          PACKAGE_EVIDENCE_PATH: package-evidence.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-evidence-${{ matrix.os }}
+          path: package-evidence.json
+          if-no-files-found: warn
+
+codex
+Already implemented; no changes needed.
+
+Verified with Bun 1.4.3:
+
+- Typecheck passed.
+- Lint passed.
+- Issue 1 integration tests: 19 passed.
+
+Prior installed-package smoke evidence is recorded in [docs/opencode-compatibility.md](/Users/rwmmtzqy/Documents/opencode-ralph-plugin/docs/opencode-compatibility.md). I did not rerun live smoke. Native Linux/Windows validation remains pending, and human-input provenance remains explicitly unsupported.
+tokens used
+19,358
+Already implemented; no changes needed.
+
+Verified with Bun 1.4.3:
+
+- Typecheck passed.
+- Lint passed.
+- Issue 1 integration tests: 19 passed.
+
+Prior installed-package smoke evidence is recorded in [docs/opencode-compatibility.md](/Users/rwmmtzqy/Documents/opencode-ralph-plugin/docs/opencode-compatibility.md). I did not rerun live smoke. Native Linux/Windows validation remains pending, and human-input provenance remains explicitly unsupported.

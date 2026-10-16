@@ -1,0 +1,1149 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/11-review-completed-feature-code.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cc8-18a4-7c93-9fd5-f18bd1b727f1
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 2 of 3
+File      : 11 of 15 — 11-review-completed-feature-code.md
+=== END METADATA ===
+
+TASK:
+# 11. Review the completed feature’s code
+
+**Type:** AFK  
+**Status:** Implemented; scheduler integration added on 2026-10-15
+**User stories:** US-7  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Run an independent code-review session after every planned issue has integrated. Freeze the reviewed commit and provide the reviewer with the approved requirements, diff, tests and execution evidence. Store structured findings that separate correctness/security/acceptance failures from optional style suggestions. Report findings in OpenCode; repair dispatch belongs to issue 13.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 227–240): independent reviewer, stable commit and blocking criteria.
+- `PRD.md` (lines 244–255): review results and completion conditions.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 8: Execute dependency-ready issues concurrently](8-execute-dependency-ready-issues-concurrently.md): predecessor contracts and the code delivered by that slice.
+- `src/review/code-review.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/review/types.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/review/snapshot.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `skills/code-review/SKILL.md`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Pin review input to an exact commit rather than a mutable branch name. A reviewer is an independent session even when it shares the executor's model. Validate finding structure and evidence; free-form claims of 'passed' are not the result contract.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Define shared review snapshots and finding results
+
+**Files:** `src/review/types.ts`, `src/review/snapshot.ts`
+
+- **IMPLEMENT:** Define ReviewSnapshot with runId, round, commit, PRD/graph revisions and evidence refs; ReviewFinding with stable id, reviewer role, reviewedCommit, category, blocking flag, criterion, evidence, suggested repair, disposition. Export createReviewSnapshot to assert all planned issues integrated and hold a stable commit for the round.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import RunStore, IssueGraph and validation summary types; export ReviewSnapshot, ReviewFinding and ReviewResult from types.ts.
+- **GOTCHA:** Issue 12 can develop concurrently: this ticket owns these shared types and must publish the described contract; issue 12 should use a structural boundary until integration, not add this as an undeclared dependency.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/11-code-review.test.ts`; add the tests below as this slice develops.
+
+### 2. Dispatch the code reviewer and publish its verdict
+
+**Files:** `src/review/code-review.ts`, `skills/code-review/SKILL.md`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** Provide committed diff and requirement evidence to a new review session using its model override. Require findings to identify a concrete defect, security issue or unmet criterion before blocking; style/refactor advice remains optional. Reject results for the wrong SHA or superseded round and persist valid findings plus a chat summary.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import OpenCodeAdapter and loadRoleInstructions; export runCodeReview with ReviewSnapshot input and ReviewResult output.
+- **GOTCHA:** Do not grant a reviewer a direct code-repair role. Read the stable commit in a review-owned workspace and verify it remains unchanged.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/11-code-review.test.ts`; add the tests below as this slice develops.
+
+### 3. Verify reviewer independence and classification
+
+**Files:** `tests/integration/11-code-review.test.ts`
+
+- **IMPLEMENT:** Test no review before every issue integrates, distinct reviewer session, fixed SHA, non-blocking style suggestion, blocking defect evidence, malformed result, and wrong-commit response. Verify reviewer output alone does not mark the complete feature verified before functional review exists.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import existing run/agent/Git fixtures and runCodeReview.
+- **GOTCHA:** Tests can use fake reviewer results; a real smoke test is consolidated in issue 15.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/11-code-review.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] Review cannot start while an issue is pending, blocked or unintegrated.
+- [x] Reviewer session and reviewed SHA are recorded and distinct from execution sessions.
+- [x] Blocking findings carry concrete evidence and classify separately from optional suggestions.
+- [x] Malformed or stale results cannot pass review.
+- [x] The user sees findings in OpenCode without automatic direct edits by the reviewer.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/11-code-review.test.ts`.
+- [x] Type checking and lint pass; no unsupported platform is silently excluded.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/11-code-review.test.ts
+
+```
+
+**Demonstration:** Finish a graph with a planted correctness defect and an optional naming suggestion; confirm only the defect blocks the code-review result.
+
+## Blocked by
+
+- [8-execute-dependency-ready-issues-concurrently.md](8-execute-dependency-ready-issues-concurrently.md) — execute dependency-ready issues concurrently supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+
+### Iteration 1 implementation evidence — 2026-10-14
+
+Implemented the shared ReviewSnapshot/ReviewFinding/ReviewResult contract,
+`createReviewSnapshot`, `runCodeReview`, a core phase boundary and public
+`router.reviewCode`. Snapshots capture committed PRD/graph/diff and persisted
+validation/execution evidence, pin the exact SHA, and require all planned issues
+to be integrated. Review runs in a new detached workspace and independent session
+with a model override and read-only tool selection. Structured findings, correlated
+session identity, operation evidence and a status summary are durable. OpenCode
+receives a summary toast and `/ralph-status` returns the findings. Code review
+never dispatches repairs or marks functional acceptance verified.
+
+TDD red/green evidence:
+- Initial integration-gate test failed on the missing snapshot module, then passed.
+- Planted-defect/public-router test failed on unimplemented snapshot capture, then
+  passed after snapshot/session/persistence integration.
+- Free-form `passed` caused a JSON parse failure before the validator; it now
+  returns a persisted unverified result with typed failure evidence.
+- Reusing a round after new execution evidence unexpectedly resolved before the
+  supersession guard; it now rejects.
+- A blocking citation to `missing.ts:99` was accepted before citation validation;
+  it now remains unverified.
+- An optional-only verdict left the dashboard green before the review phase
+  cleared verification; it now remains incomplete pending functional review.
+
+The demonstration runs through the public router and pinned SDK fake transport in
+a real temporary Git repository: an addition function subtracts instead of adding,
+and the reviewer reports that correctness defect plus optional naming advice.
+Only the correctness finding blocks. Other tests cover wrong SHA/round, malformed
+and contradictory output, absent evidence, denied/missing output, superseded
+in-flight output, workspace edits, advancing the source branch, durable reopen,
+model/tool binding, and idempotent completed review calls.
+
+Validation on Bun 1.4.3 / macOS:
+- `bun test tests/integration/11-code-review.test.ts`: 10 passed, 0 failed.
+- `bun run typecheck`: passed.
+- `bun run lint`: passed.
+- `bun test tests/integration`: 32 passed, 0 failed (154 assertions).
+- `bun run build`: passed; compiled role instructions resolve the bundled skill.
+
+Limitations: issue 8 is not implemented in the checkout, so automatic scheduler
+invocation cannot be demonstrated. Structural graph/check contracts use the
+existing durable execution-evidence boundary; authoritative approval provenance
+must be supplied by predecessors. Review-owned worktrees and pin refs are retained
+for later cleanup/recovery. Functional review/repair/recovery remain with issues
+12/13/14. No live-provider or Linux/Windows checks were run; no platform test is
+silently excluded. No publication or target-branch merge was performed.
+
+### Scheduler integration follow-up — 2026-10-15
+
+Issue 8 is now present. The public scheduler automatically starts exactly one
+independent code review once the approved graph has fully integrated. The handoff
+checks the integration HEAD against the latest completed integration advance,
+uses the planning session for publication, and forwards the configured `code-review`
+model. Repeated scheduler calls reuse the stored review. Pending/blocked graphs
+cannot dispatch review. Functional review and repairs remain with slices 12/13.
+
+Snapshots can now consume the predecessor's approved planning artifacts: approval
+hashes, PRD content hash, graph/issue bundle hash and graph validity are checked
+before durable capture. The full approved issue text is included alongside graph
+criteria. Planning artifacts need not be committed into the feature workspace;
+the existing committed-input entrypoint remains supported.
+
+TDD: the scheduler demonstration first failed with zero reviewer jobs and then
+passed with one distinct read-only session at the accepted SHA. It verifies the
+role model, frozen requirements, incomplete functional verification and idempotent
+rescheduling. A changed-PRD regression then failed because execution still reported
+`passed` after snapshot rejection; the scheduler now keeps all-integrated execution
+`incomplete` while reviews are outstanding. That regression passes without any
+reviewer dispatch. Existing planted correctness defect plus optional naming advice
+still demonstrates that only the defect blocks. Documentation updates need no tests.
+
+Validation on pinned Bun 1.4.3 / macOS:
+- `bun run typecheck`: passed.
+- `bun run lint`: passed.
+- `bun test tests/integration/11-code-review.test.ts`: 12 passed, 0 failed (92 assertions).
+- Final `bun test --timeout 30000 tests/integration/08-concurrency.test.ts`: 9 passed,
+  0 failed (121 assertions), including the final scheduler verification guard.
+- `bun run build`: passed.
+- Broader integration run before the final verification guard: 170 passed, one
+  opt-in browser test skipped, 0 failed (1036 assertions). The final code-review
+  run above includes the guard and its changed-requirements regression.
+
+Updated `docs/wiki/features/independent-code-review.md` and the issue-11 entry in
+`docs/wiki/open-questions.md`. No live-provider or native Linux/Windows checks were
+run. No publication, external messages, repairs or user-target-branch merge occurred.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing implementation and run the acceptance checks to confirm this task is already complete.
+exec
+/bin/zsh -lc "pwd; rg --files -g 'AGENTS.md' -g 'package.json' -g '*11*' -g 'PRD.md' -g 'README.md' -g 'src/review/**' -g 'src/core/orchestrator.ts' -g 'skills/code-review/SKILL.md' -g '.bun-version'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+src/review/coordinator.ts
+src/review/code-review.ts
+src/review/validate-result.ts
+src/review/after-execution.ts
+src/review/types.ts
+src/review/repairs.ts
+src/review/functional-results.ts
+src/review/functional-review.ts
+src/review/snapshot.ts
+src/review/repair-context.ts
+src/core/orchestrator.ts
+.bun-version
+skills/code-review/SKILL.md
+ralph-logs/iter-1-11-review-completed-feature-code.log
+package.json
+README.md
+tests/integration/11-code-review.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc 'git status --short' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+
+exec
+/bin/zsh -lc "cat package.json; cat .bun-version; sed -n '88,97p' PRD.md; sed -n '227,255p' PRD.md; cat src/review/types.ts; cat skills/code-review/SKILL.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+1.4.3
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+### 7.9 Final reviewers and repair loop
+
+After all issues integrate, run a code reviewer and a functional reviewer in separate sessions against the same feature commit. Keep that commit stable while both review it.
+
+- The code reviewer checks correctness, security, regressions, and approved requirements.
+- The functional reviewer derives a checklist from PRD and issue acceptance criteria. It uses agent-browser for relevant UI behavior and HTTP requests for relevant backend behavior against the local feature environment.
+- Record evidence for each applicable criterion. A criterion that cannot be tested is unverified, not passed.
+- Blocking findings are bugs, security issues, failing behavior, or unmet acceptance criteria. Optional style and refactoring suggestions do not block completion.
+
+Consolidate blocking findings into dedicated repair tasks. Each repair task receives finding evidence, affected issue context, and acceptance criteria, and uses a new worktree, TDD, the merger, and configured checks. Repair tasks have the same three-attempt execution budget as ordinary issues.
+
+Allow three total review rounds: initial review, repairs and second review, then repairs and third review. If round three still has blocking findings, stop automatic repairs and request intervention. Do not accidentally implement three additional repair-and-review rounds after the initial review.
+
+If a repair executor disputes a finding, return its evidence to the originating reviewer. The reviewer can withdraw the finding or retain it with justification. Unresolved findings remain blocking within the same bounded loop; discussion cannot create an unlimited retry path.
+
+If functional review cannot run after three attempts because of missing credentials, startup failures, or unavailable tools, finish as unverified and identify the blocker. These infrastructure attempts are separately tracked and do not grant extra rounds for fixing functional findings.
+
+### 7.10 Completion and reporting
+
+Leave the feature branch ready for the user. Do not merge into the target branch, push, or open a PR. The report in OpenCode and the dashboard includes:
+
+- Feature branch and final commit.
+- Completed, blocked, and repaired issues, with attempts used.
+- Reviewer results, acceptance-criterion evidence, and unresolved findings.
+- Every timed-out/skipped check and its impact on verification.
+- Functional-review blockers, if any.
+- Retained worktrees and cleanup failures.
+
+Missing validation produces qualified completion, not a green verified result. Unresolved implementation failures or confirmed blocking review findings remain unresolved; inability to run functional review is explicitly labeled unverified. Final review begins only after all planned issues integrate.
+import type { ExecutionEvidence, Failure } from "../core/types.js";
+import type { RunStore } from "../state/run-store.js";
+import type { FunctionalReviewResult } from "./functional-results.js";
+
+/** Review identity projection; full approved graph and issue text live in inputs. */
+export interface IssueGraph {
+  revision: string;
+  issues: { id: string }[];
+}
+export type ValidationSummary = ExecutionEvidence["checks"];
+export interface ReviewSnapshot {
+  runId: string;
+  round: number;
+  commit: string;
+  prdRevision: string;
+  graphRevision: string;
+  evidenceRefs: string[];
+}
+export interface ReviewFinding {
+  id: string;
+  reviewerRole: "code-review" | "functional-review";
+  reviewedCommit: string;
+  category:
+    | "correctness"
+    | "security"
+    | "acceptance"
+    | "regression"
+    | "style"
+    | "refactor";
+  blocking: boolean;
+  criterion: string;
+  evidence: string[];
+  suggestedRepair: string;
+  disposition: "open" | "withdrawn" | "resolved";
+}
+export interface ReviewResult {
+  role: "code-review" | "functional-review";
+  reviewedCommit: string;
+  round: number;
+  outcome: "passed" | "findings" | "unverified";
+  findings: ReviewFinding[];
+  evidenceRefs: string[];
+  sessionId?: string;
+  error?: Failure;
+}
+export interface ReviewInputs {
+  baseCommit: string;
+  prd: string;
+  graph: string;
+  diff: string;
+  tests: ValidationSummary;
+  execution: ExecutionEvidence;
+}
+export interface StoredReview {
+  snapshot: ReviewSnapshot;
+  inputs: ReviewInputs;
+  superseded?: boolean;
+  result?: ReviewResult;
+  functionalResult?: FunctionalReviewResult;
+  summary?: string;
+}
+export interface SnapshotOptions {
+  store: RunStore;
+  directory: string;
+  runId: string;
+  round: number;
+  commit: string;
+  baseCommit: string;
+  prdRevision: string;
+  graph: IssueGraph;
+  evidenceRefs: string[];
+  prdPath?: string;
+  graphPath?: string;
+  /** Read hash-verified approved planning artifacts instead of committed fixtures. */
+  approvedPlanning?: boolean;
+}
+# Independent code review
+
+Review only the exact snapshot SHA in the detached, review-owned workspace.
+Use the supplied approved PRD/graph, committed diff, validation results and
+execution evidence. Do not repair code, mutate Git, run commands, or dispatch
+other agents. Read-only tools are supplied by the adapter.
+
+Return only the structured ReviewResult JSON described by the role instructions.
+Every finding has a stable ID, code-review role, reviewed SHA, category, blocking
+flag, criterion, concrete evidence, suggested repair and open disposition.
+Correctness, security, regression and unmet acceptance criteria may block only
+with concrete defect evidence. Style and refactoring remain optional.
+Missing evidence means unverified. A passed code review never establishes that
+functional acceptance passed. Repair dispatch is owned by issue 13.
+
+## Output contract
+
+Return JSON with `role: "code-review"`, `reviewedCommit`, `round`,
+`outcome: "passed" | "findings" | "unverified"`, `findings`, and nonempty
+`evidenceRefs`. Do not surround the JSON with prose or Markdown fences.
+
+Each finding requires `id`, `reviewerRole: "code-review"`, `reviewedCommit`,
+`category: "correctness" | "security" | "acceptance" | "regression" | "style" | "refactor"`,
+`blocking` (boolean), `criterion`, nonempty `evidence` strings,
+`suggestedRepair`, and `disposition: "open"`. Reuse a stable ID for the same
+criterion and defect location across rounds. Do not withdraw or resolve findings
+in a new review; disputes and repairs belong to the later repair workflow.
+
+Cite exact `path:line` locations in the reviewed commit, or supplied evidence
+reference IDs. Describe the observed behavior and expected behavior in the
+citation. Source citations are checked against the frozen commit. Evidence
+references identify recorded check/agent artifacts, not invented test results.
+A passed verdict may have optional findings, but must have no blocking findings.
+When evidence is insufficient, use unverified and identify the missing evidence.
+
+exec
+/bin/zsh -lc "sed -n '1,240p' src/review/code-review.ts; sed -n '1,200p' src/review/snapshot.ts; cat src/review/after-execution.ts; rg -n 'review|test\\(' tests/integration/11-code-review.test.ts src/core/orchestrator.ts README.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
+import { waitForDispatch } from "../commands/control.js";
+import type { JobEnvelope } from "../core/types.js";
+import {
+  createReviewWorkspace,
+  verifyFindingEvidence,
+  verifyReviewRepository,
+  verifyReviewWorkspace,
+} from "../git/review-workspace.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { loadRoleInstructions } from "../roles/instructions.js";
+import type { RunStore } from "../state/run-store.js";
+import type { ReviewResult, ReviewSnapshot } from "./types.js";
+import { validateReviewResult } from "./validate-result.js";
+
+export interface CodeReviewOptions {
+  store: RunStore;
+  adapter: OpenCodeAdapter;
+  directory: string;
+  parentSessionId: string;
+  model?: JobEnvelope["model"];
+}
+export async function runCodeReview(
+  snapshot: ReviewSnapshot,
+  options: CodeReviewOptions,
+): Promise<ReviewResult> {
+  await waitForDispatch(options.store, snapshot.runId);
+  await verifyReviewRepository(options.directory, options.store.repositoryId);
+  const run = await options.store.getRun(snapshot.runId);
+  if (
+    !run?.review ||
+    run.review.superseded ||
+    !isDeepStrictEqual(run.review.snapshot, snapshot) ||
+    run.operations[`review-pin-${snapshot.round}`]?.status !== "completed"
+  )
+    throw new Error("Unknown or superseded review snapshot");
+  if (run.review.result) return run.review.result;
+  const workspace = join(options.store.root, "review-workspaces", randomUUID());
+  const job: JobEnvelope = {
+    runId: snapshot.runId,
+    jobId: `code-review-${snapshot.round}`,
+    attempt: 1,
+    role: "code-review",
+    readOnly: true,
+    workspace,
+    baseCommit: snapshot.commit,
+    inputRevisions: { round: snapshot.round },
+    prompt: `${await loadRoleInstructions("code-review")}\nReview input:\n${JSON.stringify({ snapshot, ...run.review.inputs })}`,
+    ...(options.model ? { model: options.model } : {}),
+  };
+  const operation = {
+    operationId: `review-workspace-${snapshot.round}`,
+    kind: "review.workspace" as const,
+    status: "intent" as const,
+    job,
+  };
+  if (!(await options.store.recordOperation(operation)))
+    throw new Error(
+      "Review dispatch already started; resume must reconcile the existing operation",
+    );
+  try {
+    await createReviewWorkspace(options.directory, workspace, snapshot.commit);
+    await options.store.recordOperation({ ...operation, status: "completed" });
+  } catch (cause) {
+    await options.store.recordOperation({
+      ...operation,
+      status: "failed",
+      error: {
+        code: "sdk-error",
+        message: "Review workspace preparation failed",
+        cause: String(cause),
+      },
+    });
+    throw cause;
+  }
+  await waitForDispatch(options.store, snapshot.runId);
+  const response = await options.adapter.dispatchJob(job);
+  const result: ReviewResult = {
+    role: "code-review",
+    reviewedCommit: snapshot.commit,
+    round: snapshot.round,
+    outcome: "unverified",
+    findings: [],
+    evidenceRefs: response.evidence,
+    ...(response.sessionId ? { sessionId: response.sessionId } : {}),
+  };
+  try {
+    if (
+      response.outcome === "completed" &&
+      (!response.sessionId ||
+        response.sessionId === options.parentSessionId ||
+        Object.values(run.jobs).some(
+          (entry) => entry.envelope.sessionId === response.sessionId,
+        ) ||
+        response.baseCommit !== snapshot.commit ||
+        response.workspace !== workspace ||
+        response.runId !== snapshot.runId ||
+        response.jobId !== job.jobId ||
+        response.attempt !== job.attempt)
+    )
+      throw new Error(
+        "Reviewer response is not an independent correlated session",
+      );
+    await verifyReviewWorkspace(workspace, snapshot.commit);
+    if (response.outcome === "completed" && response.text) {
+      const parsed = validateReviewResult(response.text, snapshot);
+      for (const finding of parsed.findings)
+        if (finding.blocking)
+          await verifyFindingEvidence(
+            workspace,
+            snapshot.commit,
+            finding.evidence,
+            snapshot.evidenceRefs,
+          );
+      result.findings = parsed.findings;
+      result.outcome = parsed.outcome;
+      result.evidenceRefs = [...parsed.evidenceRefs, ...response.evidence];
+    } else {
+      result.error = response.error ?? {
+        code: "missing-output",
+        message: "No completed reviewer output",
+      };
+    }
+  } catch (cause) {
+    result.error = {
+      code: "invalid-review",
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause:
+        cause instanceof Error
+          ? { name: cause.name, message: cause.message }
+          : cause,
+    };
+  }
+  const summary = `Code review round ${snapshot.round} at ${snapshot.commit}: ${result.outcome}.${result.error ? ` ${result.error.message}` : ""}\n${result.findings.map((finding) => `${finding.id} [${finding.blocking ? "blocking" : "optional"}] ${finding.category}: ${finding.criterion}\nEvidence: ${finding.evidence.join("; ")}\nSuggested repair: ${finding.suggestedRepair}`).join("\n")}\nFunctional review is still required.`;
+  if (
+    !(await options.store.recordReviewResult(
+      snapshot.runId,
+      snapshot,
+      result,
+      summary,
+    ))
+  )
+    throw new Error("Superseded review result ignored");
+  const stored = (await options.store.getRun(snapshot.runId))?.review;
+  if (
+    !stored?.result ||
+    stored.superseded ||
+    stored.snapshot.round !== snapshot.round
+  )
+    throw new Error("Superseded review publication ignored");
+  const publish = {
+    operationId: `review-publish-${snapshot.round}`,
+    kind: "review.publish" as const,
+    status: "intent" as const,
+    job,
+  };
+  await waitForDispatch(options.store, snapshot.runId);
+  if (!(await options.store.recordOperation(publish))) return result;
+  const published = await options.adapter.publishStatus(
+    options.parentSessionId,
+    options.directory,
+    stored.summary ?? summary,
+  );
+  await options.store.recordOperation({
+    ...publish,
+    status: published.ok ? "completed" : "failed",
+    ...(published.error ? { error: published.error } : {}),
+  });
+  return stored.result;
+}
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
+import { waitForDispatch } from "../commands/control.js";
+import {
+  pinReviewCommit,
+  readReviewGit,
+  resolveReviewCommit,
+  verifyReviewRepository,
+} from "../git/review-workspace.js";
+import { artifactHash, issueBundleHash } from "../planning/artifacts.js";
+import { validateIssueGraph } from "../planning/graph.js";
+import type { ReviewSnapshot, SnapshotOptions } from "./types.js";
+
+export async function createReviewSnapshot(
+  options: SnapshotOptions,
+): Promise<ReviewSnapshot> {
+  await waitForDispatch(options.store, options.runId);
+  await verifyReviewRepository(options.directory, options.store.repositoryId);
+  const run = await options.store.getRun(options.runId);
+  const ids = options.graph.issues.map((issue) => issue.id);
+  if (
+    !run?.execution ||
+    !ids.length ||
+    new Set(ids).size !== ids.length ||
+    ids.some(
+      (id) =>
+        run.execution?.issues.filter(
+          (issue) => issue.id === id && issue.status === "integrated",
+        ).length !== 1,
+    ) ||
+    run.execution.issues.some(
+      (issue) => issue.status !== "integrated" || !ids.includes(issue.id),
+    ) ||
+    run.execution.integrationQueue.length ||
+    Object.values(run.jobs).some(
+      (job) =>
+        job.status !== "terminal" &&
+        !["code-review", "functional-review"].includes(job.envelope.role),
+    )
+  ) {
+    throw new Error("All planned issues must be integrated before review");
+  }
+  if (
+    !Number.isInteger(options.round) ||
+    options.round < 1 ||
+    options.round > 3 ||
+    !options.prdRevision.trim() ||
+    !options.graph.revision.trim() ||
+    !options.evidenceRefs.length ||
+    options.evidenceRefs.some((ref) => !ref.trim())
+  )
+    throw new Error("Invalid review revisions, round or evidence");
+  const commit = await resolveReviewCommit(options.directory, options.commit);
+  const baseCommit = await resolveReviewCommit(
+    options.directory,
+    options.baseCommit,
+  );
+  await readReviewGit(options.directory, [
+    "merge-base",
+    "--is-ancestor",
+    baseCommit,
+    commit,
+  ]);
+  const snapshot: ReviewSnapshot = {
+    runId: options.runId,
+    round: options.round,
+    commit,
+    prdRevision: options.prdRevision,
+    graphRevision: options.graph.revision,
+    evidenceRefs: [...options.evidenceRefs],
+  };
+  if (run.review) {
+    if (
+      !run.review.superseded &&
+      isDeepStrictEqual(run.review.snapshot, snapshot)
+    )
+      return run.review.snapshot;
+    if (run.review.snapshot.round >= options.round)
+      throw new Error("Superseded or conflicting review round");
+  }
+  let prd: string;
+  let graph: string;
+  if (options.approvedPlanning) {
+    const planning = run.planning;
+    const approved = planning?.executionApproval;
+    if (
+      !planning?.prd ||
+      !planning.graph ||
+      !approved ||
+      planning.phase !== "execution_approved" ||
+      approved.prdHash !== planning.prd.hash ||
+      approved.graphHash !== planning.graph.hash ||
+      options.prdRevision !== planning.prd.hash ||
+      !isDeepStrictEqual(options.graph, {
+        revision: planning.graph.hash,
+        issues: planning.graph.value.issues,
+      })
+    )
+      throw new Error(
+        "Review requires the current approved planning revisions",
+      );
+    validateIssueGraph(
+      planning.graph.value,
+      planning.graph.files,
+      planning.prd,
+    );
+    prd = await readFile(
+      join(planning.workspace, planning.prd.artifactPath),
+      "utf8",
+    );
+    if (
+      artifactHash(prd) !== planning.prd.hash ||
+      issueBundleHash(planning.graph.value, planning.graph.files) !==
+        planning.graph.hash
+    )
+      throw new Error("Approved review requirements changed");
+    graph = JSON.stringify({
+      ...planning.graph.value,
+      files: planning.graph.files,
+    });
+  } else {
+    prd = await readReviewGit(options.directory, [
+      "show",
+      `${commit}:${options.prdPath ?? "PRD.md"}`,
+    ]);
+    graph = await readReviewGit(options.directory, [
+      "show",
+      `${commit}:${options.graphPath ?? "graph.json"}`,
+    ]);
+    const committedGraph = JSON.parse(graph);
+    if (!isDeepStrictEqual(committedGraph, options.graph) || !prd.trim())
+      throw new Error("Committed requirements do not match the approved graph");
+  }
+  const diff = await readReviewGit(options.directory, [
+    "diff",
+    "--no-ext-diff",
+    "--no-textconv",
+    baseCommit,
+    commit,
+    "--",
+  ]);
+  if (
+    !(await options.store.recordReviewSnapshot(options.runId, run.revision, {
+      snapshot,
+      inputs: {
+        baseCommit,
+        prd,
+        graph,
+        diff,
+        tests: run.execution.checks,
+        execution: run.execution,
+      },
+    }))
+  )
+    throw new Error("Execution changed while creating review snapshot");
+  const operation = {
+    operationId: `review-pin-${options.round}`,
+    kind: "review.pin" as const,
+    status: "intent" as const,
+    job: {
+      runId: options.runId,
+      jobId: `review-pin-${options.round}`,
+      attempt: 1,
+      role: "review-snapshot",
+      workspace: options.directory,
+      inputRevisions: { round: options.round },
+      baseCommit: commit,
+      prompt: "Pin review commit",
+    },
+  };
+  if (!(await options.store.recordOperation(operation)))
+    throw new Error("Review pin intent rejected");
+  try {
+    await pinReviewCommit(
+      options.directory,
+      `refs/ralph/reviews/${options.runId}/${options.round}`,
+      commit,
+    );
+    await options.store.recordOperation({ ...operation, status: "completed" });
+  } catch (cause) {
+    await options.store.recordOperation({
+      ...operation,
+      status: "failed",
+      error: {
+        code: "sdk-error",
+        message: "Cannot pin review commit",
+        cause: String(cause),
+      },
+    });
+    throw cause;
+  }
+  return snapshot;
+}
+import { readReviewGit } from "../git/review-workspace.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { RunStore } from "../state/run-store.js";
+import { runCodeReview } from "./code-review.js";
+import { createReviewSnapshot } from "./snapshot.js";
+
+/** Scheduler handoff only; functional review and repair coordination have separate owners. */
+export async function reviewIntegratedExecution(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+) {
+  const run = await store.getRun(runId);
+  if (
+    !run ||
+    (run.control && run.control.status !== "active") ||
+    !run.execution?.issues.length ||
+    run.execution.issues.some((i) => i.status !== "integrated")
+  )
+    return run;
+  if (run.review) return run;
+  const planning = run.planning;
+  if (!planning?.graph || !planning.prd || !run.baseline?.workspace)
+    throw new Error("Missing approved execution review inputs");
+  const directory = run.baseline.workspace;
+  const commit = (await readReviewGit(directory, ["rev-parse", "HEAD"])).trim();
+  const integration = Object.values(run.operations)
+    .filter(
+      (operation) =>
+        operation.kind === "integration.advance" &&
+        operation.status === "completed",
+    )
+    .at(-1);
+  if (!integration?.expectedNew || integration.expectedNew !== commit)
+    throw new Error(
+      "Integration workspace no longer matches the accepted feature commit",
+    );
+  const snapshot = await createReviewSnapshot({
+    store,
+    directory,
+    runId,
+    round: 1,
+    commit,
+    baseCommit: run.baseline.candidateCommit,
+    prdRevision: planning.prd.hash,
+    graph: {
+      revision: planning.graph.hash,
+      issues: planning.graph.value.issues,
+    },
+    evidenceRefs: Object.values(run.issueAttempts ?? {}).map(
+      (attempt) =>
+        `integration:${attempt.issueId}:${attempt.attempt}:${attempt.integratedCommit}`,
+    ),
+    approvedPlanning: true,
+  });
+  await runCodeReview(snapshot, {
+    store,
+    adapter,
+    directory,
+    parentSessionId: planning.sessionId,
+    ...(planning.settings.models["code-review"]
+      ? { model: planning.settings.models["code-review"] }
+      : {}),
+  });
+  return store.getRun(runId);
+}
+README.md:3:A locally installable OpenCode plugin with durable session jobs, independent code and functional review, bounded review repairs, a read-only dashboard, and interruption recovery. Exact tested dependencies and platform results are in [compatibility](docs/opencode-compatibility.md).
+README.md:5:The complete deterministic setup-to-report demonstration runs through the installed public command/adapter boundary. Production human answers and approvals remain blocked: the OpenCode adapter cannot yet verify their provenance. A host integration must supply correlated human responses. The automatic scheduler starts code review; a host must call `reviewFeature` with functional environment, surface and observation-tool options for the final dual review/report. Native Linux/Windows and credentialed full-workflow evidence remain release blockers. See [package validation](docs/package-validation.md).
+README.md:33:Use the **entire** URL printed by the command. It points to the package directory, where OpenCode resolves `server.js` and `tui.js`; do not point it to `dist/plugin.js`. This handles Windows drives and spaces. The example uses single quotes around JavaScript for PowerShell and POSIX shells; native Windows results are pending CI. A relative tarball dependency is recommended; Bun 1.4.3 failed to install the tested percent-encoded absolute `file:` tarball URL with spaces. Each target must be a Git repository. The repository root need not have a commit just to load the plugin; feature/review operations need committed inputs.
+README.md:52:The public `adapter`, `store`, `commands`, `types`, `review/*`, `reporting/completion` and `process` exports support typed host integration. `createCommandRouter(...).scheduleIssues(runId)` schedules the approved DAG; `executeIssue(runId, issueId)` executes/integrates one approved issue with at most three attempts and retained failure evidence; `answerExecutorQuestion(runId, issueId, response)` validates a host-provided correlated human response; `continuePlanning(runId)` presents and continues a pending execution approval; `runJob` dispatches a correlated session; `reviewFeature` coordinates the two reviewers and final report. `process` exposes ownership tracking/cleanup for approved command owners, not command approval. Tests and fixture code are excluded from runtime exports and the tarball.
+README.md:54:Code and functional reviewers load their bundled `skills/code-review` and `skills/functional-review` resources. Code-review options accept a `{ providerID, modelID }` model; functional review accepts its own model through `functionalOptions`. Executor jobs carry the same optional model field. Model/tool availability and OpenCode permissions remain host-owned; no permission is auto-approved. Command configuration validates lifecycle ordering, platform coverage (or explicit unsupported reasons), paths, timeouts, argument arrays, explicit shells and environment references. Role models and replacement skill paths are read from optional `.ralph/project.json` and captured with hashes on each run.
+README.md:76:planning; explanation approval retains it through execution. Terminal coordinated review releases the matching lock. Interrupted locks require reconciliation and explicit resume.
+README.md:119:Three **total issue attempts** include the first submission and two retries; an expected failing TDD red test does not consume an attempt. Three **total review rounds** apply to the final dual review; each generated repair task has its own three-attempt limit. Functional infrastructure retries have a separate three-attempt budget. Issue repair limits are enforced through the public single-issue entrypoint; the dependency scheduler preserves independent progress when an issue exhausts its budget.
+README.md:123:A completed agent job is not proof of a verified feature. Reports distinguish `verified`, `incomplete-validation` (including skipped checks), `unverified` (missing review evidence) and `unresolved` (blocking issues/findings). Inspect the report's commit, checks, unavailable review and cleanup/resource fields. No workflow script publishes, pushes, creates a PR or merges into a target branch.
+README.md:135:The package probe builds a clean distribution, packs it, installs it into two committed temporary repositories with spaces in their paths, and loads the installed plugin. It checks bundled skills/dashboard assets, separate stores and dashboard data, concurrent ports, argv preservation, local readiness, child cleanup and pause/resume. The workflow demo approves discovered commands, interviews, generates and approves a PRD/issue graph, prepares a clean baseline, executes real red/green addition tests, commits through the executor/merger worktrees, and dispatches independent reviewers through the fake SDK HTTP boundary. The second repository really times out its approved validation check; no execution state is seeded. The host explicitly supplies functional review options to the public coordinator after scheduling. Reports are `verified` for the passing-evidence fixture and `incomplete-validation` for the skipped-evidence fixture. These are deterministic fixture verdicts, not live-agent evidence. Temporary repositories are removed; `test:package` prints platform, runtime, outcomes and blockers. Set `PACKAGE_EVIDENCE_PATH` to retain JSON evidence.
+README.md:137:For the real installed OpenCode server probe, enable `OPENCODE_SMOKE=1` (PowerShell: `$env:OPENCODE_SMOKE='1'`) before `bun run test:smoke`. It uses a local deterministic model. The separate credentialed session probe requires `OPENCODE_LIVE_SMOKE=1`, `OPENCODE_SMOKE_URL` and `OPENCODE_SMOKE_MODEL=provider/model`; without them it reports SKIPPED. The credentialed probe covers a model session, not the complete workflow; production human provenance and automatic functional-review wiring remain blockers. A v2 server also requires authentication: set `OPENCODE_SMOKE_PASSWORD` for the live probe. Credentials remain in the configured server; do not copy them into fixtures or package assets.
+tests/integration/11-code-review.test.ts:7:import { createReviewSnapshot } from "../../src/review/snapshot.js";
+tests/integration/11-code-review.test.ts:13:test("changed approved requirements block automatic review without a green verification result", async () => {
+tests/integration/11-code-review.test.ts:27:      "Approved review requirements changed",
+tests/integration/11-code-review.test.ts:30:    expect(run?.review).toBeUndefined();
+tests/integration/11-code-review.test.ts:32:    expect(f.jobs.some((job) => job.role === "code-review")).toBe(false);
+tests/integration/11-code-review.test.ts:38:test("the scheduler starts one independent code review after all planned integrations", async () => {
+tests/integration/11-code-review.test.ts:42:  planned.planning.settings.models["code-review"] = {
+tests/integration/11-code-review.test.ts:43:    providerID: "review-provider",
+tests/integration/11-code-review.test.ts:44:    modelID: "review-model",
+tests/integration/11-code-review.test.ts:48:  const reviewJobs: import("../../src/core/types.js").JobEnvelope[] = [];
+tests/integration/11-code-review.test.ts:50:    if (job.role !== "code-review") return dispatch(job);
+tests/integration/11-code-review.test.ts:51:    reviewJobs.push(job);
+tests/integration/11-code-review.test.ts:56:    const fake = createFakeOpenCode({ sessionPrefix: "review-independent" });
+tests/integration/11-code-review.test.ts:59:        role: "code-review",
+tests/integration/11-code-review.test.ts:60:        reviewedCommit: job.baseCommit,
+tests/integration/11-code-review.test.ts:71:    expect(reviewJobs).toHaveLength(1);
+tests/integration/11-code-review.test.ts:72:    expect(reviewJobs[0]?.model).toEqual({
+tests/integration/11-code-review.test.ts:73:      providerID: "review-provider",
+tests/integration/11-code-review.test.ts:74:      modelID: "review-model",
+tests/integration/11-code-review.test.ts:76:    expect(reviewJobs[0]?.readOnly).toBe(true);
+tests/integration/11-code-review.test.ts:77:    expect(run?.review?.result?.outcome).toBe("passed");
+tests/integration/11-code-review.test.ts:78:    expect(run?.review?.snapshot.commit).toBe(reviewJobs[0]?.baseCommit);
+tests/integration/11-code-review.test.ts:79:    expect(run?.review?.inputs.prd).toBe("Add one");
+tests/integration/11-code-review.test.ts:80:    expect(JSON.parse(run?.review?.inputs.graph ?? "{}").issues).toHaveLength(
+tests/integration/11-code-review.test.ts:85:    expect(reviewJobs).toHaveLength(1);
+tests/integration/11-code-review.test.ts:91:test("review cannot start until every planned issue has integrated", async () => {
+tests/integration/11-code-review.test.ts:141:async function reviewFixture() {
+tests/integration/11-code-review.test.ts:216:test("independent reviewer sees frozen requirements and diff; only the concrete defect blocks", async () => {
+tests/integration/11-code-review.test.ts:217:  const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:222:        role: "code-review",
+tests/integration/11-code-review.test.ts:223:        reviewedCommit: f.commit,
+tests/integration/11-code-review.test.ts:230:            reviewerRole: "code-review",
+tests/integration/11-code-review.test.ts:231:            reviewedCommit: f.commit,
+tests/integration/11-code-review.test.ts:241:            reviewerRole: "code-review",
+tests/integration/11-code-review.test.ts:242:            reviewedCommit: f.commit,
+tests/integration/11-code-review.test.ts:253:    const result = await f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:256:      model: { providerID: "fixture", modelID: "reviewer" },
+tests/integration/11-code-review.test.ts:277:      id: "reviewer",
+tests/integration/11-code-review.test.ts:287:    expect(state?.review?.result).toEqual(result);
+tests/integration/11-code-review.test.ts:306:    role: "code-review",
+tests/integration/11-code-review.test.ts:307:    reviewedCommit: commit,
+tests/integration/11-code-review.test.ts:315:test("malformed review output is unverified and retains correlated failure evidence", async () => {
+tests/integration/11-code-review.test.ts:316:  const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:320:    const result = await f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:325:    expect(result.error?.code).toBe("invalid-review");
+tests/integration/11-code-review.test.ts:327:    expect((await f.store.getRun("r"))?.review?.result?.outcome).toBe(
+tests/integration/11-code-review.test.ts:335:test("wrong commit or round, missing evidence and contradictory verdicts cannot pass", async () => {
+tests/integration/11-code-review.test.ts:337:    { reviewedCommit: "a".repeat(40) },
+tests/integration/11-code-review.test.ts:344:          reviewerRole: "code-review",
+tests/integration/11-code-review.test.ts:345:          reviewedCommit: "COMMIT",
+tests/integration/11-code-review.test.ts:360:          reviewerRole: "code-review",
+tests/integration/11-code-review.test.ts:361:          reviewedCommit: "COMMIT",
+tests/integration/11-code-review.test.ts:375:          reviewerRole: "code-review",
+tests/integration/11-code-review.test.ts:376:          reviewedCommit: "invalid",
+tests/integration/11-code-review.test.ts:383:    const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:389:      const result = await f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:394:      expect(result.error?.code).toBe("invalid-review");
+tests/integration/11-code-review.test.ts:401:test("execution updates invalidate a snapshot and cannot reuse its round", async () => {
+tests/integration/11-code-review.test.ts:402:  const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:414:test("a superseded in-flight reviewer cannot publish or replace the newer round", async () => {
+tests/integration/11-code-review.test.ts:415:  const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:420:    const pending = f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:438:    expect((await f.store.getRun("r"))?.review?.snapshot).toEqual(second);
+tests/integration/11-code-review.test.ts:439:    expect((await f.store.getRun("r"))?.review?.result).toBeUndefined();
+tests/integration/11-code-review.test.ts:450:test("workspace edits are rejected without touching the source branch", async () => {
+tests/integration/11-code-review.test.ts:451:  const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:456:    const pending = f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:471:    if (!workspace) throw new Error("Missing reviewer workspace");
+tests/integration/11-code-review.test.ts:472:    await writeFile(join(workspace, "add.ts"), "reviewer tried to repair\n");
+tests/integration/11-code-review.test.ts:487:test("optional-only review passes code review but never completes or verifies the feature", async () => {
+tests/integration/11-code-review.test.ts:488:  const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:491:    // Advance the source branch after freezing; reviewer still sees the pinned SHA.
+tests/integration/11-code-review.test.ts:505:            reviewerRole: "code-review",
+tests/integration/11-code-review.test.ts:506:            reviewedCommit: f.commit,
+tests/integration/11-code-review.test.ts:517:    const result = await f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:527:    expect(run?.review?.snapshot.commit).toBe(f.commit);
+tests/integration/11-code-review.test.ts:530:      await f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:541:test("blocking claims with nonexistent source evidence remain unverified", async () => {
+tests/integration/11-code-review.test.ts:542:  const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:552:            reviewerRole: "code-review",
+tests/integration/11-code-review.test.ts:553:            reviewedCommit: f.commit,
+tests/integration/11-code-review.test.ts:564:    const result = await f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:569:    expect(result.error?.code).toBe("invalid-review");
+tests/integration/11-code-review.test.ts:575:test("missing output and permission denial preserve typed causes and remain unverified", async () => {
+tests/integration/11-code-review.test.ts:577:    const f = await reviewFixture();
+tests/integration/11-code-review.test.ts:581:      const result = await f.router.reviewCode(snapshot, {
+tests/integration/11-code-review.test.ts:589:      expect((await f.store.getRun("r"))?.review?.result?.outcome).toBe(
+src/core/orchestrator.ts:12:} from "../review/code-review.js";
+src/core/orchestrator.ts:13:import type { ReviewSnapshot } from "../review/types.js";
+src/core/orchestrator.ts:14:/** Code review is a phase boundary; feature verification belongs to both reviewers. */
+src/core/orchestrator.ts:15:export function reviewCompletedCode(
+src/core/orchestrator.ts:26:export { coordinateReviewRound } from "../review/coordinator.js";
+
+exec
+/bin/zsh -lc 'bun test tests/integration/11-code-review.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun --version; bun run typecheck' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 92ms:
+$ biome check src tests scripts
+Checked 98 files in 100ms. No fixes applied.
+
+ succeeded in 1737ms:
+1.4.3
+$ tsc --noEmit
+
+ succeeded in 20130ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/11-code-review.test.ts:
+(pass) changed approved requirements block automatic review without a green verification result [8003.19ms]
+(pass) the scheduler starts one independent code review after all planned integrations [8407.35ms]
+(pass) review cannot start until every planned issue has integrated [118.11ms]
+(pass) independent reviewer sees frozen requirements and diff; only the concrete defect blocks [225.80ms]
+(pass) malformed review output is unverified and retains correlated failure evidence [207.51ms]
+(pass) wrong commit or round, missing evidence and contradictory verdicts cannot pass [1367.57ms]
+(pass) execution updates invalidate a snapshot and cannot reuse its round [216.50ms]
+(pass) a superseded in-flight reviewer cannot publish or replace the newer round [289.38ms]
+(pass) workspace edits are rejected without touching the source branch [247.09ms]
+(pass) optional-only review passes code review but never completes or verifies the feature [263.47ms]
+(pass) blocking claims with nonexistent source evidence remain unverified [368.69ms]
+(pass) missing output and permission denial preserve typed causes and remain unverified [431.89ms]
+
+ 12 pass
+ 0 fail
+ 92 expect() calls
+Ran 12 tests across 1 file. [20.23s]
+
+codex
+Task 11 is already complete, including scheduler integration. No files changed.
+
+Verified on Bun 1.4.3:
+
+- Typecheck passed.
+- Lint passed.
+- Code-review integration tests: 12 passed, 0 failed.
+
+The tests confirm independent sessions, frozen commits, blocking defects versus optional suggestions, and rejection of malformed or stale results. Live-provider and native Linux/Windows checks were not run.
+tokens used
+16,299
+Task 11 is already complete, including scheduler integration. No files changed.
+
+Verified on Bun 1.4.3:
+
+- Typecheck passed.
+- Lint passed.
+- Code-review integration tests: 12 passed, 0 failed.
+
+The tests confirm independent sessions, frozen commits, blocking defects versus optional suggestions, and rejection of malformed or stale results. Live-provider and native Linux/Windows checks were not run.

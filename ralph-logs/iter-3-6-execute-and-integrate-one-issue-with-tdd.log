@@ -1,0 +1,952 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/6-execute-and-integrate-one-issue-with-tdd.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cd2-a917-74b0-ac11-1205ded5c644
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 6 of 15 — 6-execute-and-integrate-one-issue-with-tdd.md
+=== END METADATA ===
+
+TASK:
+# 6. Execute and integrate one issue using TDD
+
+**Type:** AFK  
+**Status:** Implemented; repository-wide lint has an unrelated existing formatting blocker  
+**User stories:** US-5  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Implement the end-to-end successful path for a single approved issue. Create an issue worktree, dispatch a TDD executor, obtain its committed submission, dispatch a separate merger in a candidate worktree, run checks, and advance the integration branch only to the validated candidate. Delete the successful issue worktree while retaining commit and test evidence. Failed submissions are recorded for the retry policy added in issue 7.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 189–209): worktrees, TDD, separate merge agent, candidate validation and cleanup.
+- `PRD.md` (lines 148–152): attempt and commit identity.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 5: Prepare the feature branch and validate its baseline](5-prepare-feature-branch-and-validate-baseline.md): predecessor contracts and the code delivered by that slice.
+- `src/execution/execute-issue.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/execution/integrate-issue.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/agents/results.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `skills/tdd/SKILL.md`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `skills/merge/SKILL.md`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Use typed JobEnvelope correlation and explicit successful validation of an exact SHA. TDD assertions are behavioral: evidence of meaningful red then green through public interfaces, or a recorded non-behavior exception. Separate the executor and merger sessions; do not let an executor advance the integration ref.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Dispatch a TDD executor in an owned issue worktree
+
+**Files:** `src/execution/execute-issue.ts`, `skills/tdd/SKILL.md`, `src/agents/results.ts`
+
+- **IMPLEMENT:** Create an issue branch from current integration HEAD. Provide PRD/issue/config/skill revisions and test behaviors, then dispatch an executor using its configured model. Define a validated Submission with issueId, attempt, sessionId, baseCommit, submittedCommit and TDD evidence or documented exception. Require clean committed output and ensure the submitted commit belongs to the owned branch.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import createOwnedWorktree, loadRoleInstructions, OpenCodeAdapter, and IssueSpec; export executeIssue and parseSubmission.
+- **GOTCHA:** Expected test failures during red stages are not submission failures. Approved test plans authorize behavior work without another approval per test.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/06-single-issue.test.ts`; add the tests below as this slice develops.
+
+### 2. Merge and validate without advancing early
+
+**Files:** `src/execution/integrate-issue.ts`, `skills/merge/SKILL.md`, `src/git/worktrees.ts`
+
+- **IMPLEMENT:** Create a candidate worktree at the latest integration SHA, dispatch the merger with the issue submission, allow mechanical conflict resolution, and return behavior conflicts as structured repair feedback. Run validateCandidate on the merger's committed output. Advance the integration branch using an expected-old-SHA comparison only after a successful or qualified validation, then record integration durably.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import validateCandidate, createOwnedWorktree, RunStore and OpenCodeAdapter; export integrateIssue and IntegrationResult. Add compareAndAdvanceRef to the Git module.
+- **GOTCHA:** Reject candidate changes after validation. If integration HEAD changed, rebuild/revalidate the candidate rather than reuse stale check results. Preserve user target branches.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/06-single-issue.test.ts`; add the tests below as this slice develops.
+
+### 3. Clean successful worktrees and prove the whole path
+
+**Files:** `src/execution/execute-issue.ts`, `tests/integration/06-single-issue.test.ts`
+
+- **IMPLEMENT:** Remove owned issue and candidate worktrees only after recording the accepted integration. Preserve failed worktrees and capture cleanup errors without undoing accepted work. Test a real Git fixture with fake agent-produced commits and meaningful red/green evidence; test rejected submission identity, behavior conflict, failed validation, stale candidate, and cleanup failure.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import createTestProject/createFakeOpenCode and public executor/integrator functions.
+- **GOTCHA:** Never use forced deletion on an unrecognized path. State must retain enough intent and SHA data for issue 14 recovery.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/06-single-issue.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] A single issue travels from approved graph to integrated commit through two separate agent sessions.
+- [x] Issue and candidate worktrees are based on the correct recorded commits.
+- [x] Failed validation leaves the integration branch unchanged.
+- [x] TDD evidence is retained and red-stage failures do not count as completed submission failures.
+- [x] Successful worktrees are removed after integration; failed worktrees and logs remain inspectable.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/06-single-issue.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded. — Type checking and changed-file lint pass; full lint remains blocked by existing `tests/browser/dashboard.test.ts` formatting.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/06-single-issue.test.ts
+
+```
+
+**Demonstration:** Implement a one-function behavior in a fixture using fake agents that create a failing test and then a passing commit; confirm both sessions, validation SHA, integration SHA, and worktree removal.
+
+## Blocked by
+
+- [5-prepare-feature-branch-and-validate-baseline.md](5-prepare-feature-branch-and-validate-baseline.md) — prepare the feature branch and validate its baseline supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+## Completion evidence (2026-10-15)
+
+Implemented the public `executeIssue` / `integrateIssue` path with owned issue/candidate worktrees, independently configured executor/merger sessions, correlated committed submissions, retained TDD logs, durable candidate validation and expected-old-SHA integration advancement. Behavior conflicts and failed checks preserve worktrees and diagnostic records. Successful cleanup follows durable acceptance; cleanup failure retains accepted integration.
+
+TDD evidence: the original demonstration failed because both workflow modules were absent, then passed after implementation. Added behavioral regressions exposed candidate mutation after validation, validation commands lacking merger session permission identity, an old baseline approval being accepted, and a stop after integration intent allowing a late ref advance. Each failure was observed and corrected with green tests. The fixture runs a real failing `addOne(2) === 3` assertion before implementing `n + 1`, then commits passing behavior through the fake OpenCode HTTP adapter boundary.
+
+The demonstration verifies separate sessions, exact validation/integration SHA, unchanged user HEAD, retained red/green evidence and successful worktree removal. Regressions cover mismatched submission identity, behavior conflict, failed candidate validation, stale integration base rebuilding/revalidation, candidate mutation, cleanup failure, old baseline approval and stopped completion. Wiki: `docs/wiki/features/single-issue-integration.md`.
+
+Validation results are recorded below after final checks. Native Linux/Windows and credentialed live agent smoke were not run. Retry policy and scheduler remain owned by issues 7–8; no publication, external messages or user-target merging occurred.
+
+Final command results (Bun 1.4.3, macOS):
+- `bun run typecheck`: passed.
+- `bun test tests/integration/06-single-issue.test.ts`: 9 passed, 0 failed; 55 assertions.
+- `bun test --timeout 30000 tests/integration`: 139 passed, 1 skipped, 0 failed. The opt-in real agent-browser case was skipped.
+- `bunx biome check` on the eight touched TypeScript/test files: passed with no diagnostics.
+- `bun run lint`: failed solely on the pre-existing formatting error at `tests/browser/dashboard.test.ts:38`; left unchanged under the ticket's unrelated-file constraint.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing implementation and rerun this ticket’s acceptance checks. If it’s complete, I’ll leave the code unchanged.
+exec
+/bin/zsh -lc "pwd; rg --files -g AGENTS.md -g package.json -g '*single-issue*' -g '*execute-issue*' -g '*integrate-issue*' -g '*results.ts' -g '*worktrees.ts' -g '*6-execute*' -g README.md -g PRD.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+src/git/worktrees.ts
+src/review/functional-results.ts
+src/execution/execute-issue.ts
+src/execution/integrate-issue.ts
+src/agents/results.ts
+ralph-logs/iter-1-6-execute-and-integrate-one-issue-with-tdd.log
+ralph-logs/iter-2-6-execute-and-integrate-one-issue-with-tdd.log
+package.json
+README.md
+docs/wiki/features/single-issue-integration.md
+tests/helpers/single-issue.ts
+tests/integration/06-single-issue.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc "sed -n '88,97p' PRD.md; sed -n '148,152p' PRD.md; sed -n '189,209p' PRD.md; cat skills/tdd/SKILL.md; cat skills/merge/SKILL.md; rg -n 'test\\(|it\\(' tests/integration/06-single-issue.test.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc "sed -n '1,250p' src/execution/integrate-issue.ts; cat docs/wiki/features/single-issue-integration.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+### 6.5 Durable job contracts
+
+Each dispatched job records role, run ID, issue ID when relevant, attempt, session, workspace, input artifact revisions, and starting commit. Results reference produced commits, logs, evidence, findings, or questions.
+
+Persist intent before externally visible Git/process operations, then persist their observed result. Recovery must detect already-completed operations and avoid duplicate integrations. Late results from cancelled or superseded attempts cannot advance workflow state.
+### 7.5 Dependency scheduling and execution
+
+Run up to two eligible issues concurrently by default. An issue is eligible only when every dependency has been integrated and passed all non-skipped checks. Agent completion alone does not satisfy a dependency.
+
+Create each issue's branch and worktree from the latest integration commit when it starts. Executors receive the approved issue, PRD, relevant project instructions, configured model, and TDD instructions. Concurrent environments must have separate resources where isolation is required.
+
+If an executor cannot resolve a requirement from the PRD or code, send its question to the main OpenCode chat. Block that issue and its dependents while independent work continues. If the answer changes approved scope, revise the relevant artifacts and obtain renewed approval before dependent implementation.
+
+### 7.6 TDD requirements
+
+Implement one behavior at a time: write a meaningful failing test through a public interface, observe the expected failure, implement the minimum change, then refactor while tests remain green. Do not write a batch of speculative tests before all implementation. Repair executors follow the same process, normally beginning with a regression test.
+
+The approved issue plan supplies the intended behaviors and interface changes, avoiding a redundant approval at every TDD cycle. Record red/green evidence in execution logs. Expected red-stage failures do not consume issue repair attempts. Documentation or configuration changes with no meaningful automated behavior test may use a documented exception plus appropriate validation.
+
+### 7.7 Integration and worktree lifecycle
+
+A separate merge agent combines each completed submission with the latest integration branch in a temporary candidate worktree. Integration is sequential even when execution is parallel.
+
+The merger may resolve mechanical conflicts. Conflicts requiring behavior or feature decisions return to the executor with context and consume the issue's attempt budget. The command runner validates the candidate commit using approved checks. Only then does the orchestrator advance the integration branch to that exact candidate. Never advance the feature branch first and rely on rollback after failed checks.
+
+After successful integration and checks, remove the issue worktree. Retain its commit references, execution evidence, and logs. Preserve failed worktrees for diagnosis. Cleanup failure is reported and must not reverse an otherwise recorded integration or delete unrecognized user work.
+# Executor TDD
+The approved issue and test behaviors authorize implementation. Work only in the provided issue worktree; never update the integration branch. For each behavior, write a meaningful public-interface test, run it and observe the expected failure, implement the minimum change, then run it green. Refactor while green. Expected red failures are evidence, not failed submissions.
+Commit all output on the owned branch and leave a clean checkout. Return JSON with issueId, attempt, baseCommit, submittedCommit, and tdd: {cycles: [{behavior, red: {exitCode, log}, green: {exitCode, log}}]}. Logs must show the behavior assertion failing and passing. For work without meaningful automated behavior, use cycles: [] and a specific documented exception. Do not claim missing output as success.
+
+If a requirement is unresolved, return JSON {"kind":"needs_input","question":"specific question","recommendedAnswer":"recommended answer","affectedRequirement":"issue criterion or PRD requirement"}. Commit or retain your current work in this worktree; do not guess or change approved scope. Ralph will release capacity while the main-session user answers and resume this same bounded attempt with the answer context. If the answer requires changing approved artifacts, the host must submit a user-correlated {"kind":"revise_scope","prd":"full PRD text","graph":<complete graph>,"files":<issue-path to text map>} answer to publish a validated draft for renewed execution approval.
+# Separate merger
+Combine the submission with the provided latest integration base in this candidate worktree. Never advance the integration ref. Resolve only mechanical conflicts. If a conflict requires a behavior decision, return {"kind":"behavior_conflict","feedback":"specific repair context"}. Otherwise commit the complete merge, leave the owned branch clean, and return {"kind":"merged","candidateCommit":"full HEAD SHA"}. The orchestrator validates that exact commit before integration.
+
+Merge the exact submitted commit with Git ancestry preserved: both the latest integration base and submittedCommit must be ancestors of candidateCommit. Do not squash or replace the submission with an unrelated commit. The orchestrator, not this session, owns integration advancement and cleanup.
+12:test("approved issue uses separate sessions, validates exact commit and cleans owned worktrees", async () => {
+43:test("candidate mutation after check completion cannot advance integration", async () => {
+77:test("rejected submission identity retains its worktree and failure evidence", async () => {
+100:test("behavior conflicts return structured repair feedback and retain both worktrees", async () => {
+118:test("failed candidate checks preserve integration HEAD and retained diagnostics", async () => {
+136:test("a moved integration HEAD rebuilds and revalidates in a fresh merger session", async () => {
+180:test("cleanup failure retains accepted integration and leaves changed work inspectable", async () => {
+215:test("a baseline from an older approval cannot dispatch an executor", async () => {
+237:test("stopping after integration intent ignores the late completion", async () => {
+
+ succeeded in 0ms:
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import { correlatedResult } from "../agents/results.js";
+import { loadRoleInstructions } from "../agents/skills.js";
+import { waitForDispatch } from "../commands/control.js";
+import { commandConfigHash } from "../config/commands.js";
+import { loadProjectConfig } from "../config/project.js";
+import type { JobEnvelope } from "../core/types.js";
+import {
+  compareAndAdvanceRef,
+  createOwnedWorktree,
+  gitOutput,
+  inspectWorktree,
+  removeOwnedWorktree,
+} from "../git/worktrees.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { executionIssue } from "../review/repair-context.js";
+import type { RunStore } from "../state/run-store.js";
+import {
+  type AttemptOptions,
+  dispatchAttempt,
+  failAttempt,
+} from "./attempts.js";
+import {
+  assertCurrentAttempt,
+  type IssueAttempt,
+  saveIssueAttempt,
+} from "./execute-issue.js";
+import { integrationQueue } from "./integration-queue.js";
+import { validateCandidate } from "./validation.js";
+
+export type IntegrationResult = IssueAttempt;
+const mergeResult = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("merged"),
+      candidateCommit: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("behavior_conflict"),
+      feedback: z.string().trim().min(1),
+    })
+    .strict(),
+]);
+export async function integrateSubmission(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  issueId: string,
+  options: AttemptOptions = {},
+): Promise<IntegrationResult> {
+  await waitForDispatch(store, runId);
+  const initial = await store.getRun(runId);
+  const stored = initial?.issueAttempts?.[issueId];
+  if (!initial || !stored) throw new Error("Missing issue submission");
+  if (stored.status !== "submitted") return stored;
+  const attempt = structuredClone(stored);
+  const submission = attempt.submission;
+  const planning = initial.planning;
+  const baseline = initial.baseline;
+  if (!submission || !planning || !baseline?.workspace || !baseline.branch)
+    throw new Error("Missing integration inputs");
+  assertCurrentAttempt(initial, initial, attempt);
+  attempt.status = "merging";
+  // Reserve before dispatch: another integrator may not dispatch this attempt again.
+  await saveIssueAttempt(store, initial, attempt);
+  try {
+    const config = await loadProjectConfig(planning.workspace);
+    if (commandConfigHash(config.commands) !== planning.commandHash)
+      throw new Error("Approved commands changed");
+    const skill = await loadRoleInstructions(
+      planning.workspace,
+      "merger",
+      config.skillPaths,
+    );
+    for (let rebuild = 0; rebuild < 3; rebuild++) {
+      const base = await inspectWorktree(baseline.workspace);
+      if (
+        base.repositoryId !== store.repositoryId ||
+        base.branch !== `refs/heads/${baseline.branch}`
+      )
+        throw new Error("Integration identity changed");
+      const operationId = `candidate-${randomUUID()}`;
+      const job: JobEnvelope = {
+        ...attempt.job,
+        jobId: operationId,
+        role: "merger",
+        workspace: `${attempt.job.workspace}-${operationId}`,
+        baseCommit: base.commit,
+        ...(planning.settings.models.merger
+          ? { model: planning.settings.models.merger }
+          : {}),
+        prompt: `${skill.text}\nSkill: ${JSON.stringify({ path: skill.path, hash: skill.hash })}\nApproved PRD: ${JSON.stringify(planning.prd)}\nApproved issue: ${JSON.stringify(executionIssue(initial, issueId))}\nLatest integration: ${base.commit}\nSUBMISSION\n${JSON.stringify(submission)}`,
+      };
+      delete job.sessionId;
+      delete job.environment;
+      if (!planning.settings.models.merger) delete job.model;
+      attempt.candidate = {
+        operationId,
+        job,
+        ref: `refs/heads/ralph/candidates/${runId}/${operationId}`,
+      };
+      await saveIssueAttempt(store, initial, attempt);
+      await createOwnedWorktree(store, planning.workspace, {
+        operationId,
+        kind: "candidate.workspace",
+        status: "intent",
+        job,
+        ref: attempt.candidate.ref,
+        expectedNew: base.commit,
+      });
+      const result = await dispatchAttempt(
+        store,
+        adapter,
+        job,
+        attempt.agentTimeoutMs ?? planning.settings.agentTimeoutMs ?? 1800000,
+        options,
+      );
+      assertCurrentAttempt(initial, await store.getRun(runId), attempt);
+      attempt.candidate.result = result;
+      if (result.outcome !== "completed") {
+        attempt.error = result.error ?? {
+          code:
+            result.outcome === "denied"
+              ? "permission-denied"
+              : result.outcome === "cancelled"
+                ? "cancelled"
+                : "missing-output",
+          message: "Merger did not complete",
+        };
+        throw new Error(attempt.error.message);
+      }
+      const output = mergeResult.parse(correlatedResult(job, result));
+      attempt.mergerSessionId = result.sessionId as string;
+      if (result.sessionId === submission.sessionId)
+        throw new Error("Merger must use a separate session");
+      if (output.kind === "behavior_conflict") {
+        attempt.feedback = output.feedback;
+        throw new Error("Merge requires behavior repair");
+      }
+      const found = await inspectWorktree(job.workspace);
+      if (
+        found.repositoryId !== store.repositoryId ||
+        found.branch !== attempt.candidate.ref ||
+        found.commit !== output.candidateCommit ||
+        (
+          await gitOutput(job.workspace, [
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+          ])
+        ).trim()
+      )
+        throw new Error(
+          "Merger output must be clean and committed on the owned candidate branch",
+        );
+      await gitOutput(job.workspace, [
+        "merge-base",
+        "--is-ancestor",
+        base.commit,
+        found.commit,
+      ]);
+      await gitOutput(job.workspace, [
+        "merge-base",
+        "--is-ancestor",
+        submission.submittedCommit,
+        found.commit,
+      ]);
+      attempt.candidate.commit = found.commit;
+      await saveIssueAttempt(store, initial, attempt);
+      const validationJob = {
+        ...job,
+        baseCommit: found.commit,
+        sessionId: result.sessionId as string,
+      };
+      await waitForDispatch(store, runId);
+      assertCurrentAttempt(initial, await store.getRun(runId), attempt);
+      attempt.validation = await validateCandidate({
+        store,
+        adapter,
+        job: validationJob,
+        config: config.commands,
+        sourceWorkspace: planning.workspace,
+        ...(options.clock ? { clock: options.clock } : {}),
+      });
+      await saveIssueAttempt(store, initial, attempt);
+      if (attempt.validation.status === "failed") {
+        if (attempt.validation.failureCause)
+          attempt.error = attempt.validation.failureCause;
+        throw new Error(
+          attempt.validation.blocker ?? "Candidate validation failed",
+        );
+      }
+      assertCurrentAttempt(initial, await store.getRun(runId), attempt);
+      await waitForDispatch(store, runId);
+      assertCurrentAttempt(initial, await store.getRun(runId), attempt);
+      const advanced = await compareAndAdvanceRef(store, planning.workspace, {
+        operationId: `advance-${operationId}`,
+        kind: "integration.advance",
+        status: "intent",
+        job,
+        ref: `refs/heads/${baseline.branch}`,
+        expectedOld: base.commit,
+        expectedNew: found.commit,
+      });
+      if (!advanced) continue; // New base requires a new merger session and validation.
+      attempt.status = "integrated";
+      attempt.integratedCommit = found.commit;
+      const advanceError = (await store.getRun(runId))?.operations[
+        `advance-${operationId}`
+      ]?.error;
+      if (advanceError) attempt.cleanupErrors = [advanceError.message];
+      await saveIssueAttempt(store, initial, attempt);
+      for (const owned of [attempt.operationId, operationId]) {
+        try {
+          await removeOwnedWorktree(store, planning.workspace, owned);
+        } catch (cause) {
+          attempt.cleanupErrors ??= [];
+          attempt.cleanupErrors.push(String(cause));
+        }
+      }
+      await saveIssueAttempt(store, initial, attempt);
+      return attempt;
+    }
+    throw new Error(
+      "Integration kept changing; retained candidates require revalidation",
+    );
+  } catch (cause) {
+    attempt.error ??= {
+      code: "baseline-blocked",
+      message: String(cause),
+      cause: String(cause),
+    };
+    if (attempt.status !== "integrated") failAttempt(attempt);
+    await saveIssueAttempt(store, initial, attempt).catch(() => {});
+  }
+  return attempt;
+}
+
+/** Every public integration caller shares the repository run's serial queue. */
+export function integrateIssue(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  issueId: string,
+  options: AttemptOptions = {},
+) {
+  return integrationQueue(store, runId).enqueue(
+# Single issue execution and integration
+
+## Summary
+An approved, dependency-ready issue executes in an owned worktree at current integration HEAD. A separate merger session combines its committed submission with the latest integration base in a candidate worktree. Only successful validation of that exact candidate permits an expected-old-SHA ref advance.
+
+## Key behavior
+- `executeIssue` checks execution approval, matching baseline approval/starting SHA, command hash, PRD hash and approved graph. It reserves one attempt durably before creating the worktree. The reservation precedes submission setup, so setup failures consume the same budget as agent and validation failures.
+- Jobs capture run/job/issue/attempt/base/revision identity, configured role models, skill content hashes and approved behaviors. Bundled TDD/merge rules remain present with project overrides.
+- Submission parsing rejects missing/mismatched output and requires recorded red/green logs with exit codes or a documented non-behavior exception. Git verifies clean owned branch HEAD and ancestry. Expected red test failures are retained evidence, not failed attempts.
+- `integrateIssue` reserves merging, dispatches a separate session, retains behavior-conflict feedback, verifies merger ownership/ancestry and runs approved commands with the merger session's permission identity.
+- `compareAndAdvanceRef` requires durable successful validation of the exact SHA and current attempt/config/control identity. Candidate changes invalidate acceptance; changed integration HEAD creates a new candidate/session and reruns checks (at most three base rebuilds within the same issue attempt).
+- Integration operations retain old/new SHA intent for recovery. User target branches remain untouched. The owned baseline checkout index is synchronized after ref advancement; synchronization failures are recorded without undoing acceptance.
+- Accepted integration is recorded before non-forced issue/candidate cleanup. Failed and stale candidate worktrees remain inspectable. Cleanup errors retain accepted status, commit/test evidence and changed files.
+
+- Executor setup/start/readiness uses the approved lifecycle before agent dispatch, with main-session command permission. Runtime allocations and lifecycle evidence are retained on the attempt; denial/cancellation wait, setup timeout consumes an attempt.
+- `runIssue` / `createCommandRouter(...).executeIssue` execute and integrate one issue with three total attempts. Attempt history retains executor/merger results, failed check logs, merge feedback and worktree references. Issue agent completions never attest feature completion; the run remains running for independent work/final review. Exhaustion blocks that issue without stopping the entire run; repeat or concurrent calls cannot create a fourth job.
+- Executor and merger dispatch use the run's `agentTimeoutMs` (default 1,800,000 ms). An injected clock controls deadlines in tests. Timeout cancellation finishes before repair; late output cannot replace the active attempt. Permission denial and cancellation wait rather than trigger repairs.
+- Before repair, owned activity is stopped and retained workspace identity, HEAD and dirty files are reconciled into the executor prompt. Reconciliation or cancellation uncertainty waits for intervention. Failed work is retained, never force removed.
+- Candidate validation reuses baseline run-local check IDs across repairs, issues and review validation. Only genuine check timeouts with confirmed cleanup cause skips; setup failures, spawn errors, nonzero exits and cancellation remain distinct. Cleanup always runs. Every check skipped permits integration with `passed_with_omissions`, visible in status; new runs retry the commands.
+- The process runner publishes live ownership before waiting, letting `/ralph-stop` kill a running tree and record cancellation without adding a timeout skip.
+
+## Code references
+- `src/execution/attempts.ts`, `src/core/orchestrator.ts` — bounded ledger, cancellation, workspace reconciliation and single-issue repairs.
+- `src/execution/validation.ts`, `src/process/runner.ts` — omission policy, typed command outcomes and live process ownership.
+- `src/execution/execute-issue.ts` — public execution, attempt identity and submission verification.
+- `src/execution/integrate-issue.ts` — merger, candidate validation and accepted cleanup.
+- `src/agents/results.ts`, `src/agents/skills.ts` — correlated results, TDD evidence and role instructions.
+- `src/git/worktrees.ts` — owned worktrees and guarded integration ref mutation.
+- `tests/integration/07-retries.test.ts`, `tests/helpers/clock.ts` — fake-clock retry, exhaustion, timeout, permission, cancellation and skip regressions.
+- `tests/integration/06-single-issue.test.ts` — real Git and fake SDK red/green demonstration and rejection scenarios.
+
+## Related
+- [Execution baseline](execution-baseline.md)
+- [Planning approval](feature-planning.md)
+- [Concurrent dependency execution](concurrent-execution.md)
+
+## Notes
+The public command router exposes bounded single-issue execution and dependency scheduling. Human requirement-question routing remains downstream slice 9. Agent prose is recorded evidence, not independently verified execution provenance. Tests execute on macOS with Bun 1.4.3; native Linux/Windows and credentialed live agent runs were not performed.
+
+## Last updated
+2026-10-15
+
+exec
+/bin/zsh -lc "git status --short; cat package.json; sed -n '1,220p' src/execution/execute-issue.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import {
+  correlatedResult,
+  parseExecutorQuestion,
+  parseSubmission,
+  type Submission,
+} from "../agents/results.js";
+import { loadRoleInstructions } from "../agents/skills.js";
+import { commandConfigHash } from "../config/commands.js";
+import { loadProjectConfig } from "../config/project.js";
+import type {
+  Failure,
+  JobEnvelope,
+  JobResult,
+  RunRecord,
+} from "../core/types.js";
+import {
+  createOwnedWorktree,
+  gitOutput,
+  inspectWorktree,
+} from "../git/worktrees.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { approvalMatchesRevision } from "../planning/approvals.js";
+import { artifactHash, issueBundleHash } from "../planning/artifacts.js";
+import {
+  createApprovedEnvironment,
+  disposeEnvironment,
+  prepareEnvironment,
+} from "../process/environment.js";
+import { currentRepair, executionIssue } from "../review/repair-context.js";
+import { parseFindingDispute } from "../review/repairs.js";
+import type { RunStore } from "../state/run-store.js";
+import {
+  type AttemptOptions,
+  beginAttempt,
+  dispatchAttempt,
+  failAttempt,
+  reconcileAttempt,
+  repairContext,
+} from "./attempts.js";
+import { withExecutorSlot } from "./executor-slots.js";
+import type { ValidationSummary } from "./validation.js";
+
+export { parseSubmission };
+export interface IssueAttempt {
+  issueId: string;
+  attempt: number;
+  agentTimeoutMs?: number;
+  remainingAgentMs?: number;
+  status:
+    | "executing"
+    | "submitted"
+    | "merging"
+    | "failed"
+    | "integrated"
+    | "exhausted"
+    | "waiting"
+    | "resume_ready";
+  findingDispute?: { findingIds: string[]; evidenceRefs: string[] };
+  question?: import("./questions.js").ExecutorQuestion;
+  questions?: import("./questions.js").ExecutorQuestion[];
+  history?: Omit<IssueAttempt, "history">[];
+  operationId: string;
+  job: JobEnvelope;
+  submission?: Submission;
+  executionResult?: JobResult;
+  candidate?: {
+    operationId: string;
+    job: JobEnvelope;
+    ref: string;
+    commit?: string;
+    result?: JobResult;
+  };
+  validation?: ValidationSummary;
+  integratedCommit?: string;
+  mergerSessionId?: string;
+  feedback?: string;
+  error?: Failure;
+  cleanupErrors?: string[];
+  environment?: {
+    lease?: import("../process/environment.js").EnvironmentLease;
+    lifecycle: import("../process/runner.js").CommandResult[];
+  };
+  reconciledWork?: Awaited<ReturnType<typeof reconcileAttempt>>;
+}
+
+/** Approval and control identity remain fixed throughout one attempt. */
+export function assertCurrentAttempt(
+  initial: RunRecord,
+  current: RunRecord | undefined,
+  attempt: IssueAttempt,
+): asserts current is RunRecord {
+  if (
+    !current ||
+    (current.control &&
+      !["active", "paused"].includes(current.control.status)) ||
+    (current.control?.epoch ?? 0) !== (initial.control?.epoch ?? 0) ||
+    current.planning?.executionApproval?.requestId !==
+      initial.planning?.executionApproval?.requestId ||
+    current.planning?.prd?.hash !== initial.planning?.prd?.hash ||
+    current.planning?.graph?.hash !== initial.planning?.graph?.hash ||
+    current.planning?.commandHash !== initial.planning?.commandHash ||
+    current.baseline?.operationId !== initial.baseline?.operationId ||
+    (currentRepair(initial, attempt.issueId) &&
+      (current.reviewWorkflow?.ownerId !== initial.reviewWorkflow?.ownerId ||
+        current.reviewWorkflow?.rounds.length !==
+          initial.reviewWorkflow?.rounds.length ||
+        !currentRepair(current, attempt.issueId))) ||
+    current.issueAttempts?.[attempt.issueId]?.job.jobId !== attempt.job.jobId ||
+    current.issueAttempts?.[attempt.issueId]?.operationId !==
+      attempt.operationId
+  )
+    throw new Error("Stale issue completion");
+}
+export async function saveIssueAttempt(
+  store: RunStore,
+  initial: RunRecord,
+  attempt: IssueAttempt,
+) {
+  for (;;) {
+    const current = await store.getRun(initial.runId);
+    assertCurrentAttempt(initial, current, attempt);
+    if (
+      await store.recordIssueAttempt(initial.runId, current.revision, attempt)
+    )
+      return;
+  }
+}
+async function executeAttempt(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  issueId: string,
+  options: AttemptOptions = {},
+): Promise<IssueAttempt> {
+  const initial = await store.getRun(runId);
+  const planning = initial?.planning;
+  const baseline = initial?.baseline;
+  if (
+    !initial ||
+    planning?.phase !== "execution_approved" ||
+    !planning.executionApproval ||
+    !approvalMatchesRevision(planning) ||
+    !planning.prd ||
+    !planning.graph ||
+    !baseline?.workspace ||
+    !baseline.branch ||
+    !["passed", "passed_with_omissions"].includes(baseline.status) ||
+    baseline.approvalRequestId !== planning.executionApproval.requestId ||
+    baseline.candidateCommit !== planning.executionApproval.selectedCommit
+  )
+    throw new Error("An approved graph and validated baseline are required");
+  if (initial.control && initial.control.status !== "active")
+    throw new Error("Run is inactive");
+  const previous = initial.issueAttempts?.[issueId];
+  if (previous && !["failed", "resume_ready"].includes(previous.status))
+    return previous;
+  const resuming = previous?.status === "resume_ready";
+  const number = resuming ? previous.attempt : beginAttempt(previous);
+  const context = executionIssue(initial, issueId);
+  const issue = context?.issue;
+  const repair = currentRepair(initial, issueId);
+  const reserved = repair?.attempts.at(-1);
+  if (repair && (reserved?.attempt !== number || reserved.status !== "intent"))
+    throw new Error(
+      "Repair attempt must be reserved by the review coordinator",
+    );
+  if (
+    !issue ||
+    issue.dependencies.some(
+      (id) => initial.issueAttempts?.[id]?.status !== "integrated",
+    )
+  )
+    throw new Error("Issue is not dependency ready");
+  const operationId = resuming ? previous.operationId : `issue-${randomUUID()}`;
+  let job: JobEnvelope = {
+    runId,
+    issueId,
+    jobId: operationId,
+    role: "executor",
+    attempt: number,
+    workspace:
+      reserved?.workspace ?? join(store.root, "worktrees", operationId),
+    baseCommit:
+      baseline.candidateCommit ??
+      planning.executionApproval.selectedCommit ??
+      "",
+    inputRevisions: {
+      prd: planning.prd.revision,
+      graph: planning.graph.revision,
+      commands: baseline.commandRevision,
+      skill: 1,
+    },
+    ...(planning.settings.models.executor
+      ? { model: planning.settings.models.executor }
+      : {}),
+    prompt: "Reserved issue attempt",
+  };
+  let attempt: IssueAttempt = {
+    issueId,
+    attempt: number,
+    agentTimeoutMs: planning.settings.agentTimeoutMs ?? 1800000,
+    status: "executing",
+    operationId,
+    job,
+    history: previous
+      ? [
+          ...(previous.history ?? []),
+          (({ history: _history, ...entry }) => entry)(previous),
+        ]
+      : [],
+  };
+  if (resuming) {
+    attempt = { ...structuredClone(previous), status: "executing" };
+    if (!attempt.question?.answer)
+      throw new Error("Missing continuation answer");
+    attempt.questions = [...(attempt.questions ?? []), attempt.question];
+    job = { ...attempt.job, jobId: `continuation-${randomUUID()}` };
+
+exec
+/bin/zsh -lc 'bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run typecheck' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun --version; bun test tests/integration/06-single-issue.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 107ms:
+$ biome check src tests scripts
+Checked 98 files in 115ms. No fixes applied.
+
+ succeeded in 1666ms:
+$ tsc --noEmit
+
+ succeeded in 6970ms:
+1.4.3
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/06-single-issue.test.ts:
+(pass) approved issue uses separate sessions, validates exact commit and cleans owned worktrees [1332.37ms]
+(pass) candidate mutation after check completion cannot advance integration [1092.34ms]
+(pass) rejected submission identity retains its worktree and failure evidence [283.30ms]
+(pass) behavior conflicts return structured repair feedback and retain both worktrees [470.02ms]
+(pass) failed candidate checks preserve integration HEAD and retained diagnostics [716.67ms]
+(pass) a moved integration HEAD rebuilds and revalidates in a fresh merger session [1357.82ms]
+(pass) cleanup failure retains accepted integration and leaves changed work inspectable [859.35ms]
+(pass) a baseline from an older approval cannot dispatch an executor [119.86ms]
+(pass) stopping after integration intent ignores the late completion [747.27ms]
+
+ 9 pass
+ 0 fail
+ 55 expect() calls
+Ran 9 tests across 1 file. [7.05s]
+
+codex
+Already implemented; no changes needed.
+
+Verified with Bun 1.4.3:
+
+- Typecheck passed.
+- Repository-wide lint passed—the previously reported blocker is resolved.
+- Single-issue integration tests: 9 passed, 55 assertions.
+
+Live-agent and native Linux/Windows checks were not run.
+tokens used
+17,491
+Already implemented; no changes needed.
+
+Verified with Bun 1.4.3:
+
+- Typecheck passed.
+- Repository-wide lint passed—the previously reported blocker is resolved.
+- Single-issue integration tests: 9 passed, 55 assertions.
+
+Live-agent and native Linux/Windows checks were not run.

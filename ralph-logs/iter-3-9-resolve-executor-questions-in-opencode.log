@@ -1,0 +1,679 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/9-resolve-executor-questions-in-opencode.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cd5-448b-7b73-8314-a9fe18d8a898
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 9 of 15 — 9-resolve-executor-questions-in-opencode.md
+=== END METADATA ===
+
+TASK:
+# 9. Resolve executor questions through OpenCode chat
+
+**Type:** AFK  
+**Status:** Implemented with host-provided human provenance; repository-wide lint retains the unrelated predecessor formatting blocker  
+**User stories:** US-2, US-3, US-4  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Route unresolved executor requirements into the main OpenCode chat without stopping independent issues. Persist question identity, pause affected work and descendants, and resume the same bounded task after the user responds. Distinguish clarification within approved scope from a changed PRD or graph requiring renewed approval. Keep question waiting separate from agent timeout and attempt consumption.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 195–201): clarifications, scope changes, approved test intent.
+- `PRD.md` (lines 179–179): revision-bound approval.
+- `PRD.md` (lines 343–349): approval records.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 8: Execute dependency-ready issues concurrently](8-execute-dependency-ready-issues-concurrently.md): predecessor contracts and the code delivered by that slice.
+- `src/execution/questions.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/planning/approvals.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/execution/scheduler.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Use authenticated/correlated OpenCode user responses from the adapter, never parse arbitrary model text as approval. Store the question against run, issue, attempt and artifact revision. Resume from validated current state, not a stale session callback.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Record and present executor questions
+
+**Files:** `src/execution/questions.ts`, `src/agents/results.ts`, `src/execution/scheduler.ts`
+
+- **IMPLEMENT:** Add a needs_input job result carrying a specific question, recommended answer and affected requirement. Persist it, release executor capacity, and publish it to the main planning session. Mark only that issue and descendants waiting; independent scheduling continues. Suspend its execution deadline while waiting for the user.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import OpenCodeAdapter, RunStore, IssueSpec and scheduler readiness helpers; export handleExecutorQuestion and answerExecutorQuestion.
+- **GOTCHA:** Do not consume a retry merely because a user has not answered. Reject replies for superseded questions and attempts.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/09-questions.test.ts`; add the tests below as this slice develops.
+
+### 2. Resume or reapprove revised scope
+
+**Files:** `src/planning/approvals.ts`, `src/execution/questions.ts`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** For clarification within approved scope, append answer context and resume the issue using the same attempt. For changed PRD/graph, write draft revisions, validate the graph again, and require execution approval for changed artifacts. Do not silently invalidate already-integrated work; show affected work and preserve evidence until the revision is approved.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import validateIssueGraph and current planning handlers; export recordApproval and approvalMatchesRevision.
+- **GOTCHA:** Avoid classifying a scope change purely by model confidence: compare artifact revisions and require the normal gate whenever approved content is edited.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/09-questions.test.ts`; add the tests below as this slice develops.
+
+### 3. Test questions amid concurrent execution
+
+**Files:** `tests/integration/09-questions.test.ts`
+
+- **IMPLEMENT:** Hold issue B on a question while C and E integrate, answer B and resume it, and assert no extra attempt. Test a changed acceptance criterion requiring reapproval, a stale answer, and a reply from an unrelated session.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import existing diamond fixture and fake OpenCode response controls.
+- **GOTCHA:** No browser mutation endpoint should be introduced for answering questions.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/09-questions.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] Executor questions appear in the main OpenCode session with affected issue context.
+- [x] Independent jobs continue while the blocked issue waits.
+- [x] Clarification waiting does not exhaust agent timeouts or issue attempts.
+- [x] Changed PRD/graph artifacts cannot execute under a stale approval.
+- [x] Answers are delivered only to the intended current job.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/09-questions.test.ts`.
+- [x] Type checking and lint pass; no unsupported platform is silently excluded.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/09-questions.test.ts
+
+```
+
+**Demonstration:** Trigger a missing requirement in one of two parallel issues, complete the other, then answer in OpenCode and watch the waiting issue resume.
+
+## Blocked by
+
+- [8-execute-dependency-ready-issues-concurrently.md](8-execute-dependency-ready-issues-concurrently.md) — execute dependency-ready issues concurrently supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+
+## Completion evidence (2026-10-15)
+
+Implemented structured `needs_input` executor results, durable question identity and
+main-session publication/input requests through the existing OpenCode adapter. Questions
+carry requirement, recommendation, run, issue, job, operation, attempt, epoch and artifact
+revisions. Only the affected issue and descendants wait; the executor releases its slot
+and owned environment before human waiting. Unsupported human-input capability remains
+visible on the pending question instead of consuming an attempt.
+
+A correlated clarification continues the same worktree, base commit and attempt with a
+fresh job ID, current approved PRD/issue context and retained question history. Human
+waiting has no timer; the remaining active executor deadline survives continuation.
+Answers from unrelated sessions, old/superseded requests or artifact revisions, stale
+attempts/control epochs and duplicate messages cannot advance work. Current durable
+state is re-read before every transition; old dispatch completions cannot overwrite a
+new continuation.
+
+User-correlated `revise_scope` answers supply complete proposed PRD/graph/issue content.
+Content hashes determine whether artifacts actually changed; graph validation precedes
+publication. Draft publication uses the existing intent/atomic-directory mechanism and
+normal combined execution approval gate. Previous artifacts, approval and integrated
+work evidence are retained, and affected/already-integrated IDs appear in the approval
+presentation. Only renewed approval rebinds the unchanged validated baseline; affected
+integrated work is scheduled against the revised artifacts with evidence retained. The
+questioning issue resumes its existing attempt. Other pending questions receive fresh
+revision-bound identities. Public router methods accept later host responses and continue
+planning; adapter-delivered responses continue automatically. No browser mutation route,
+package publication, external message or target-branch merge was introduced.
+
+TDD evidence:
+- The initial B-question/C/E-progress test failed because no question was published, then
+  passed after durable waiting and adapter routing. A continuation ownership error was
+  caught and corrected to preserve the original workspace operation.
+- The unrelated/stale-response regression first failed at the absent public answer
+  method, then passed with current-state correlation and replay rejection.
+- The changed-criterion regression first observed `execution_approved` under the old
+  approval, then passed with draft publication and renewed normal approval.
+- The typed-result regression first observed `completed` instead of `needs_input`, then
+  passed after adapter normalization. A successive-question regression also verifies
+  that two five-second executor turns leave twenty seconds from a thirty-second active
+  budget despite an hour of human waiting.
+- Existing diamond setup was extracted unchanged into `tests/helpers/diamond.ts` for
+  reuse. Documentation/wiki edits are non-behavior exceptions.
+
+Final slice validation on macOS with pinned Bun 1.4.3:
+- `bun run typecheck`: passed.
+- `bun test tests/integration/09-questions.test.ts`: 4 passed, 0 failed, 58 assertions.
+- `bunx biome check src tests/helpers/diamond.ts tests/helpers/clock.ts tests/integration/08-concurrency.test.ts tests/integration/09-questions.test.ts`: passed, no warnings.
+- `bun run lint`: fails only on the predecessor formatting error at
+  `tests/browser/dashboard.test.ts:38`; left unchanged under the unrelated-file constraint.
+- Broader planning/single-issue/retry/concurrency/question run: 51 passed, 1 failed.
+  The concurrency test expected B to finish asynchronous setup before C; C dispatched
+  first while both were held. A fresh focused rerun of that unchanged assertion passed
+  (21 assertions). This timing-sensitive predecessor test is disclosed, not hidden.
+
+Demonstrated through `createCommandRouter` and the controllable real-SDK adapter:
+B asks a requirement question while C and E integrate; D remains blocked; an hour of
+clock advancement consumes no attempt/deadline; the main-session answer resumes B and
+unlocks D on attempt one. A changed acceptance criterion separately requires revision
+approval before B/D can continue.
+
+Wiki updated: created `docs/wiki/features/executor-questions.md`, updated the wiki index
+and concurrent-execution page. README and bundled executor instructions document the
+question and explicit scope-revision contracts.
+
+Limitations: production human provenance remains unsupported by the predecessor adapter,
+so no live human-chat demonstration is claimed. Native Linux/Windows and credentialed
+live smoke were not run; fixtures retain all three platform declarations. No unsupported
+platform was silently excluded.
+
+Final fresh-process reruns after the last question-identity guards:
+- `bun run typecheck`: passed.
+- `bun test tests/integration/09-questions.test.ts`: 4 passed, 0 failed; 58 assertions.
+- `bun test tests/integration/08-concurrency.test.ts`: 9 passed, 0 failed; 121 assertions.
+The earlier broader-run timing failure remains documented above.
+
+Verification rerun (iteration 1, 2026-10-15):
+- `bun run typecheck`: passed.
+- `bun test tests/integration/09-questions.test.ts`: 4 passed, 0 failed; 58 assertions.
+- `bun run lint`: passed after a format-only `biome format --write` fix to `tests/browser/dashboard.test.ts` (whitespace only, no behavior change).
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing implementation and rerun this ticket’s validation. If it’s already complete, I’ll leave the code unchanged.
+
+exec
+/bin/zsh -lc "pwd; rg --files -g 'AGENTS.md' -g '*09*' -g '*questions*' -g 'package.json' -g 'README.md' -g 'PRD.md' -g '*9-resolve*'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+src/execution/questions.ts
+ralph-logs/iter-1-9-resolve-executor-questions-in-opencode.log
+ralph-logs/iter-2-9-resolve-executor-questions-in-opencode.log
+package.json
+README.md
+docs/wiki/open-questions.md
+docs/wiki/features/executor-questions.md
+tests/integration/09-questions.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc "git status --short; cat package.json; sed -n '1,200p' src/execution/questions.ts; sed -n '1,140p' docs/wiki/features/executor-questions.md; rg -n 'test\\(|human|provenance|needs_input' tests/integration/09-questions.test.ts src/opencode/adapter.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { z } from "zod";
+import type { executorQuestionSchema } from "../agents/results.js";
+import { continuePlanning } from "../core/orchestrator.js";
+import type {
+  Failure,
+  RunRecord,
+  UserInputRequest,
+  UserInputResult,
+} from "../core/types.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { approvalMatchesRevision } from "../planning/approvals.js";
+import { artifactHash, issueBundleHash } from "../planning/artifacts.js";
+import { publishRevision } from "../planning/generation.js";
+import { topologicalOrder, validateIssueGraph } from "../planning/graph.js";
+import type { RunStore } from "../state/run-store.js";
+import type { AttemptOptions } from "./attempts.js";
+import type { IssueAttempt } from "./execute-issue.js";
+import { scheduleReadyIssues } from "./scheduler.js";
+
+export interface ExecutorQuestion
+  extends z.infer<typeof executorQuestionSchema> {
+  request: UserInputRequest;
+  jobId: string;
+  attempt: number;
+  operationId: string;
+  epoch: number;
+  prdHash: string;
+  graphHash: string;
+  inputRevisions: Record<string, number>;
+  answer?: Extract<UserInputResult, { ok: true }>;
+  error?: Failure;
+}
+export function createExecutorQuestion(
+  run: RunRecord,
+  attempt: IssueAttempt,
+  value: z.infer<typeof executorQuestionSchema>,
+): ExecutorQuestion {
+  const state = run.planning;
+  if (!state?.prd || !state.graph)
+    throw new Error("Missing approved question artifacts");
+  return {
+    kind: value.kind,
+    question: value.question,
+    recommendedAnswer: value.recommendedAnswer,
+    affectedRequirement: value.affectedRequirement,
+    jobId: attempt.job.jobId,
+    attempt: attempt.attempt,
+    operationId: attempt.operationId,
+    epoch: run.control?.epoch ?? 0,
+    prdHash: state.prd.hash,
+    graphHash: state.graph.hash,
+    inputRevisions: {
+      ...attempt.job.inputRevisions,
+      prd: state.prd.revision,
+      graph: state.graph.revision,
+    },
+    request: {
+      runId: run.runId,
+      workspace: state.workspace,
+      sessionId: state.sessionId,
+      requestId: randomUUID(),
+      revision: state.graph.revision,
+      question: `Issue ${attempt.issueId}, attempt ${attempt.attempt}\nRequirement: ${value.affectedRequirement}\n${value.question}\nRecommended answer: ${value.recommendedAnswer}`,
+    },
+  };
+}
+
+/** Durable pending identity is the publication intent; waiting has no agent timer. */
+const pending = new Map<string, Promise<void>>();
+export function handleExecutorQuestion(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  issueId: string,
+  requestId?: string,
+  options: AttemptOptions = {},
+) {
+  const key = `${store.repositoryId}:${runId}:${issueId}:${requestId ?? "current"}`;
+  if (pending.has(key)) return;
+  const work = (async () => {
+    const attempt = (await store.getRun(runId))?.issueAttempts?.[issueId];
+    const question = attempt?.question;
+    if (
+      attempt?.status !== "waiting" ||
+      !question ||
+      question.answer ||
+      (requestId && question.request.requestId !== requestId)
+    )
+      return;
+    const published = await adapter.publishStatus(
+      question.request.sessionId,
+      question.request.workspace,
+      question.request.question,
+    );
+    const response: UserInputResult = published.ok
+      ? await adapter.requestUserInput(question.request)
+      : {
+          ok: false,
+          error: published.error ?? {
+            code: "sdk-error",
+            message: "Could not publish executor question",
+          },
+        };
+    if (!response.ok) {
+      for (;;) {
+        const latest = await store.getRun(runId);
+        const current = latest?.issueAttempts?.[issueId];
+        if (
+          !latest ||
+          (latest.control && latest.control.status !== "active") ||
+          !current?.question ||
+          current.question.request.requestId !== question.request.requestId ||
+          current.question.answer
+        )
+          return;
+        current.question.error = response.error;
+        if (await store.recordIssueAttempt(runId, latest.revision, current))
+          return;
+      }
+    }
+    if (await answerExecutorQuestion(store, runId, issueId, response)) {
+      if (
+        (await store.getRun(runId))?.planning?.phase === "execution_approval"
+      ) {
+        await continuePlanning(store, adapter, runId);
+      } else {
+        // A scheduler may still be settling independent workers. Join it, then re-read.
+        await scheduleReadyIssues(store, adapter, runId, options);
+        await scheduleReadyIssues(store, adapter, runId, options);
+      }
+    }
+  })()
+    .catch(async (cause) => {
+      const run = await store.getRun(runId);
+      const attempt = run?.issueAttempts?.[issueId];
+      if (
+        run &&
+        attempt?.question &&
+        attempt.status === "waiting" &&
+        (!requestId || attempt.question.request.requestId === requestId)
+      ) {
+        attempt.question.error = { code: "sdk-error", message: String(cause) };
+        await store.recordIssueAttempt(runId, run.revision, attempt);
+      }
+    })
+    .finally(() => {
+      pending.delete(key);
+    });
+  pending.set(key, work);
+}
+
+export async function answerExecutorQuestion(
+  store: RunStore,
+  runId: string,
+  issueId: string,
+  response: UserInputResult,
+) {
+  for (;;) {
+    const run = await store.getRun(runId);
+    const attempt = run?.issueAttempts?.[issueId];
+    const q = attempt?.question;
+    const state = run?.planning;
+    if (
+      !run ||
+      !state ||
+      !attempt ||
+      attempt.status !== "waiting" ||
+      !q ||
+      q.answer ||
+      (run.control && run.control.status !== "active") ||
+      (run.control?.epoch ?? 0) !== q.epoch ||
+      attempt.operationId !== q.operationId ||
+      attempt.job.jobId !== q.jobId ||
+      attempt.attempt !== q.attempt ||
+      state.phase !== "execution_approved" ||
+      !approvalMatchesRevision(state) ||
+      state.prd?.hash !== q.prdHash ||
+      state.graph?.hash !== q.graphHash ||
+      state.graph?.revision !== q.request.revision ||
+      state.prd?.revision !== q.inputRevisions.prd ||
+      !response.ok ||
+      response.source !== "user" ||
+      !response.messageId ||
+      !response.text.trim() ||
+      response.requestId !== q.request.requestId ||
+      response.sessionId !== q.request.sessionId ||
+      response.revision !== q.request.revision ||
+      state.transcript.some(
+        (entry) => entry.messageId === response.messageId,
+      ) ||
+      Object.values(run.issueAttempts ?? {}).some((a) =>
+        [...(a.questions ?? []), ...(a.question ? [a.question] : [])].some(
+          (q) => q.answer?.messageId === response.messageId,
+        ),
+      )
+    )
+      return false;
+# Executor questions
+
+## Summary
+Executor `needs_input` output persists a specific question, recommendation and affected requirement on the current issue attempt. The main OpenCode adapter publishes it and requests a correlated human response outside the executor slot and deadline. Independent issues continue integrating.
+
+## Key behavior
+- Waiting issues and descendants are blocked. Clarification resumes the same attempt, owned worktree and base commit with a fresh dispatch identity and current approved context. Question history is retained.
+- Only active executor time reduces the remaining agent deadline. Human waiting has no timer or attempt charge.
+- Answers require adapter-supplied human provenance, the main session, current request/job/attempt/operation/epoch and artifact revisions. Superseded, duplicate and unrelated-session responses cannot advance work.
+- An explicit user-correlated `revise_scope` answer carries complete PRD text, graph and issue files. Actual content comparison determines whether approval is needed; graph validation precedes publication. Draft publication records intent and retains old artifacts, approval and integrated-work evidence.
+- The normal combined approval gate presents affected and already-integrated issue IDs. Only renewed approval rebinds the unchanged validated baseline. Affected integrated work retains its evidence and is scheduled for execution again; the questioning issue continues the same attempt. Other pending questions receive new revision-bound request identities.
+- Public host methods `answerExecutorQuestion` and `continuePlanning` support later responses and approval continuation. Adapter-delivered answers continue automatically. There is no browser write endpoint.
+
+## Code references
+- `src/execution/questions.ts` — question persistence, delivery, correlation, scope drafts and approval continuation.
+- `src/execution/execute-issue.ts`, `src/execution/attempts.ts` — same-attempt dispatch and remaining active-time budget.
+- `src/agents/results.ts`, `src/opencode/adapter.ts`, `skills/tdd/SKILL.md` — structured question output contract.
+- `src/planning/approvals.ts`, `src/planning/issues.ts` — revision-bound approval and affected-work presentation.
+- `src/execution/scheduler.ts`, `src/core/orchestrator.ts`, `src/commands/router.ts` — independent scheduling and public host boundary.
+- `tests/integration/09-questions.test.ts`, `tests/helpers/diamond.ts` — concurrent question demonstration, rejection and renewed approval coverage.
+
+## Related
+- [Concurrent execution](concurrent-execution.md)
+- [Planning approval](feature-planning.md)
+
+## Notes
+The production adapter still reports unsupported human provenance. Tests supply authenticated/correlated user responses through the controllable adapter and real temporary Git repositories; live human-chat and native Linux/Windows runs are not claimed. A prose clarification does not authorize artifact edits; scope revisions use the explicit artifact proposal and normal human approval gate.
+
+## Last updated
+2026-10-15
+src/opencode/adapter.ts:107:      /permission.*(denied|rejected)|PermissionDenied|not allowed|declined/i.test(
+src/opencode/adapter.ts:390:            raw.kind === "needs_input"
+src/opencode/adapter.ts:396:          outcome: question ? "needs_input" : "completed",
+src/opencode/adapter.ts:432:            "Ralph has no verified human approval/provenance channel yet. No assistant or API-created message is accepted as approval.",
+tests/integration/09-questions.test.ts:10:test("B waits without a deadline or retry while C and E integrate, then resumes the same task", async () => {
+tests/integration/09-questions.test.ts:22:          kind: "needs_input",
+tests/integration/09-questions.test.ts:46:    expect(run.issueAttempts?.B?.executionResult?.outcome).toBe("needs_input");
+tests/integration/09-questions.test.ts:79:test("unrelated-session, superseded and duplicate answers cannot resume an executor", async () => {
+tests/integration/09-questions.test.ts:87:      error: { code: "unsupported", message: "Pending human input" },
+tests/integration/09-questions.test.ts:94:          kind: "needs_input",
+tests/integration/09-questions.test.ts:114:      messageId: "human-answer",
+tests/integration/09-questions.test.ts:146:test("a changed acceptance criterion publishes a draft and requires renewed approval before same-attempt continuation", async () => {
+tests/integration/09-questions.test.ts:160:          kind: "needs_input",
+tests/integration/09-questions.test.ts:230:test("successive questions supersede prior answers and preserve the remaining active-time deadline", async () => {
+tests/integration/09-questions.test.ts:245:          kind: "needs_input",
+
+exec
+/bin/zsh -lc 'bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run typecheck' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun test tests/integration/09-questions.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 89ms:
+$ biome check src tests scripts
+Checked 98 files in 106ms. No fixes applied.
+
+ succeeded in 1627ms:
+$ tsc --noEmit
+
+ succeeded in 24326ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/09-questions.test.ts:
+(pass) B waits without a deadline or retry while C and E integrate, then resumes the same task [11770.49ms]
+(pass) unrelated-session, superseded and duplicate answers cannot resume an executor [251.73ms]
+(pass) a changed acceptance criterion publishes a draft and requires renewed approval before same-attempt continuation [11112.29ms]
+(pass) successive questions supersede prior answers and preserve the remaining active-time deadline [1215.77ms]
+
+ 4 pass
+ 0 fail
+ 58 expect() calls
+Ran 4 tests across 1 file. [24.42s]
+
+codex
+This task is already implemented. No files changed.
+
+Validation with Bun 1.4.3 passed:
+
+- Typecheck
+- Repository-wide lint
+- Question integration tests: 4 passed, 58 assertions
+
+Live human-chat verification remains limited by the adapter’s unsupported human provenance channel; host-correlated responses are covered by tests.
+tokens used
+16,834
+This task is already implemented. No files changed.
+
+Validation with Bun 1.4.3 passed:
+
+- Typecheck
+- Repository-wide lint
+- Question integration tests: 4 passed, 58 assertions
+
+Live human-chat verification remains limited by the adapter’s unsupported human provenance channel; host-correlated responses are covered by tests.

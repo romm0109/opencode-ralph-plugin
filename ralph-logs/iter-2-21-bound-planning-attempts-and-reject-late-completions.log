@@ -1,0 +1,2877 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/21-bound-planning-attempts-and-reject-late-completions.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a14423-d2a2-7e41-8647-f19c8f041a7c
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 2 of 3
+File      : 6 of 10 — 21-bound-planning-attempts-and-reject-late-completions.md
+=== END METADATA ===
+
+TASK:
+# 21. Retry incomplete planning stages within three total attempts
+
+**Type:** AFK  
+**User stories:** PRD §5 stories 5, 7  
+**Requirements:** PRD §§7.11, 7.12, 11
+
+## What to build
+
+Make PRD and issue authoring recoverable from failure without accepting final prose as completion. Each stage gets one initial attempt and at most two automatic retries, with partial drafts retained and explicit owner retirement. Correctable validation errors stay in the live attempt; timeouts, failed turns and ending without accepted completion consume an attempt. After three attempts, show the blocker and use a native question for retry/reset or stop choices. Test that cancellation and successful handoffs cannot race into an extra attempt or cancel downstream execution.
+
+## Repository rules and implementation approach
+
+- Source of truth: root `PRD.md` (2026-10-16 revision), especially the sections cited below.
+- Follow root `AGENTS.md`. No `CLAUDE.md` or `docs/adr/` exists in the inspected repository. Use standalone Bun **1.4.3** from `.bun-version`, with the pinned OpenCode **2.0.29** dependencies; do not upgrade them for this feature.
+- Use behavior-focused public-interface TDD for meaningful behavior changes. Exercise real temporary Git projects where ownership, artifact or preflight behavior matters. Do not weaken assertions merely to retain old protocol fixtures.
+- No backward compatibility, old-state migration or legacy fallback. New-flow recovery is still required. Preserve unrelated setup, removal, execution and reviewer guarantees.
+- Run build, browser, package and test commands **sequentially within one checkout**. Include both `bun run test:status` and `bun run test`; the full suite remains mandatory for candidate integration and final validation. Never alter approved commands during a run.
+- Baseline file references below were inspected when these tickets were written; predecessor work may move lines or introduce the explicitly named new modules. Follow the referenced symbol if line positions shift.
+
+
+## Context: files to read before implementing
+
+- `src/planning/generation.ts` (lines 84–175) — old one-attempt dispatch/timeout and late-generation checks.
+- `src/core/types.ts` (lines 40–82) — attempt envelope and failure/result vocabulary.
+- `src/execution/attempts.ts` (lines 1–90) — existing execution attempt-budget conventions.
+- `src/opencode/adapter.ts` (lines 463–495) — cancellation before/after prompt delivery.
+- `src/commands/control.ts` (lines 74–149) — bounded owned cancellation and cleanup uncertainty.
+- `tests/integration/04-planning.test.ts` (lines 410–490) — late output and timeout regressions.
+- `tests/helpers/clock.ts` (lines 1–36) — test clock helpers.
+
+Also read root `PRD.md`, `AGENTS.md`, and all predecessor tickets named in **Blocked by**. Full source skill snapshots are under `/Users/rwmmtzqy/.agents/skills/` for authoring only; installed code must use package-local assets.
+
+## Patterns to follow
+
+Persist ownership/attempt status before dispatch, check the current attempt/control epoch on every callback, and use existing failure codes honestly. Reuse cancellation and session inspection rather than assuming that an aborted request stopped its agent. Stage retries are independent of issue attempts and final review rounds. Native question waiting must suspend active-time deadlines rather than burning retries while the user thinks.
+
+**Tests and errors:** Mirror `createTestProject()` in `tests/helpers/project.ts:7` and `createFakePluginContext()` in `tests/helpers/fake-opencode.ts:259`. Use revision-checked store writes and actionable structured failure/tool outcomes. Do not catch permission denial or stale ownership and proceed as success.
+
+## Step-by-step tasks
+
+### UPDATE `src/planning/generation.ts; src/planning/types.ts; src/state/run-store.ts`
+
+- **IMPLEMENT:** Record each stage attempt, active-time budget, draft root, owner/session and terminal reason. Drive retry only for failed/timed-out/finished-without-completion attempts. Preserve accepted handoff outcomes and never retry a stage already accepted.
+- **PATTERN:** src/planning/generation.ts:129 and src/commands/control.ts:62.
+- **IMPORTS:** Reuse type JobEnvelope/JobResult/Failure, RunStore, and captured timeout settings; add clock injection following tests/helpers/clock.ts.
+- **GOTCHA:** An invalid completion tool result is correctable during a live attempt; a missing completion at settled turn end is a failure. Paused/user-waiting time is not active authoring time.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/04-planning.test.ts tests/integration/14-recovery.test.ts`.
+
+### UPDATE `src/opencode/adapter.ts; src/planning/completion.ts; src/planning/artifact-writer.ts`
+
+- **IMPLEMENT:** Retire failed attempt authority before interrupting its session and starting another. Reconcile session state where cancellation is uncertain. Preserve partial drafts in the failed attempt namespace and supply explicit accepted inputs to retries. Reject late writes, answers and completions from retired attempts.
+- **PATTERN:** src/opencode/adapter.ts:451 and src/plugin.ts:499.
+- **IMPORTS:** Reuse cancelJob, inspectSession, RunStore control guards and the stage session adapter; do not spawn a retry on an unconfirmed busy owner.
+- **GOTCHA:** For PRD retries, continue its interview/PRD session only after prior activity is settled; do not silently move the live PRD stage into a new session and lose its interview context.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/04-planning.test.ts tests/integration/14-recovery.test.ts`.
+
+### UPDATE `src/planning/generation.ts; src/plugin.ts; tests/integration/04-planning.test.ts`
+
+- **IMPLEMENT:** After attempt three, persist exhaustion, publish the error and ask for explicit recovery. Record any human-authorized budget reset; otherwise keep stopped/blocked state. Test handoff completion followed by old turn settlement, stop, pause and late callbacks.
+- **PATTERN:** src/commands/control.ts:33 and tests/integration/04-planning.test.ts:410.
+- **IMPORTS:** Reuse native input and existing control helpers; import expect/test from bun:test and temporary Git fixtures.
+- **GOTCHA:** Do not grant a fourth automatic attempt or spend issue/review budgets on planning failures.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/04-planning.test.ts tests/integration/14-recovery.test.ts`.
+
+### UPDATE `docs/wiki/features/workflow-recovery.md` and behavior tests
+
+- **IMPLEMENT:** Record the delivered behavior, its reason, and the actual code/test references in `docs/wiki/features/workflow-recovery.md`. Add or replace public-interface cases for every acceptance criterion below; keep historical behavior explicitly labeled where relevant.
+- **PATTERN:** Existing compact feature wiki pages under `docs/wiki/features/`; mirror their summary/code/test structure without claiming unimplemented behavior.
+- **IMPORTS:** Tests use `expect` and `test` from `bun:test` plus existing fake-host and real-Git helpers; docs require no production imports.
+- **GOTCHA:** Do not describe a deterministic fixture or a source prompt assertion as proof of real native UI behavior.
+- **VALIDATE:** Run the focused cases and required full checks below.
+
+## Acceptance criteria
+
+- [ ] PRD and issue planning retry at most three total attempts each; final prose without completion never advances.
+- [ ] Validation errors can be corrected in the live attempt without immediate budget consumption.
+- [ ] Native user waiting and pause do not expire the authoring active-time budget.
+- [ ] Failed-attempt drafts remain available; old sessions cannot write or complete after retirement.
+- [ ] Exhaustion produces a native recovery choice; a budget reset requires a real explicit user choice recorded in state.
+- [ ] Successful handoff, tool return, or ordinary turn completion does not stop the run or duplicate downstream work.
+- [ ] Focused behavior tests, `bun run test:status`, and mandatory `bun run test` pass; the compact wiki reflects delivered behavior.
+
+## Validation commands
+
+Run one at a time with standalone Bun 1.4.3 on PATH:
+
+```bash
+bun --version
+bun run typecheck
+bun run lint
+bun test --timeout 30000 tests/integration/04-planning.test.ts tests/integration/14-recovery.test.ts
+bun run test:status
+bun run test
+```
+
+Installed-host and cross-platform evidence is completed by issue 25; this slice must still pass its public-interface tests and full integration suite.
+
+## Blocked by
+
+- [19-complete-issues-and-start-authorized-execution.md](19-complete-issues-and-start-authorized-execution.md) — supplies the predecessor behavior required by this slice.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the current retry behavior and predecessor work, then address any gaps and run the required checks sequentially.
+
+exec
+/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g '*19-complete*' -g '*21-bound*' -g '.bun-version' -g 'PRD.md' && git status --short" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+.bun-version
+AGENTS.md
+ralph-logs/iter-1-19-complete-issues-and-start-authorized-execution.log
+ralph-logs/iter-2-19-complete-issues-and-start-authorized-execution.log
+ralph-logs/iter-1-21-bound-planning-attempts-and-reject-late-completions.log
+PRD.md
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? .ralph/
+?? AGENTS.md
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+
+exec
+/bin/zsh -lc 'cat AGENTS.md .bun-version && cat /Users/rwmmtzqy/.agents/skills/tdd/SKILL.md && cat /Users/rwmmtzqy/.agents/skills/code-wiki/SKILL.md' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+# Working in this repository
+
+Use standalone Bun from `.bun-version` and the pinned OpenCode dependencies.
+
+Project setup must include both `bun run test` and `bun run test:status` among the proposed checks. The focused status command is for quick public-interface TDD cycles; the full integration suite remains mandatory for candidate integration and final validation. Their overlapping coverage is intentional. Do not change approved commands during a feature run. Run build, browser, package and test commands sequentially within one checkout: they share generated assets, so parallel invocation can race file removal and produce misleading tool diagnostics.
+
+After meaningful behavior changes, update the relevant compact page in `docs/wiki` with the behavior, reason and code/test references.
+1.4.3
+---
+name: tdd
+description: Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants integration tests.
+---
+
+# Test-Driven Development
+
+## Philosophy
+
+**Core principle**: Tests should verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't.
+
+**Good tests** are integration-style: they exercise real code paths through public APIs. They describe _what_ the system does, not _how_ it does it. A good test reads like a specification - "user can checkout with valid cart" tells you exactly what capability exists. These tests survive refactors because they don't care about internal structure.
+
+**Bad tests** are coupled to implementation. They mock internal collaborators, test private methods, or verify through external means (like querying a database directly instead of using the interface). The warning sign: your test breaks when you refactor, but behavior hasn't changed. If you rename an internal function and tests fail, those tests were testing implementation, not behavior.
+
+See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
+
+## Anti-Pattern: Horizontal Slices
+
+**DO NOT write all tests first, then all implementation.** This is "horizontal slicing" - treating RED as "write all tests" and GREEN as "write all code."
+
+This produces **crap tests**:
+
+- Tests written in bulk test _imagined_ behavior, not _actual_ behavior
+- You end up testing the _shape_ of things (data structures, function signatures) rather than user-facing behavior
+- Tests become insensitive to real changes - they pass when behavior breaks, fail when behavior is fine
+- You outrun your headlights, committing to test structure before understanding the implementation
+
+**Correct approach**: Vertical slices via tracer bullets. One test → one implementation → repeat. Each test responds to what you learned from the previous cycle. Because you just wrote the code, you know exactly what behavior matters and how to verify it.
+
+```
+WRONG (horizontal):
+  RED:   test1, test2, test3, test4, test5
+  GREEN: impl1, impl2, impl3, impl4, impl5
+
+RIGHT (vertical):
+  RED→GREEN: test1→impl1
+  RED→GREEN: test2→impl2
+  RED→GREEN: test3→impl3
+  ...
+```
+
+## Workflow
+
+### 1. Planning
+
+When exploring the codebase, read `CONTEXT.md` (if it exists) so that test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
+
+Before writing any code:
+
+- [ ] Confirm with user what interface changes are needed
+- [ ] Confirm with user which behaviors to test (prioritize)
+- [ ] Identify opportunities for deep modules (small interface, deep implementation) — run the `/codebase-design` skill for the vocabulary and the testability checks
+- [ ] List the behaviors to test (not implementation steps)
+- [ ] Get user approval on the plan
+
+Ask: "What should the public interface look like? Which behaviors are most important to test?"
+
+**You can't test everything.** Confirm with the user exactly which behaviors matter most. Focus testing effort on critical paths and complex logic, not every possible edge case.
+
+### 2. Tracer Bullet
+
+Write ONE test that confirms ONE thing about the system:
+
+```
+RED:   Write test for first behavior → test fails
+GREEN: Write minimal code to pass → test passes
+```
+
+This is your tracer bullet - proves the path works end-to-end.
+
+### 3. Incremental Loop
+
+For each remaining behavior:
+
+```
+RED:   Write next test → fails
+GREEN: Minimal code to pass → passes
+```
+
+Rules:
+
+- One test at a time
+- Only enough code to pass current test
+- Don't anticipate future tests
+- Keep tests focused on observable behavior
+
+### 4. Refactor
+
+After all tests pass, look for [refactor candidates](refactoring.md):
+
+- [ ] Extract duplication
+- [ ] Deepen modules (move complexity behind simple interfaces)
+- [ ] Apply SOLID principles where natural
+- [ ] Consider what new code reveals about existing code
+- [ ] Run tests after each refactor step
+
+**Never refactor while RED.** Get to GREEN first.
+
+## Checklist Per Cycle
+
+```
+[ ] Test describes behavior, not implementation
+[ ] Test uses public interface only
+[ ] Test would survive internal refactor
+[ ] Code is minimal for this test
+[ ] No speculative features added
+```
+---
+name: code-wiki
+description: >
+  Use after any meaningful code change that adds, changes, removes, or refactors durable project behavior.
+  Update the compact project wiki in docs/wiki so future AI agents can quickly understand what changed,
+  why it matters, and where to look in the code.
+---
+# Project Wiki Memory
+## Goal
+Maintain a small, accurate project memory under `docs/wiki`.
+The wiki should help future AI agents answer:
+- What exists?
+- Why does it exist?
+- Where is it implemented?
+- What should future changes be careful about?
+Do not duplicate the code. Capture durable knowledge only.
+## When to update the wiki
+Update the wiki after changes involving:
+- new or changed features
+- APIs, routes, commands, jobs, or integrations
+- database/schema changes
+- permissions, auth, billing, security, or data ownership
+- meaningful refactors
+- bug fixes that reveal an important invariant or edge case
+- feature removals or deprecations
+Skip wiki updates for:
+- formatting-only changes
+- typo fixes
+- local variable renames
+- dependency lockfile-only changes
+- temporary experiments
+- trivial internal cleanup with no behavior or architecture impact
+## Wiki structure
+Use this structure:
+```text
+docs/wiki/
+  index.md
+  features/
+  concepts/
+  decisions/
+  open-questions.md
+  ```
+
+Create folders/files if they do not exist.
+
+### Workflow
+
+1. Review the task and changed files.
+2. Decide whether durable project knowledge changed.
+3. Search docs/wiki for an existing relevant page.
+4. Prefer updating an existing page over creating a new one.
+5. Create a new page only for a genuinely new feature, concept, or decision.
+6. Add source references to relevant code files.
+7. Update docs/wiki/index.md if a new page is created.
+8. Record uncertainty or future work in docs/wiki/open-questions.md when useful.
+
+Page format
+
+Use this compact format for feature or concept pages:
+
+# <Name>
+## Summary
+One or two paragraphs explaining what this is and why it exists.
+## Key behavior
+- Important behavior or flow.
+- Important invariant.
+- Important edge case.
+## Code references
+- `path/to/file.ts` — why this file matters.
+- `path/to/test.ts` — what behavior this test covers.
+## Related
+- [Other page](../concepts/example.md)
+## Notes
+- Limitation, uncertainty, or future work.
+## Last updated
+YYYY-MM-DD
+
+Use this compact format for decision pages:
+
+# Decision: <Title>
+## Date
+YYYY-MM-DD
+## Context
+What problem or tradeoff caused this decision?
+## Decision
+What was chosen?
+## Consequences
+- Important upside.
+- Important downside or follow-up.
+## Code references
+- `path/to/file.ts`
+## Last updated
+YYYY-MM-DD
+
+Writing rules
+
+* Be concise.
+* Prefer facts from code, tests, migrations, PR text, or user instructions.
+* Do not invent product intent.
+* If unsure, write it as uncertainty.
+* Do not describe every function call.
+* Do not create duplicate pages.
+* Keep links relative.
+* Keep pages useful for future AI retrieval.
+
+Completion response
+
+After updating the wiki, report briefly:
+
+Wiki updated:
+- Created: ...
+- Updated: ...
+- Open questions: ...
+
+If no wiki update was needed, say:
+
+No wiki update needed: this change did not affect durable project knowledge.
+And in your root `AGENTS.md`, I’d add only this:
+```md
+## Project wiki memory
+This repo uses a compact AI-maintained wiki under `docs/wiki`.
+After any meaningful code change, use `.skills/code-wiki/SKILL.md` to update the wiki.
+A meaningful change includes new features, changed behavior, APIs, migrations, permissions, integrations, important refactors, durable bug-fix lessons, or removals.
+Do not update the wiki for formatting-only, typo-only, or trivial cleanup changes.
+exec
+/bin/zsh -lc 'cat src/planning/generation.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+import { randomUUID } from "node:crypto";
+import {
+  lstat,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { join } from "node:path";
+import { handleControlCommand } from "../commands/control.js";
+import type { JobEnvelope } from "../core/types.js";
+import { type Clock, systemClock } from "../execution/attempts.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { RunStore } from "../state/run-store.js";
+import { issueBundleHash } from "./artifacts.js";
+import type { PlanningState } from "./types.js";
+
+export async function savePlanning(
+  store: RunStore,
+  runId: string,
+  revision: number,
+  state: PlanningState,
+) {
+  if (!(await store.recordPlanning(runId, revision, state))) {
+    const current = await store.getRun(runId);
+    if (current?.control && current.control.status !== "active")
+      throw new Error(
+        `Planning write rejected: control is ${current.control.status}; reconcile or explicitly resume first`,
+      );
+    throw new Error("Stale planning transition: revision conflict");
+  }
+}
+export async function featureRoot(state: PlanningState, runId: string) {
+  if (!/^feature-[A-Za-z0-9-]+$/.test(runId))
+    throw new Error("Invalid feature ID");
+  let path = state.workspace;
+  for (const part of [".ralph", "features", runId]) {
+    path = join(path, part);
+    await mkdir(path, { recursive: true });
+    if (
+      !(await lstat(path)).isDirectory() ||
+      (await lstat(path)).isSymbolicLink()
+    )
+      throw new Error("Feature path must be a real directory");
+  }
+  return path;
+}
+/** Rename a complete revision directory; never expose a partial bundle. */
+export async function publishRevision(
+  store: RunStore,
+  expectedRevision: number,
+  state: PlanningState,
+  runId: string,
+  name: string,
+  files: Record<string, string>,
+  publicationId?: string,
+) {
+  if (!/^(prd|graph)-[1-9][0-9]*$/.test(name))
+    throw new Error("Invalid revision directory");
+  const jobId = publicationId;
+  if (!jobId) throw new Error("Artifact publication requires a generation job");
+  state.publication = {
+    jobId,
+    name,
+    hash: issueBundleHash({ name }, files),
+    status: "intent",
+  };
+  await savePlanning(store, runId, expectedRevision, state);
+  const persisted = await store.getRun(runId);
+  if (
+    !persisted?.planning ||
+    persisted.planning.publication?.jobId !== jobId ||
+    persisted.planning.publication?.name !== name ||
+    (persisted.control && persisted.control.status !== "active")
+  )
+    throw new Error("Stale artifact publication");
+  const root = await featureRoot(state, runId);
+  if (publicationId) {
+    try {
+      const target = join(root, name);
+      if ((await lstat(target)).isSymbolicLink())
+        throw new Error("Accepted revision symlink denied");
+      for (const [path, text] of Object.entries(files)) {
+        const file = join(target, path);
+        if (
+          (await lstat(file)).isSymbolicLink() ||
+          (await readFile(file, "utf8")) !== text
+        )
+          throw new Error("Accepted revision bytes changed");
+      }
+      state.publication.status = "completed";
+      return {
+        directory: `.ralph/features/${runId}/${name}`,
+        revision: persisted.revision,
+      };
+    } catch (cause) {
+      if ((cause as NodeJS.ErrnoException).code !== "ENOENT") throw cause;
+    }
+  }
+  const staged = join(root, `.draft-${randomUUID()}`);
+  await mkdir(staged);
+  try {
+    for (const [path, text] of Object.entries(files)) {
+      if (!/^(PRD\.md|graph\.json|issues\/[A-Za-z0-9_-]+\.md)$/.test(path))
+        throw new Error("Invalid artifact reference");
+      if (path.startsWith("issues/"))
+        await mkdir(join(staged, "issues"), { recursive: true });
+      await writeFile(join(staged, path), text, { flag: "wx" });
+    }
+    await rename(staged, join(root, name));
+  } finally {
+    await rm(staged, { recursive: true, force: true });
+  }
+  state.publication.status = "completed";
+  return {
+    directory: `.ralph/features/${runId}/${name}`,
+    revision: persisted.revision,
+  };
+}
+/** Durable authoring authority is allocated before the inbox prompt is delivered. */
+export async function registerPlanningAttempt(
+  store: RunStore,
+  runId: string,
+  messageId: string,
+  prompt: string,
+  now = Date.now(),
+) {
+  const run = await store.getRun(runId);
+  const state = run?.planning;
+  const owner = state?.owner;
+  if (!run || !state || !owner || owner.retired || owner.stage === "interview")
+    throw new Error("No live planning owner");
+  const existing = state.attempts?.find(
+    (a) =>
+      a.stage === owner.stage &&
+      a.attempt === owner.attempt &&
+      a.messageId === messageId,
+  );
+  if (existing) {
+    if (
+      !run.jobs[existing.job.jobId] &&
+      !(await store.recordIntent(existing.job))
+    )
+      throw new Error("Planning dispatch authority changed");
+    return;
+  }
+  const job: JobEnvelope = {
+    runId,
+    jobId: `planning-${owner.stage}-${randomUUID()}`,
+    attempt: owner.attempt,
+    role: owner.stage,
+    sessionId: owner.sessionId,
+    workspace: state.workspace,
+    baseCommit: state.approval?.sha ?? "",
+    readOnly: true,
+    inputRevisions: {
+      explanation: state.explanation?.revision ?? 0,
+      prd: state.prd?.revision ?? 0,
+    },
+    model: requiredPlanningModel(state, owner.stage),
+    prompt,
+  };
+  state.attempts = [
+    ...(state.attempts ?? []),
+    {
+      stage: owner.stage,
+      attempt: owner.attempt,
+      sessionId: owner.sessionId,
+      job,
+      prompt,
+      messageId,
+      draftRoot: `.ralph/features/${runId}/${owner.stage}-draft-${owner.attempt}`,
+      remainingMs: state.settings.agentTimeoutMs ?? state.settings.timeoutMs,
+      controlEpoch: run.control?.epoch ?? 0,
+      observedAt: now,
+      status: "active",
+    },
+  ];
+  await savePlanning(store, runId, run.revision, state);
+  if (!(await store.recordIntent(job)))
+    throw new Error("Planning dispatch authority changed");
+}
+
+const supervising = new Set<string>();
+/** One observation per tick; question/control waits do not spend active time. */
+export async function supervisePlanning(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  now = Date.now(),
+) {
+  const key = `${store.root}:${runId}`;
+  if (supervising.has(key)) return;
+  supervising.add(key);
+  try {
+    let run = await store.getRun(runId);
+    let state = run?.planning;
+    let owner = state?.owner;
+    if (
+      !run ||
+      !state ||
+      state.protocol !== "native-interview-v1" ||
+      !owner ||
+      owner.stage === "interview"
+    )
+      return;
+    const controlEpoch = run.control?.epoch ?? 0;
+    const stage = owner.stage;
+    if (
+      (stage === "prd" && state.prdAcceptance) ||
+      (stage === "issues" && state.issueAcceptance)
+    )
+      return;
+    const ownerAttempt = owner.attempt;
+    let attempt = state.attempts?.find(
+      (a) =>
+        a.stage === stage &&
+        a.attempt === ownerAttempt &&
+        a.messageId ===
+          (stage === "prd"
+            ? state?.prdDelivery?.id
+            : state?.issueHandoff?.messageId),
+    );
+    if (!attempt) return;
+    // Paused records cannot be written. Discard the interval crossing a pause.
+    if (run.control?.status === "paused") return;
+    if (run.control && run.control.status !== "active") return;
+    if (!owner.retired) {
+      const suspended =
+        !!state.pending ||
+        !!state.revisionProposal ||
+        !!state.nativeQuestions?.length ||
+        state.phase !==
+          (stage === "prd" ? "prd_generation" : "issue_generation");
+      const elapsed =
+        suspended || attempt.suspended || attempt.observedAt === undefined
+          ? 0
+          : Math.max(0, now - attempt.observedAt);
+      attempt.remainingMs = Math.max(0, attempt.remainingMs - elapsed);
+      attempt.observedAt = now;
+      attempt.suspended = suspended;
+      if (suspended) return;
+      const turn = await adapter.inspectPlanningTurn?.(
+        owner.sessionId,
+        attempt.messageId,
+      );
+      const reason =
+        attempt.remainingMs <= 0
+          ? {
+              code: "agent-timeout" as const,
+              message: `${stage} active authoring deadline exceeded`,
+            }
+          : typeof turn === "object"
+            ? turn.error
+            : turn === "failed" || turn === "settled"
+              ? {
+                  code:
+                    turn === "failed"
+                      ? ("sdk-error" as const)
+                      : ("missing-output" as const),
+                  message: `${stage} turn ended without accepted completion`,
+                }
+              : undefined;
+      if (!reason) {
+        // The persisted budget plus active-since timestamp already describes a
+        // running deadline. Avoid revision churn racing ordinary artifact tools.
+        return;
+      }
+      owner.retired = true;
+      attempt.status = "retired";
+      attempt.reason = reason;
+      state.error = reason;
+      // CAS retirement precedes interruption. A winning completion invalidates this write.
+      if (!(await store.recordPlanning(runId, run.revision, state))) return;
+    }
+    // Never abort a downstream owner, including when acceptance won the race.
+    run = await store.getRun(runId);
+    state = run?.planning;
+    owner = state?.owner;
+    if (
+      !run ||
+      (run.control?.epoch ?? 0) !== controlEpoch ||
+      !state ||
+      !owner?.retired ||
+      owner.stage !== stage ||
+      owner.attempt !== attempt.attempt ||
+      (run.control && run.control.status !== "active")
+    )
+      return;
+    const cancelled = await adapter.cancelJob(attempt.job);
+    const session = await adapter.inspectSession?.(attempt.job);
+    if (
+      !cancelled.ok ||
+      !["idle", "missing"].includes(session ?? "unknown") ||
+      (stage === "prd" && session === "missing")
+    ) {
+      const latest = await store.getRun(runId);
+      if (latest?.planning)
+        await store.recordPlanning(runId, latest.revision, {
+          ...latest.planning,
+          error: {
+            code: "cancelled",
+            message:
+              "Planning owner settlement is unconfirmed; reconcile the retained session before retrying",
+          },
+        });
+      return;
+    }
+    run = await store.getRun(runId);
+    state = run?.planning;
+    if (
+      !run ||
+      (run.control?.epoch ?? 0) !== controlEpoch ||
+      !state?.owner?.retired ||
+      state.owner.attempt !== attempt.attempt ||
+      (run.control && run.control.status !== "active")
+    )
+      return;
+    const reset =
+      state.budgetResets
+        ?.filter(
+          (r) =>
+            r.stage === stage &&
+            r.explanationRevision === state?.explanation?.revision,
+        )
+        .at(-1)?.afterAttempt ?? 0;
+    const used =
+      state.attempts?.filter(
+        (a) =>
+          a.stage === stage &&
+          a.job.inputRevisions.explanation === state?.explanation?.revision &&
+          a.attempt > reset,
+      ).length ?? 0;
+    if (used >= 3) {
+      if (!state.pending) {
+        state.pending = {
+          kind: "planning-recovery",
+          runId,
+          workspace: state.workspace,
+          sessionId: owner.sessionId,
+          requestId: randomUUID(),
+          revision: owner.attempt,
+          question: `${stage} exhausted three authoring attempts. ${state.error?.message ?? attempt.reason?.message}. Partial drafts are retained. Reset the budget and retry, or stop?`,
+          options: [
+            {
+              label: "Reset budget and retry",
+              description: "Authorize three new authoring attempts",
+            },
+            { label: "Stop", description: "Retain drafts and stop the run" },
+          ],
+        };
+        if (!(await store.recordPlanning(runId, run.revision, state))) return;
+        await adapter.publishStatus(
+          owner.sessionId,
+          state.workspace,
+          state.pending.question,
+        );
+      }
+      const request = state.pending;
+      if (request.kind !== "planning-recovery") return;
+      const beforeQuestion = await store.getRun(runId);
+      if (
+        !beforeQuestion ||
+        (beforeQuestion.control?.epoch ?? 0) !== controlEpoch ||
+        (beforeQuestion.control &&
+          beforeQuestion.control.status !== "active") ||
+        beforeQuestion.planning?.pending?.requestId !== request.requestId ||
+        !beforeQuestion.planning.owner?.retired ||
+        beforeQuestion.planning.owner.attempt !== attempt.attempt
+      )
+        return;
+      const answer = await adapter.requestUserInput(request);
+      run = await store.getRun(runId);
+      state = run?.planning;
+      if (
+        !run ||
+        (run.control?.epoch ?? 0) !== controlEpoch ||
+        !state ||
+        (run.control && run.control.status !== "active") ||
+        state.pending?.requestId !== request.requestId
+      )
+        return;
+      if (!answer.ok) {
+        const error = {
+          ...answer.error,
+          message: `${stage} exhausted three attempts: ${attempt.reason?.message}. Native recovery input unavailable: ${answer.error.message}`,
+        };
+        if (
+          state.error?.message !== error.message ||
+          state.error.code !== error.code
+        ) {
+          state.error = error;
+          if (await store.recordPlanning(runId, run.revision, state))
+            await adapter.publishStatus(
+              request.sessionId,
+              state.workspace,
+              error.message,
+            );
+        }
+        return;
+      }
+      if (
+        answer.source !== "user" ||
+        !answer.messageId ||
+        answer.sessionId !== request.sessionId ||
+        answer.requestId !== request.requestId ||
+        answer.revision !== request.revision ||
+        state.budgetResets?.some((r) => r.answer.messageId === answer.messageId)
+      )
+        return;
+      if (answer.text === "Stop") {
+        await handleControlCommand("ralph-stop", runId, store, adapter, {
+          source: "human",
+          expectedRevision: run.revision,
+        });
+        return;
+      }
+      if (answer.text !== "Reset budget and retry") return;
+      state.budgetResets = [
+        ...(state.budgetResets ?? []),
+        {
+          stage,
+          afterAttempt: owner.attempt,
+          explanationRevision: state.explanation?.revision ?? 0,
+          answer,
+        },
+      ];
+      delete state.pending;
+      if (!(await store.recordPlanning(runId, run.revision, state))) return;
+    }
+    run = await store.getRun(runId);
+    state = run?.planning;
+    if (
+      !run ||
+      (run.control?.epoch ?? 0) !== controlEpoch ||
+      !state?.owner?.retired ||
+      (run.control && run.control.status !== "active")
+    )
+      return;
+    // A native recovery question can wait indefinitely. Its earlier idle receipt
+    // cannot authorize dispatch after the user answers into a now-busy session.
+    const settled = await adapter.inspectSession?.(attempt.job);
+    if (
+      !["idle", "missing"].includes(settled ?? "unknown") ||
+      (stage === "prd" && settled === "missing")
+    ) {
+      state.error = {
+        code: "cancelled",
+        message:
+          "Planning owner is not settled after recovery; retry waits for session reconciliation",
+      };
+      await store.recordPlanning(runId, run.revision, state);
+      return;
+    }
+    const afterInspection = await store.getRun(runId);
+    if (
+      !afterInspection ||
+      afterInspection.revision !== run.revision ||
+      (afterInspection.control?.epoch ?? 0) !== controlEpoch ||
+      (afterInspection.control && afterInspection.control.status !== "active")
+    )
+      return;
+    const number = state.owner.attempt + 1;
+    let sessionId = state.owner.sessionId;
+    if (stage === "issues") {
+      if (!adapter.findIssueSession || !adapter.createIssueSession) return;
+      const jobId = `retry-${attempt.job.jobId}-${number}`;
+      sessionId =
+        (await adapter.findIssueSession(
+          state.workspace,
+          runId,
+          jobId,
+          number,
+        )) ??
+        (await adapter.createIssueSession(
+          state.workspace,
+          runId,
+          jobId,
+          number,
+          requiredPlanningModel(state, stage),
+        ));
+    }
+    // Re-read after external work: stop/pause/completion cannot authorize this retry.
+    const latest = await store.getRun(runId);
+    if (
+      !latest ||
+      latest.revision !== run.revision ||
+      (latest.control?.epoch ?? 0) !== controlEpoch
+    )
+      return;
+    state.owner = { stage, attempt: number, sessionId };
+    state.sessionId = sessionId;
+    delete state.error;
+    const messageId = `msg_ralph-${stage}-retry-${randomUUID()}`;
+    const prompt = `${attempt.prompt}\nRETRY AUTHORITATIVE IDENTITY: runId=${runId}, attempt=${number}. All tools MUST use attempt ${number}. Draft directory: .ralph/features/${runId}/${stage}-draft-${number}. Previous partial drafts (read only): ${JSON.stringify(state.attempts?.filter((a) => a.stage === stage).map((a) => a.draftRoot))}. Failure: ${attempt.reason?.message}. Approved explanation: ${JSON.stringify(state.explanation)}. Accepted PRD: ${JSON.stringify(state.prd)}. Product decisions: ${JSON.stringify(state.decisions ?? [])}. Final prose does not complete this stage; call ralph_complete_${stage}.`;
+    if (stage === "prd")
+      state.prdDelivery = { id: messageId, text: prompt, status: "intent" };
+    else if (state.issueHandoff)
+      state.issueHandoff = {
+        ...state.issueHandoff,
+        sessionId,
+        attempt: number,
+        messageId,
+        prompt,
+        queued: false,
+        focused: false,
+      };
+    // Append the new record in the same guarded ownership transition.
+    const { reason: _reason, ...previous } = attempt;
+    state.attempts = [
+      ...(state.attempts ?? []),
+      {
+        ...previous,
+        attempt: number,
+        sessionId,
+        job: {
+          ...attempt.job,
+          jobId: `planning-${stage}-${randomUUID()}`,
+          sessionId,
+          attempt: number,
+          prompt,
+        },
+        messageId,
+        prompt,
+        draftRoot: `.ralph/features/${runId}/${stage}-draft-${number}`,
+        remainingMs: state.settings.agentTimeoutMs ?? state.settings.timeoutMs,
+        controlEpoch: run.control?.epoch ?? 0,
+        observedAt: now,
+        suspended: false,
+        status: "active",
+      },
+    ];
+    if (!(await store.recordPlanning(runId, run.revision, state))) return;
+    attempt = state.attempts?.at(-1);
+    if (!attempt) throw new Error("Missing persisted planning attempt");
+    if (!(await store.recordIntent(attempt.job))) return;
+    const beforeQueue = await store.getRun(runId);
+    if (
+      !beforeQueue ||
+      (beforeQueue.control && beforeQueue.control.status !== "active") ||
+      beforeQueue.planning?.owner?.attempt !== number
+    )
+      return;
+    await queuePlanningPrompt(
+      store,
+      adapter,
+      runId,
+      sessionId,
+      messageId,
+      prompt,
+    );
+    if (stage === "issues")
+      await adapter.focusStageSession?.(
+        state.workspace,
+        runId,
+        sessionId,
+        "issues",
+      );
+  } finally {
+    supervising.delete(key);
+  }
+}
+function requiredPlanningModel(state: PlanningState, stage: "prd" | "issues") {
+  const model = state.settings.models[stage] ?? state.settings.models.interview;
+  if (!model) throw new Error("Missing planning model");
+  return model;
+}
+
+/** Native question tools can also be invoked directly by the stage agent. */
+export async function setPlanningQuestionWaiting(
+  store: RunStore,
+  runId: string,
+  sessionId: string,
+  id: string,
+  waiting: boolean,
+) {
+  let run = await store.getRun(runId);
+  const epoch = run?.control?.epoch ?? 0;
+  while (run?.control?.status === "paused") {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    run = await store.getRun(runId);
+  }
+  const state = run?.planning;
+  if ((run?.control?.epoch ?? 0) !== epoch) return;
+  if (
+    !run ||
+    !state ||
+    state.owner?.sessionId !== sessionId ||
+    state.owner.retired ||
+    (run.control && run.control.status !== "active")
+  )
+    return;
+  state.nativeQuestions = waiting
+    ? [...new Set([...(state.nativeQuestions ?? []), id])]
+    : (state.nativeQuestions ?? []).filter((value) => value !== id);
+  for (const attempt of state.attempts ?? [])
+    if (attempt.status === "active") {
+      attempt.suspended = true;
+      delete attempt.observedAt;
+    }
+  await savePlanning(store, runId, run.revision, state);
+}
+
+/** Injectable scheduling and time keep native waits independent of authoring time. */
+export function startPlanningSupervision(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  options: { clock?: Clock; onError?: (cause: unknown) => void } = {},
+) {
+  const clock = options.clock ?? systemClock;
+  let disposed = false;
+  let cancel = () => {};
+  const report =
+    options.onError ??
+    ((cause) => console.error("Ralph planning supervision failed", cause));
+  async function tick() {
+    try {
+      for (const run of await store.listRuns()) {
+        if (disposed) return;
+        void supervisePlanning(
+          store,
+          adapter,
+          run.runId,
+          clock.now?.() ?? Date.now(),
+        ).catch(report);
+      }
+    } catch (cause) {
+      if (!disposed) report(cause);
+    } finally {
+      if (!disposed)
+        cancel = clock.schedule(250, () => {
+          void tick();
+        });
+    }
+  }
+  cancel = clock.schedule(250, () => {
+    void tick();
+  });
+  return () => {
+    disposed = true;
+    cancel();
+  };
+}
+
+/** Check authority on both sides of inbox delivery, which may outlive stop cleanup. */
+export async function queuePlanningPrompt(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  sessionId: string,
+  messageId: string,
+  prompt: string,
+) {
+  const run = await store.getRun(runId);
+  const attempt = run?.planning?.attempts?.find(
+    (a) => a.messageId === messageId && a.sessionId === sessionId,
+  );
+  if (
+    !run ||
+    !attempt ||
+    attempt.status !== "active" ||
+    run.planning?.owner?.retired ||
+    (run.control && run.control.status !== "active") ||
+    attempt.controlEpoch !== (run.control?.epoch ?? 0)
+  )
+    throw new Error("Stale planning prompt authority");
+  if (!adapter.queueStagePrompt)
+    throw new Error("Native stage queue is unavailable");
+  await adapter.queueStagePrompt(sessionId, messageId, prompt);
+  const latest = await store.getRun(runId);
+  const current = latest?.planning?.attempts?.find(
+    (a) => a.job.jobId === attempt.job.jobId,
+  );
+  if (current?.status === "accepted") return;
+  if (
+    !latest ||
+    current?.status !== "active" ||
+    (latest.control?.epoch ?? 0) !== attempt.controlEpoch ||
+    (latest.control && !["active", "paused"].includes(latest.control.status))
+  ) {
+    const cancelled = await adapter.cancelJob(attempt.job);
+    if (!cancelled.ok)
+      throw new Error(
+        "Late planning delivery cancellation is unconfirmed; reconcile the owned session",
+      );
+    throw new Error("Planning authority retired during prompt delivery");
+  }
+}
+
+exec
+/bin/zsh -lc "rg -n '7.11|7.12|attempt|retry|Retry|exhaust|retir' PRD.md src/planning/types.ts src/planning/completion.ts src/planning/artifact-writer.ts src/state/run-store.ts tests/integration/04-planning.test.ts docs/wiki/features/workflow-recovery.md; rg --files .ralph | head -35; cat package.json; command -v bun" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+src/planning/types.ts:7:    attempt: number;
+src/planning/types.ts:8:    retired?: boolean;
+src/planning/types.ts:11:  attempts?: {
+src/planning/types.ts:13:    attempt: number;
+src/planning/types.ts:23:    status: "active" | "retired" | "accepted";
+src/planning/types.ts:50:    attempt: number;
+src/planning/types.ts:74:    attempt: number;
+src/planning/types.ts:82:    attempt: number;
+src/planning/types.ts:88:    attempt: number;
+src/planning/artifact-writer.ts:23:    attempt: z.number().int().positive(),
+src/planning/artifact-writer.ts:52:    value.attempt,
+src/planning/artifact-writer.ts:91:    `${state.owner?.stage === "issues" ? "issues" : "prd"}-draft-${value.attempt}`,
+src/planning/artifact-writer.ts:117:      value.attempt,
+src/planning/artifact-writer.ts:121:      throw new Error("Stale planning write; retry from current state");
+src/planning/artifact-writer.ts:124:    const relative = `.ralph/features/${value.runId}/${state.owner?.stage === "issues" ? "issues" : "prd"}-draft-${value.attempt}/${value.path}`;
+src/planning/artifact-writer.ts:135:    path: `.ralph/features/${value.runId}/${state.owner?.stage === "issues" ? "issues" : "prd"}-draft-${value.attempt}/${value.path}`,
+src/planning/artifact-writer.ts:143:  attempt: number,
+src/planning/artifact-writer.ts:150:    `prd-draft-${attempt}`,
+src/planning/completion.ts:22:    attempt: z.number().int().positive(),
+src/planning/completion.ts:32:  attempt: number,
+src/planning/completion.ts:42:    state.owner.retired ||
+src/planning/completion.ts:45:    state.owner.attempt !== attempt ||
+src/planning/completion.ts:65:    value.attempt,
+src/planning/completion.ts:93:        value.attempt,
+src/planning/completion.ts:210:    value.attempt,
+src/planning/completion.ts:251:    attempt: z.number().int().positive(),
+src/planning/completion.ts:311:      ? accepted.sessionId !== sessionId || accepted.attempt !== value.attempt
+src/planning/completion.ts:312:      : state.owner?.retired ||
+src/planning/completion.ts:315:        state.owner.attempt !== value.attempt ||
+src/planning/completion.ts:319:      "Stale PRD stage ownership; use the current owner and attempt",
+src/planning/completion.ts:351:        await readPrdDraft(state.workspace, value.runId, value.attempt),
+src/planning/completion.ts:371:      attempt: value.attempt,
+src/planning/completion.ts:391:      `complete-prd-${intent.attempt}`,
+src/planning/completion.ts:406:      message: `PRD accepted; retry this completion to reconcile the issue handoff: ${String(cause)}`,
+src/planning/completion.ts:420:    attempt: z.number().int().positive(),
+src/planning/completion.ts:455:    value.attempt,
+src/planning/completion.ts:459:    state.owner?.retired ||
+src/planning/completion.ts:513:      const draft = `.ralph/features/${run.runId}/issues-draft-${value.attempt}/`;
+src/planning/completion.ts:545:        attempt: value.attempt,
+src/planning/completion.ts:561:        message: `Fix issue drafts and retry ralph_complete_issues: ${String(cause)}`,
+src/planning/completion.ts:568:    value.attempt,
+src/planning/completion.ts:593:      `complete-issues-${value.attempt}`,
+docs/wiki/features/workflow-recovery.md:12:- Reconciliation verifies accepted PRD bytes and scope authorization, repository ownership and stable host prompt receipts. A supported live authoring attempt with correlated delivery retains its owner and remaining budget through recovery freeze; stopped/blocked owners stay retired. Unknown delivery evidence blocks repeated dispatch. Recovery remains observational until explicit resume.
+docs/wiki/features/workflow-recovery.md:13:- Native PRD and issue authoring each allow three total attempts per approved stage, independent of issue/review budgets. Only accepted completion tools advance the stage. A settled turn with final prose, failed turn, or active-time timeout consumes an attempt; correctable completion validation stays in the live attempt.
+docs/wiki/features/workflow-recovery.md:14:- Authoring attempts persist the owning session, prompt identity, draft root, captured remaining active-time budget and terminal result. Pending product/approval questions, direct native question tools and pause suspend the deadline. The injected planning clock supports deterministic deadline checks.
+docs/wiki/features/workflow-recovery.md:15:- Failure retires tool authority before cancelling the recorded planning job. Retry requires confirmed cancellation and an idle/missing inspected owner; missing PRD interview sessions require intervention. PRD retries retain the same interview session; issue retries use reconciled fresh sessions. Each retry writes a separate draft namespace and receives accepted inputs, decision history, prior draft paths and the failure reason. Retired sessions retain their planning tool restrictions.
+docs/wiki/features/workflow-recovery.md:16:- Exhaustion retains the blocker and native recovery request. Only a correlated real native “Reset budget and retry” answer grants another three attempts, with answer provenance recorded in `budgetResets`; “Stop” stops the run. Unavailable native input leaves the request pending and publishes its diagnostic. Stop/pause racing cancellation cannot allocate another attempt. Accepted completion atomically terminates the planning job, so its later turn settlement cannot cancel execution or consume another attempt. Authorized scope transitions retire superseded authoring jobs without aborting the continuing session; obsolete jobs cannot block final review.
+docs/wiki/features/workflow-recovery.md:18:- `/ralph-resume` and `ralph_control` share the typed router resume service. Without an ID, it selects the latest feature ahead of unrelated setup records. `--base <commit>`/`selectedCommit` requests renewed explanation authorization; `--review`/`review` retains explicit review-only retry after terminal ownership release. Options cannot be combined, and unknown flags are rejected.
+docs/wiki/features/workflow-recovery.md:19:- Native resume drives the saved phase; it does more than flip the control flag. Pending planning, failed baseline retry, scheduling, and automatic review continuation retain approvals and attempt budgets.
+docs/wiki/features/workflow-recovery.md:20:- Pause rejects new jobs and suspends review scheduling while current jobs settle. Production executor submissions retain their attempt identity; mergers and successful in-flight checks wait at the next scheduling/ref boundary rather than becoming failed retries. Each resumed in-flight boundary rechecks the original epoch so stop followed by resume cannot revive a stale callback.
+docs/wiki/features/workflow-recovery.md:26:- Review counters, attempt identities, approvals and artifact revisions are retained; controls do not reset budgets. Native resume preserves the stage owner and correlated unanswered questions.
+docs/wiki/features/workflow-recovery.md:28:- An executing attempt with no submission/candidate can be recovered as a consumed failure only after a matching cancelled job, completed abort, idle/missing exact session and proven environment cleanup. Work and attempt history remain available to the next explicit retry. Busy, unknown or mismatched sessions stay blocked.
+docs/wiki/features/workflow-recovery.md:37:- `src/planning/generation.ts`, `src/planning/types.ts` — durable authoring attempts, bounded retries, native exhaustion recovery and injectable supervision clock.
+docs/wiki/features/workflow-recovery.md:38:- `src/opencode/adapter.ts`, `src/plugin.ts` — prompt-specific turn inspection, owned cancellation, native question waits, periodic supervision and retired-session tool confinement.
+docs/wiki/features/workflow-recovery.md:39:- `src/planning/completion.ts`, `src/planning/artifact-writer.ts`, `src/state/run-store.ts` — revision-checked acceptance/writes, retirement rejection and terminal planning jobs before downstream handoffs.
+docs/wiki/features/workflow-recovery.md:40:- `tests/integration/04-planning.test.ts` — real Git/fake-host cases for three-attempt exhaustion/reset, retained drafts, correctable validation, suspended deadlines, uncertain cancellation, stop/pause races and accepted handoffs. These are deterministic host fixtures, not proof of live native UI behavior.
+docs/wiki/features/workflow-recovery.md:46:- `src/recovery/reconcile.ts`, `src/state/run-store.ts` — facts, guarded recovered-attempt writes and idempotent operation reconciliation.
+PRD.md:56:- ✅ Durable stage/session identity, artifact revisions, attempts, and approval provenance.
+PRD.md:59:- ✅ Three total attempts for each PRD or issue-planning stage before intervention.
+PRD.md:76:- ❌ A redesign of scheduling, integration, retry budgets, or final-review policy.
+PRD.md:117:| Orchestrator | Durable stage transitions, authorization, attempts, handoffs, and recovery |
+PRD.md:127:Persist stage identity, owning session, attempt, selected skill hashes, pending request identity, user-answer provenance, approved explanation revision, starting SHA, command configuration revision, artifact hashes, and handoff intent/result. Bind completion to exact artifact bytes. New workflow records must be distinguishable from unsupported old records; no old schema needs conversion.
+PRD.md:151:The completion tool validates the owning stage/session/attempt, required PRD structure, nonempty content, approved explanation reference, and permitted artifact paths. Missing product decisions require a native question; they must not be silently invented. Record the accepted PRD revision before starting the next stage.
+PRD.md:165:Create the feature integration branch at the pinned starting commit. Run approved setup and baseline checks before scheduling issues. A completed failing check blocks execution and consumes no issue attempt. A timed-out validation check follows the existing run-local skip policy, including at baseline. Setup and readiness failures cannot be skipped into readiness.
+PRD.md:179:The approved issue plan supplies the intended behaviors and interface changes, avoiding a redundant approval at every TDD cycle. Record red/green evidence in execution logs. Expected red-stage failures do not consume issue repair attempts. Documentation or configuration changes with no meaningful automated behavior test may use a documented exception plus appropriate validation.
+PRD.md:185:The merger may resolve mechanical conflicts. Conflicts requiring behavior or feature decisions return to the executor with context and consume the issue's attempt budget. The command runner validates the candidate commit using approved checks. Only then does the orchestrator advance the integration branch to that exact candidate. Never advance the feature branch first and rely on rollback after failed checks.
+PRD.md:193:| Issue submission fails completed validation | Return check output to executor; allow three total issue attempts: initial attempt plus two repairs |
+PRD.md:194:| Agent gets stuck or times out | Stop that attempt and retry from reconciled saved work; consumes the same three-attempt budget |
+PRD.md:195:| Issue exhausts attempts | Block issue and dependents, continue independent work, request user intervention |
+PRD.md:198:| Setup or startup times out | Do not skip; retry within the affected task's attempt budget, then block affected work |
+PRD.md:203:Implementation default: command timeouts are explicit in the approved JSON, with a suggested ten minutes for ordinary checks and configurable longer setup budgets. Agent attempts default to a configurable thirty-minute deadline. These durations were not prescribed by the user and must be visible in configuration.
+PRD.md:214:Consolidate blocking findings into dedicated repair tasks. Each repair task receives finding evidence, affected issue context, and acceptance criteria, and uses a new worktree, TDD, the merger, and configured checks. Repair tasks have the same three-attempt execution budget as ordinary issues.
+PRD.md:218:If a repair executor disputes a finding, return its evidence to the originating reviewer. The reviewer can withdraw the finding or retain it with justification. Unresolved findings remain blocking within the same bounded loop; discussion cannot create an unlimited retry path.
+PRD.md:220:If functional review cannot run after three attempts because of missing credentials, startup failures, or unavailable tools, finish as unverified and identify the blocker. These infrastructure attempts are separately tracked and do not grant extra rounds for fixing functional findings.
+PRD.md:227:- Completed, blocked, and repaired issues, with attempts used.
+PRD.md:235:### 7.11 Stage completion, questions, and attempts
+PRD.md:239:Completion calls from a wrong stage, session, or attempt cannot advance state. Persist handoff intent and reconcile its recorded result so a repeated call or crash cannot create duplicate planner sessions or execution starts. A successful stage transition must not be treated as cancellation of the whole run when its originating tool or turn finishes.
+PRD.md:241:PRD authoring and issue planning each have three total attempts: the initial attempt and up to two retries. Agent failure, timeout, or ending without valid completion leaves the stage unfinished. Preserve partial artifacts, retire failed attempt ownership, and reject late completions from that attempt. Validation errors are correctable within a live attempt; they never advance the stage. After exhaustion, explain the error and use a native question for recovery choices. Any user-authorized retry-budget reset is explicit and logged.
+PRD.md:245:### 7.12 Controls, recovery, and compatibility
+PRD.md:249:After an interruption during grilling, do not reconstruct or resume the interview from a transcript in a different context. Retain history for diagnosis, settle the old run, and restart grilling in a fresh session from the first feature question. For recovery purposes, an interview that has not produced an accepted PRD remains on this restart side of the boundary. Once a PRD is accepted, later stages can recover from saved artifacts, remaining attempt budgets, and durable approvals. Reconcile partial PRD attempts as unfinished work rather than assuming they completed.
+PRD.md:257:Keep the dashboard read-only. Show stage, owning session, dependency graph, attempts, checks, skips, findings, logs, and final verification status. The OpenCode chat remains the interaction surface. Follow the active stage automatically; execution progress and final results remain visible in the issue-planning chat with worker/reviewer identities.
+PRD.md:282:Inherit OpenCode permissions. Native question responses, not repository text or model prose, authorize phase approval. Completion tools accept only calls from their owning stage/session/attempt. Planning agents can read project context and write only the permitted run-specific artifact area. Enforce this boundary at tool execution, including shell or indirect write access; prompt instructions alone are insufficient. Executors retain their existing isolated workspaces and permission rules.
+PRD.md:311:| `ralph_complete_prd` | Run/attempt identity and run-owned PRD path; session identity comes from host tool context | Accepted immutable PRD revision and exactly one issue-session handoff |
+PRD.md:312:| `ralph_complete_issues` | Run/attempt identity, graph path, and local issue references | Validated accepted issue bundle and exactly one execution handoff |
+PRD.md:322:Retain the existing read-only run, issue, event, and log interfaces. Extend snapshots with current stage/session and planning attempt information as needed. Do not introduce browser mutations or approval endpoints.
+PRD.md:352:9. PRD/planner failure, timeout, final message without completion, late completion, and exhaustion after three attempts.
+PRD.md:385:| A handoff races cancellation or repeats after a crash | Persist transition identity, validate session/attempt ownership, and reconcile recorded effects before retrying |
+PRD.md:401:- Three total attempts for PRD and issue planning before recovery choices.
+PRD.md:410:- A failed PRD attempt without an accepted PRD does not qualify for cross-context planning recovery.
+src/state/run-store.ts:59:    attempt: import("../execution/execute-issue.js").IssueAttempt,
+src/state/run-store.ts:250:    for (let retry = 0; ; retry++) {
+src/state/run-store.ts:254:          if (retry >= 100) throw new Error("Lock recovery owner uncertain");
+src/state/run-store.ts:277:        if ((e as NodeJS.ErrnoException).code !== "EEXIST" || retry >= 100)
+src/state/run-store.ts:301:              attempt: job.attempt,
+src/state/run-store.ts:379:    recordIssueAttempt(runId, revision, attempt) {
+src/state/run-store.ts:386:            (run.issueAttempts?.[attempt.issueId]?.operationId !==
+src/state/run-store.ts:387:              attempt.operationId ||
+src/state/run-store.ts:388:              run.issueAttempts?.[attempt.issueId]?.job.jobId !==
+src/state/run-store.ts:389:                attempt.job.jobId ||
+src/state/run-store.ts:390:              run.issueAttempts?.[attempt.issueId]?.attempt !==
+src/state/run-store.ts:391:                attempt.attempt))
+src/state/run-store.ts:395:        run.issueAttempts[attempt.issueId] = sanitizeValue(attempt, secrets);
+src/state/run-store.ts:407:        const attempt = run?.issueAttempts?.[issueId];
+src/state/run-store.ts:409:        const entry = attempt && run?.jobs[attempt.job.jobId];
+src/state/run-store.ts:416:          attempt?.status !== "executing" ||
+src/state/run-store.ts:417:          attempt.submission ||
+src/state/run-store.ts:418:          attempt.candidate ||
+src/state/run-store.ts:421:          entry.envelope.attempt !== attempt.attempt ||
+src/state/run-store.ts:426:          abort.job.attempt !== attempt.attempt ||
+src/state/run-store.ts:430:        attempt.status = "failed";
+src/state/run-store.ts:431:        attempt.executionResult = entry.result;
+src/state/run-store.ts:432:        attempt.error = {
+src/state/run-store.ts:435:            "Interrupted executor proven idle during recovery; attempt consumed, workspace retained",
+src/state/run-store.ts:447:        const attempt = run?.issueAttempts?.[issueId];
+src/state/run-store.ts:454:          !attempt ||
+src/state/run-store.ts:455:          attempt.status !== "merging" ||
+src/state/run-store.ts:458:          advance.job.jobId !== attempt.candidate?.job.jobId ||
+src/state/run-store.ts:459:          advance.job.attempt !== attempt.attempt ||
+src/state/run-store.ts:461:          advance.expectedNew !== attempt.candidate?.commit
+src/state/run-store.ts:464:        attempt.status = "integrated";
+src/state/run-store.ts:465:        attempt.integratedCommit = advance.expectedNew;
+src/state/run-store.ts:511:            !Number.isSafeInteger(owner.attempt) ||
+src/state/run-store.ts:512:            owner.attempt < 1 ||
+src/state/run-store.ts:521:                      (old.owner?.retired &&
+src/state/run-store.ts:523:                        owner.attempt === old.owner.attempt + 1)) &&
+src/state/run-store.ts:527:                (old.owner?.attempt !== owner.attempt &&
+src/state/run-store.ts:531:                    owner.attempt === 1
+src/state/run-store.ts:534:                    old.owner?.retired &&
+src/state/run-store.ts:536:                    owner.attempt === old.owner.attempt + 1 &&
+src/state/run-store.ts:537:                    planning.attempts?.at(-1)?.attempt === owner.attempt
+src/state/run-store.ts:669:        for (const attempt of next.attempts ?? []) {
+src/state/run-store.ts:670:          if (enteringNativeWait && attempt.status === "active") {
+src/state/run-store.ts:671:            const previous = run.planning?.attempts?.find(
+src/state/run-store.ts:672:              (a) => a.job.jobId === attempt.job.jobId,
+src/state/run-store.ts:679:              attempt.remainingMs = Math.max(
+src/state/run-store.ts:683:            attempt.suspended = true;
+src/state/run-store.ts:684:            delete attempt.observedAt;
+src/state/run-store.ts:687:            attempt.stage === "prd" ? next.prdAcceptance : next.issueAcceptance;
+src/state/run-store.ts:689:            attempt.job.inputRevisions.explanation ===
+src/state/run-store.ts:691:            accepted?.attempt === attempt.attempt &&
+src/state/run-store.ts:692:            accepted.sessionId === attempt.sessionId &&
+src/state/run-store.ts:693:            attempt.status === "active"
+src/state/run-store.ts:695:            attempt.status = "accepted";
+src/state/run-store.ts:696:            const job = run.jobs[attempt.job.jobId];
+src/state/run-store.ts:707:            attempt.status === "active" &&
+src/state/run-store.ts:708:            (attempt.job.inputRevisions.explanation !==
+src/state/run-store.ts:710:              attempt.stage !== next.owner?.stage ||
+src/state/run-store.ts:711:              attempt.sessionId !== next.owner.sessionId ||
+src/state/run-store.ts:712:              attempt.attempt !== next.owner.attempt)
+src/state/run-store.ts:714:            attempt.status = "retired";
+src/state/run-store.ts:715:            attempt.reason = {
+src/state/run-store.ts:720:            const job = run.jobs[attempt.job.jobId];
+src/state/run-store.ts:726:                evidence: [attempt.reason.message],
+src/state/run-store.ts:731:            attempt.status === "active" &&
+src/state/run-store.ts:732:            attempt.suspended &&
+src/state/run-store.ts:736:            ((attempt.stage === "prd" && next.phase === "prd_generation") ||
+src/state/run-store.ts:737:              (attempt.stage === "issues" && next.phase === "issue_generation"))
+src/state/run-store.ts:739:            attempt.suspended = false;
+src/state/run-store.ts:740:            attempt.observedAt = now();
+src/state/run-store.ts:753:        // fresh human-input identities without changing answers or attempt budgets.
+src/state/run-store.ts:758:          for (const attempt of Object.values(run.issueAttempts ?? {})) {
+src/state/run-store.ts:760:              attempt.status === "waiting" &&
+src/state/run-store.ts:761:              attempt.question &&
+src/state/run-store.ts:762:              !attempt.question.answer
+src/state/run-store.ts:764:              attempt.question.epoch = run.control?.epoch ?? 0;
+src/state/run-store.ts:765:              attempt.question.request.requestId = randomUUID();
+src/state/run-store.ts:766:              delete attempt.question.error;
+src/state/run-store.ts:770:        for (const attempt of run.planning?.attempts ?? []) {
+src/state/run-store.ts:771:          if (attempt.status === "active") {
+src/state/run-store.ts:777:              attempt.status = "retired";
+src/state/run-store.ts:778:              attempt.reason = {
+src/state/run-store.ts:780:                message: `Planning attempt retired by ${control.status}`,
+src/state/run-store.ts:783:                run.planning?.owner?.stage === attempt.stage &&
+src/state/run-store.ts:784:                run.planning.owner.attempt === attempt.attempt
+src/state/run-store.ts:786:                run.planning.owner.retired = true;
+src/state/run-store.ts:788:            attempt.suspended =
+src/state/run-store.ts:793:            if (attempt.suspended) delete attempt.observedAt;
+src/state/run-store.ts:795:              attempt.observedAt = now();
+src/state/run-store.ts:796:              attempt.controlEpoch = run.control?.epoch ?? 0;
+src/state/run-store.ts:1017:            (previous.envelope.attempt >= job.attempt ||
+src/state/run-store.ts:1045:            entry.envelope.attempt !== job.attempt ||
+src/state/run-store.ts:1128:            entry.envelope.attempt !== job.attempt ||
+src/state/run-store.ts:1174:            entry.envelope.attempt !== result.attempt ||
+tests/integration/04-planning.test.ts:124:      attempt: 1,
+tests/integration/04-planning.test.ts:152:  const input = { runId: run.runId, attempt: 1, path: "PRD.md" };
+tests/integration/04-planning.test.ts:238:test("native PRD completion rejects foreign ownership, stale attempts and malformed drafts without creating a planner", async () => {
+tests/integration/04-planning.test.ts:251:    await expect(f.complete({ ...f.input, attempt: 2 })).rejects.toThrow(
+tests/integration/04-planning.test.ts:461:        { runId: f.run.runId, attempt: 1, path, content },
+tests/integration/04-planning.test.ts:477:            { runId: f.run.runId, attempt: 1, graphPath: "graph.json" },
+tests/integration/04-planning.test.ts:502:              { runId: f.run.runId, attempt: 1, graphPath: "graph.json" },
+tests/integration/04-planning.test.ts:543:      { runId: f.run.runId, attempt: 1, path, content },
+tests/integration/04-planning.test.ts:548:  const complete = async (ctx = planner, attempt = 1) =>
+tests/integration/04-planning.test.ts:553:            { runId: f.run.runId, attempt, graphPath: "graph.json" },
+tests/integration/04-planning.test.ts:629:test("native issue completion rejects stale owners and attempts", async () => {
+tests/integration/04-planning.test.ts:767:      attempt: 1,
+tests/integration/04-planning.test.ts:860:      { runId: f.run.runId, attempt: 1, graphPath: "graph.json" },
+tests/integration/04-planning.test.ts:913:                attempt: 1,
+tests/integration/04-planning.test.ts:966:              attempt: 1,
+tests/integration/04-planning.test.ts:989:      after.attempts?.find((a) => a.stage === "issues"),
+tests/integration/04-planning.test.ts:991:    expect(superseded.status).toBe("retired");
+tests/integration/04-planning.test.ts:1033:        { runId: f.run.runId, attempt: 1, path, content },
+tests/integration/04-planning.test.ts:1040:            { runId: f.run.runId, attempt: 1, graphPath: "graph.json" },
+tests/integration/04-planning.test.ts:1136:        attempt: 1,
+tests/integration/04-planning.test.ts:1204:      { runId: f.run.runId, attempt: 1, graphPath: "graph.json" },
+tests/integration/04-planning.test.ts:1237:    expect((await f.store.getRun(f.run.runId))?.issueAttempts?.A?.attempt).toBe(
+tests/integration/04-planning.test.ts:1275:        { runId: f.run.runId, attempt: 1, path, content },
+tests/integration/04-planning.test.ts:1286:      { runId: f.run.runId, attempt: 1, graphPath: "graph.json" },
+tests/integration/04-planning.test.ts:1292:    expect(integrated.issueAttempts?.A?.attempt).toBe(1);
+tests/integration/04-planning.test.ts:1321:      attempt: 1,
+tests/integration/04-planning.test.ts:1433:      attempt: 1,
+tests/integration/04-planning.test.ts:1474:  test(`native ${stage} prose consumes three attempts, retains drafts and requires explicit budget reset`, async () => {
+tests/integration/04-planning.test.ts:1501:            : state?.owner?.attempt === i + 2;
+tests/integration/04-planning.test.ts:1504:      expect(state.attempts?.filter((a) => a.stage === stage)).toHaveLength(3);
+tests/integration/04-planning.test.ts:1505:      expect(state.owner?.retired).toBe(true);
+tests/integration/04-planning.test.ts:1512:            attempt: 3,
+tests/integration/04-planning.test.ts:1534:        (await f.store.getRun(f.run.runId))?.planning?.attempts,
+tests/integration/04-planning.test.ts:1535:      ).toHaveLength(state.attempts?.length ?? 0);
+tests/integration/04-planning.test.ts:1543:          text: "Reset budget and retry",
+tests/integration/04-planning.test.ts:1554:      expect(waiting.owner?.attempt).toBe(3);
+tests/integration/04-planning.test.ts:1555:      expect(waiting.owner?.retired).toBe(true);
+tests/integration/04-planning.test.ts:1560:          (await f.store.getRun(f.run.runId))?.planning?.owner?.attempt === 4
+tests/integration/04-planning.test.ts:1567:      expect(reset.owner?.attempt).toBe(4);
+tests/integration/04-planning.test.ts:1568:      expect(reset.owner?.retired).toBeUndefined();
+tests/integration/04-planning.test.ts:1592:      (await f.store.getRun(f.run.runId))?.planning?.attempts?.at(-1),
+tests/integration/04-planning.test.ts:1617:        attempt: 1,
+tests/integration/04-planning.test.ts:1663:    expect(state.attempts?.at(-1)?.remainingMs).toBe(remaining);
+tests/integration/04-planning.test.ts:1664:    expect(state.owner?.attempt).toBe(1);
+tests/integration/04-planning.test.ts:1667:    expect((await store.getRun(f.run.runId))?.planning?.owner?.attempt).toBe(2);
+tests/integration/04-planning.test.ts:1669:      (await store.getRun(f.run.runId))?.planning?.attempts?.[0]?.reason?.code,
+tests/integration/04-planning.test.ts:1683:  test(`native retired planning cannot retry across ${control} during cancellation`, async () => {
+tests/integration/04-planning.test.ts:1696:      let retired = false;
+tests/integration/04-planning.test.ts:1698:        retired = !!(await f.store.getRun(f.run.runId))?.planning?.owner
+tests/integration/04-planning.test.ts:1699:          ?.retired;
+tests/integration/04-planning.test.ts:1719:      expect(retired).toBe(true);
+tests/integration/04-planning.test.ts:1721:      expect(state.owner?.attempt).toBe(1);
+tests/integration/04-planning.test.ts:1722:      expect(state.owner?.retired).toBe(true);
+tests/integration/04-planning.test.ts:1723:      expect(state.attempts).toHaveLength(1);
+tests/integration/04-planning.test.ts:1755:      after.planning?.attempts?.filter((a) => a.stage === "issues"),
+tests/integration/04-planning.test.ts:1757:    expect(after.planning?.attempts?.[0]?.status).toBe("accepted");
+tests/integration/04-planning.test.ts:1765:test("native PRD retry corrects validation in place and completes from its retained interview session", async () => {
+tests/integration/04-planning.test.ts:1774:    const input = { ...f.input, attempt: 2 };
+tests/integration/04-planning.test.ts:1779:    expect(state.owner?.attempt).toBe(2);
+tests/integration/04-planning.test.ts:1780:    expect(state.owner?.retired).toBeUndefined();
+tests/integration/04-planning.test.ts:1781:    expect(state.attempts).toHaveLength(2);
+tests/integration/04-planning.test.ts:1786:    expect(state.prdAcceptance?.attempt).toBe(2);
+tests/integration/04-planning.test.ts:1787:    expect(state.attempts?.filter((a) => a.stage === "prd")).toHaveLength(2);
+tests/integration/04-planning.test.ts:1788:    expect(state.attempts?.at(-1)?.stage).toBe("issues");
+tests/integration/04-planning.test.ts:1789:    expect(state.owner?.attempt).toBe(1);
+tests/integration/04-planning.test.ts:1796:test("native exhaustion keeps unavailable input pending and records an explicit Stop without resetting", async () => {
+tests/integration/04-planning.test.ts:1823:    expect(question).toContain("exhausted three");
+tests/integration/04-planning.test.ts:1824:    expect(question).toContain("Reset budget and retry");
+tests/integration/04-planning.test.ts:1836:      text: "Reset budget and retry",
+tests/integration/04-planning.test.ts:1843:      (await f.store.getRun(f.run.runId))?.planning?.attempts?.at(-1)?.job,
+tests/integration/04-planning.test.ts:1851:        attempt: 1,
+tests/integration/04-planning.test.ts:1868:    expect(stopped.planning?.attempts).toHaveLength(3);
+.ralph/commands.json
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "docs/live-opencode-trial.md",
+    "docs/live-opencode-evidence.json",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e",
+    "test:status": "bun test --timeout 30000 tests/integration --test-name-pattern status"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+/Users/rwmmtzqy/.npm-global/bin/bun
+
+exec
+/bin/zsh -lc 'cat PRD.md' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+# Ralph Orchestrator — Product Requirements Document
+
+**Status:** Draft for review; requirements, not an implementation-completion report  
+**Date:** 2026-10-16  
+**Product:** Reusable OpenCode plugin with deterministic stage control  
+**Source:** Repository inspection and the feature interview in this conversation  
+**Revision:** Replaces the previous workflow requirements. No backward compatibility.
+
+## 1. Executive Summary
+
+Ralph turns a feature request into a reviewed implementation. The plugin directly handles `/ralph-orchestrator`, opens a fresh interview session, and supplies the full grill-me skill with instructions for that stage only. The interviewer first asks what feature the user wants to build, explores the repository, and asks recommended questions through OpenCode's native question tool. When the relevant decisions are resolved, it explains the feature using ASD-STE100 writing instructions and requests approval to advance.
+
+That approval authorizes PRD creation, issue planning, and execution within the agreed scope from a displayed, pinned starting commit. The plugin injects the full create-prd skill into the same interview session. Valid PRD completion opens a fresh session containing the full adapted to-issues skill and explicit approved artifacts. Valid issue completion starts execution automatically. There is no issue-breakdown review or second execution-approval gate. Each planning stage must call a completion tool; the plugin validates artifacts and owns every transition.
+
+This change replaces startup, interview, planning, and their integration with execution. It retains the existing isolated workers, dependency scheduling, sequential candidate integration, approved checks, TDD, independent reviewers, and read-only dashboard. The user follows the active stage in OpenCode and sees progress and final results there. Existing workflow protocols and saved runs are not supported or migrated.
+
+## 2. Mission
+
+Make feature development deterministic in its control flow and clear in its human decisions.
+
+- Let plugin code control startup, approvals, handoffs, and execution eligibility.
+- Give each agent only its current stage responsibilities.
+- Resolve product decisions with the user and repository facts through exploration.
+- Bind automatic execution to explicit scope approval and validated artifacts.
+- Preserve bounded execution, evidence, and honest recovery and reporting.
+
+## 3. Target Users
+
+### Primary user
+
+A developer who uses OpenCode and Git, understands project checks, and wants to describe a feature without manually launching each planning stage. The user makes product decisions during discovery and authorizes implementation through the explanation approval.
+
+### Secondary user
+
+A maintainer who installs Ralph in several repositories and needs reusable skills, project-specific command configuration, consistent worker behavior, and visible failure recovery.
+
+### Needs and pain points
+
+The current command delegates startup to an assistant through a workflow prompt. Its chat-reply protocol disables the native question tool while waiting, exposes downstream orchestration instructions, and can report inactive-run resume failures as revision conflicts. The bundled planning skills are shortened versions of the user's actual skills. The new flow must remove these mismatches without redesigning the execution engine.
+
+## 4. MVP Scope
+
+### Core functionality
+
+- ✅ Direct, deterministic slash-command startup after approved project setup.
+- ✅ Fresh interview session and a mandatory opening feature question.
+- ✅ Native question forms for interview input, approvals, product decisions, and recovery choices.
+- ✅ Full grill-me and create-prd skills; full to-issues skill adapted to the agreed workflow.
+- ✅ ASD-STE100 feature explanation, approved before PRD authoring.
+- ✅ PRD authoring in the interview session; issue planning in a fresh session.
+- ✅ Validated completion-tool handoffs and automatic execution after issues.
+- ✅ Renewed explanation approval when product scope changes.
+
+### Technical and integration scope
+
+- ✅ Durable stage/session identity, artifact revisions, attempts, and approval provenance.
+- ✅ Follow the active stage in the OpenCode interface; show execution progress and results in the issue-planning chat.
+- ✅ Stage-specific tool access and planning-artifact write boundaries.
+- ✅ Three total attempts for each PRD or issue-planning stage before intervention.
+- ✅ Restart interrupted grilling; recover later stages from saved artifacts.
+- ✅ Preserve existing execution, review, dashboard, and project-command behavior except where the new flow requires integration changes.
+
+### Distribution and platform scope
+
+- ✅ Reusable installed plugin with bundled skills and pinned OpenCode dependencies.
+- ✅ Existing macOS, Linux, and native Windows product support remains required.
+- ✅ One active feature workflow per repository, including linked worktrees.
+
+### Out of scope
+
+- ❌ Legacy workflow tools, ordinary-chat approval transport, old-state migration, or compatibility shims.
+- ❌ A separate ASD-STE100 compliance checker or certification claim.
+- ❌ User approval of issue granularity or a second approval immediately before execution.
+- ❌ External issue trackers, automatic target-branch merge, push, deployment, or PR creation.
+- ❌ Workflow execution independent of OpenCode's lifetime.
+- ❌ A redesign of scheduling, integration, retry budgets, or final-review policy.
+
+The check marks identify required scope; they do not claim that implementation is complete.
+
+## 5. User Stories
+
+1. **As a developer, I want the plugin to start the interview directly, so that startup does not depend on an assistant choosing a tool.** Invoking `/ralph-orchestrator` opens a fresh interview and its opening question without showing an orchestration prompt.
+2. **As a feature owner, I want focused grilling with recommended answers, so that I resolve requirements before authorizing work.** For a password-reset feature, the agent reads existing authentication code and asks about unresolved expiry and error behavior.
+3. **As a feature owner, I want a clear explanation and one scope approval, so that I know what automatic planning and execution will build.** The approval shows the explanation, criteria, and exact starting commit and states its authorization clearly.
+4. **As a developer, I want each planning stage to receive the intended full skill, so that PRDs and issues retain the detail of my existing workflows.** The PRD uses the full template, while issue files contain concrete code and test references.
+5. **As a developer, I want validated handoffs, so that agent prose cannot accidentally start the next stage.** Repeating a PRD completion call cannot create two planner sessions.
+6. **As a feature owner, I want new product decisions brought back to me, so that automatic execution stays within approved scope.** A planner that discovers an unspecified retention requirement asks through the question tool and obtains revised approval if scope changes.
+7. **As a developer, I want explicit recovery choices, so that interrupted work does not silently restart or use a different interview context.** Interrupted grilling restarts in a fresh context; a completed PRD can support later-stage recovery.
+8. **As a maintainer, I want existing worker and review guarantees preserved, so that the new planning experience does not weaken implementation checks.** Candidates still pass approved checks before integration, and both final reviewers inspect the same stable commit.
+
+## 6. Core Architecture & Patterns
+
+### 6.1 Deterministic state machine
+
+The normal flow is:
+
+`configured → interview → explanation approval → PRD authoring → issue planning → preflight/baseline → execution → final review → result`
+
+The plugin owns state transitions. Agents perform discovery, writing, implementation, and review within their stage. An agent's final message or a successful tool invocation alone is not proof that artifacts, Git operations, or checks are valid. Waiting, paused, interrupted, failed, and blocked conditions are distinct from completed stages.
+
+### 6.2 Session boundaries
+
+| Stage | Context and visible session |
+| --- | --- |
+| Interview | Fresh session; full grill-me skill and interview-only instructions; no injected downstream workflow instructions |
+| PRD | Same session after approval; inject full create-prd skill, stage instructions, approved explanation, and pinned commit |
+| Issues | Fresh session; full adapted to-issues skill, exact PRD, approved explanation, project references, and explicit stage contract |
+| Execution and review | Existing independent worker/reviewer sessions; progress and final report appear in the issue-planning chat |
+
+Use OpenCode session navigation to follow the interview and issue stages. Session switches must not create duplicate work. Context isolation means that Ralph does not inject later-stage instructions into grilling; repository exploration may still encounter documentation that mentions those stages.
+
+### 6.3 Responsibilities
+
+| Component | Responsibility |
+| --- | --- |
+| Command handler | Validate setup and ownership, then initiate the correct workflow action directly |
+| Orchestrator | Durable stage transitions, authorization, attempts, handoffs, and recovery |
+| OpenCode adapter and TUI | Sessions, native questions, navigation, permissions, progress, and lifecycle |
+| Planning agents | Explore code and write only their permitted planning artifacts |
+| Completion tools | Validate stage identity and artifact content, record completion, and trigger one transition |
+| Existing execution services | Workers, candidate integration, approved commands, review, cleanup, and reporting |
+
+### 6.4 Artifacts and durable records
+
+Keep existing per-feature artifact conventions under `.ralph/features/<run-id>/`: a PRD, local Markdown issues, and a machine-readable dependency graph. Keep canonical runtime state and repository ownership shared through the Git common directory. Never replace the repository's own root PRD as a side effect of a feature agent authoring a feature PRD.
+
+Persist stage identity, owning session, attempt, selected skill hashes, pending request identity, user-answer provenance, approved explanation revision, starting SHA, command configuration revision, artifact hashes, and handoff intent/result. Bind completion to exact artifact bytes. New workflow records must be distinguishable from unsupported old records; no old schema needs conversion.
+
+## 7. Tools and Feature Specifications
+
+### 7.1 Project setup and direct startup
+
+`/ralph-commands` continues to explore the project, propose commands, obtain approval, and validate and save configuration without executing it. Missing approved setup prevents interview startup and gives an actionable direction to run setup.
+
+For this repository, proposals must include both `bun run test:status` and `bun run test`. The focused command supports quick public-interface TDD cycles. The full integration suite remains mandatory for candidate integration and final validation. Never change approved commands during a feature run.
+
+`/ralph-orchestrator` must not inject a prompt asking the current assistant to choose start/resume tools. With valid setup and no active run, it creates and focuses the interview session directly. If a supported run owns the repository, show its phase and use the native question tool for applicable recovery or stop-and-restart choices. Starting fresh requires settled cancellation and ownership cleanup; preserve prior artifacts and work.
+
+### 7.2 Grilling, explanation, and approval
+
+Always begin with a native question asking what feature to build. If the slash command included a description, show it for confirmation rather than skipping the question. Use the full grill-me skill: explore discoverable facts, resolve dependent decisions, and provide a recommended answer for each substantive interview question.
+
+Stop grilling when scope, acceptance criteria, constraints, and failure behavior are resolved. Explain the agreed feature using ASD-STE100 writing rules and vocabulary conventions as instructions. This replaces the old informal simplified-English requirement. There is no separate compliance-validation stage and no claim of certification.
+
+Present the explanation, scope, observable criteria, current branch, and full resolved HEAD SHA. Ask through the native question tool whether the user approves advancing through PRD creation, issue planning, and implementation within that scope. The affirmative option must make this authorization clear. Approval is bound to this displayed revision, commit, configuration, and actual human response. Rejection or requested changes return to grilling; a new revision needs new approval.
+
+### 7.3 PRD authoring and issue planning
+
+Approval deterministically injects the full create-prd skill and PRD-stage prompt into the interview session. Preserve its comprehensive section structure. Tell the agent to write the run-specific PRD and finish by calling the PRD completion tool. It may explore the repository and write its stage artifacts, but it may not implement project code or start other stages itself.
+
+The completion tool validates the owning stage/session/attempt, required PRD structure, nonempty content, approved explanation reference, and permitted artifact paths. Missing product decisions require a native question; they must not be silently invented. Record the accepted PRD revision before starting the next stage.
+
+Create and focus a fresh issue-planning session. Supply the exact PRD revision and content, approved explanation, pinned commit, project instructions, approved commands, and full adapted to-issues skill. Retain deep code exploration, thin vertical slices, concrete patterns, dependencies, and self-sufficient implementation/test guidance. Adapt the skill to local feature artifacts, omit its setup/issue-tracker prerequisites, and skip its user breakdown-review step.
+
+The planner writes Markdown issues and a graph, then calls the issue completion tool. Validate unique IDs, safe file references, required content, PRD identity, missing dependencies, and cycles. Invalid submissions stay in the current stage and return actionable errors. Valid completion authorizes preflight and execution automatically under the existing explanation approval. Publish artifact references and an execution summary without asking for another approval.
+
+### 7.4 Scope changes, authorization, and preflight
+
+If authoring or planning discovers a new product decision, ask through the native question tool. If the answer changes scope, revise the explanation, present the resulting scope and criteria, and obtain renewed approval. Invalidate dependent planning outputs and regenerate them as needed. Technical choices within approved scope do not require a new gate.
+
+Before execution, verify the approved explanation, accepted PRD and issue graph, pinned starting SHA, unchanged command configuration, and clean working checkout under existing preflight rules. A changed starting point pauses the workflow and requires the user to approve the revised starting point with the explanation. Do not silently use the newest HEAD.
+
+Generated planning artifacts must be handled consistently with clean-checkout requirements: keep them in the managed artifact area and exclude only known run-owned generated files from dirtiness checks where necessary. Never discard or ignore unrelated user changes. Do not silently commit user files to satisfy preflight.
+
+Create the feature integration branch at the pinned starting commit. Run approved setup and baseline checks before scheduling issues. A completed failing check blocks execution and consumes no issue attempt. A timed-out validation check follows the existing run-local skip policy, including at baseline. Setup and readiness failures cannot be skipped into readiness.
+
+### 7.5 Dependency scheduling and execution
+
+Run up to two eligible issues concurrently by default. An issue is eligible only when every dependency has been integrated and passed all non-skipped checks. Agent completion alone does not satisfy a dependency.
+
+Create each issue's branch and worktree from the latest integration commit when it starts. Executors receive the approved issue, PRD, relevant project instructions, configured model, and TDD instructions. Concurrent environments must have separate resources where isolation is required.
+
+If an executor cannot resolve a requirement from the PRD or code, ask its question through the native question tool in the active workflow chat. Block that issue and its dependents while independent work continues. If the answer changes approved scope, revise the relevant artifacts and obtain renewed explanation approval before dependent implementation.
+
+### 7.6 TDD requirements
+
+Implement one behavior at a time: write a meaningful failing test through a public interface, observe the expected failure, implement the minimum change, then refactor while tests remain green. Do not write a batch of speculative tests before all implementation. Repair executors follow the same process, normally beginning with a regression test.
+
+The approved issue plan supplies the intended behaviors and interface changes, avoiding a redundant approval at every TDD cycle. Record red/green evidence in execution logs. Expected red-stage failures do not consume issue repair attempts. Documentation or configuration changes with no meaningful automated behavior test may use a documented exception plus appropriate validation.
+
+### 7.7 Integration and worktree lifecycle
+
+A separate merge agent combines each completed submission with the latest integration branch in a temporary candidate worktree. Integration is sequential even when execution is parallel.
+
+The merger may resolve mechanical conflicts. Conflicts requiring behavior or feature decisions return to the executor with context and consume the issue's attempt budget. The command runner validates the candidate commit using approved checks. Only then does the orchestrator advance the integration branch to that exact candidate. Never advance the feature branch first and rely on rollback after failed checks.
+
+After successful integration and checks, remove the issue worktree. Retain its commit references, execution evidence, and logs. Preserve failed worktrees for diagnosis. Cleanup failure is reported and must not reverse an otherwise recorded integration or delete unrecognized user work.
+
+### 7.8 Attempts, timeouts, and command skipping
+
+| Event | Required behavior |
+| --- | --- |
+| Issue submission fails completed validation | Return check output to executor; allow three total issue attempts: initial attempt plus two repairs |
+| Agent gets stuck or times out | Stop that attempt and retry from reconciled saved work; consumes the same three-attempt budget |
+| Issue exhausts attempts | Block issue and dependents, continue independent work, request user intervention |
+| Validation check times out | Terminate its owned process tree, skip that check ID for the remainder of the feature run, and record the omission |
+| Every validation check is skipped | Continue execution and review; report missing automated validation and never label it fully verified |
+| Setup or startup times out | Do not skip; retry within the affected task's attempt budget, then block affected work |
+| Check exits nonzero | Treat as a failure, not as a timeout or a reason to disable it |
+
+The skip list is run-local, applies to later issues and review validation, and never modifies approved JSON. Future features try the commands again. Skipping a validation command must not skip environment cleanup or secretly remove another check.
+
+Implementation default: command timeouts are explicit in the approved JSON, with a suggested ten minutes for ordinary checks and configurable longer setup budgets. Agent attempts default to a configurable thirty-minute deadline. These durations were not prescribed by the user and must be visible in configuration.
+
+### 7.9 Final reviewers and repair loop
+
+After all issues integrate, run a code reviewer and a functional reviewer in separate sessions against the same feature commit. Keep that commit stable while both review it.
+
+- The code reviewer checks correctness, security, regressions, and approved requirements.
+- The functional reviewer derives a checklist from PRD and issue acceptance criteria. It uses agent-browser for relevant UI behavior and HTTP requests for relevant backend behavior against the local feature environment.
+- Record evidence for each applicable criterion. A criterion that cannot be tested is unverified, not passed.
+- Blocking findings are bugs, security issues, failing behavior, or unmet acceptance criteria. Optional style and refactoring suggestions do not block completion.
+
+Consolidate blocking findings into dedicated repair tasks. Each repair task receives finding evidence, affected issue context, and acceptance criteria, and uses a new worktree, TDD, the merger, and configured checks. Repair tasks have the same three-attempt execution budget as ordinary issues.
+
+Allow three total review rounds: initial review, repairs and second review, then repairs and third review. If round three still has blocking findings, stop automatic repairs and request intervention. Do not accidentally implement three additional repair-and-review rounds after the initial review.
+
+If a repair executor disputes a finding, return its evidence to the originating reviewer. The reviewer can withdraw the finding or retain it with justification. Unresolved findings remain blocking within the same bounded loop; discussion cannot create an unlimited retry path.
+
+If functional review cannot run after three attempts because of missing credentials, startup failures, or unavailable tools, finish as unverified and identify the blocker. These infrastructure attempts are separately tracked and do not grant extra rounds for fixing functional findings.
+
+### 7.10 Completion and reporting
+
+Leave the feature branch ready for the user. Do not merge into the target branch, push, or open a PR. The report in OpenCode and the dashboard includes:
+
+- Feature branch and final commit.
+- Completed, blocked, and repaired issues, with attempts used.
+- Reviewer results, acceptance-criterion evidence, and unresolved findings.
+- Every timed-out/skipped check and its impact on verification.
+- Functional-review blockers, if any.
+- Retained worktrees and cleanup failures.
+
+Missing validation produces qualified completion, not a green verified result. Unresolved implementation failures or confirmed blocking review findings remain unresolved; inability to run functional review is explicitly labeled unverified. Final review begins only after all planned issues integrate.
+
+### 7.11 Stage completion, questions, and attempts
+
+Each stage prompt specifies its completion tool. Ordinary assistant text cannot complete a stage. Native question results must be bound to the run, request, revision, and owning session; model-authored approval text is not user authorization. Duplicate or stale answers must not approve another revision.
+
+Completion calls from a wrong stage, session, or attempt cannot advance state. Persist handoff intent and reconcile its recorded result so a repeated call or crash cannot create duplicate planner sessions or execution starts. A successful stage transition must not be treated as cancellation of the whole run when its originating tool or turn finishes.
+
+PRD authoring and issue planning each have three total attempts: the initial attempt and up to two retries. Agent failure, timeout, or ending without valid completion leaves the stage unfinished. Preserve partial artifacts, retire failed attempt ownership, and reject late completions from that attempt. Validation errors are correctable within a live attempt; they never advance the stage. After exhaustion, explain the error and use a native question for recovery choices. Any user-authorized retry-budget reset is explicit and logged.
+
+If the native question capability is unavailable, report the blocker and keep the request pending. Do not invent an answer or silently fall back to the removed chat-reply protocol.
+
+### 7.12 Controls, recovery, and compatibility
+
+Keep status, pause, resume, stop, and previewed project removal. Pause stops new scheduling while owned operations settle. Stop cancels owned work and preserves recoverable artifacts. Removal preserves project code, Git history, feature branches, and retained workspaces and requires explicit approval under its existing safeguards.
+
+After an interruption during grilling, do not reconstruct or resume the interview from a transcript in a different context. Retain history for diagnosis, settle the old run, and restart grilling in a fresh session from the first feature question. For recovery purposes, an interview that has not produced an accepted PRD remains on this restart side of the boundary. Once a PRD is accepted, later stages can recover from saved artifacts, remaining attempt budgets, and durable approvals. Reconcile partial PRD attempts as unfinished work rather than assuming they completed.
+
+For supported later-stage recovery, inspect sessions, artifacts, commits, processes, and locks before resuming. Do not repeat successful handoffs or integrations or trust interrupted checks as passed. Resume must update control and session binding in a valid order; inactive-state rejection must not be mislabeled as a revision race.
+
+There is no backward compatibility. Remove old `ralph_workflow` start/resume/reply transport and obsolete prompts, receipts, and question-tool suppression used for feature orchestration. Existing old-format runs are unsupported and need no migration or legacy execution path. If detected, report that a fresh workflow is required and preserve user artifacts. This does not remove recovery for runs created by the new workflow.
+
+### 7.13 Dashboard and lifecycle
+
+Keep the dashboard read-only. Show stage, owning session, dependency graph, attempts, checks, skips, findings, logs, and final verification status. The OpenCode chat remains the interaction surface. Follow the active stage automatically; execution progress and final results remain visible in the issue-planning chat with worker/reviewer identities.
+
+The plugin owns orchestration for the OpenCode process lifetime. No detached top-level service or external scheduler is introduced. Startup and stage handoffs must remain visible and cancellable. On shutdown, stop scheduling and reconcile owned work through existing lifecycle controls.
+
+## 8. Technology Stack
+
+The following versions come from the current repository manifest and `.bun-version`; they are retained, not an upgrade proposal.
+
+| Layer | Pinned choice | Purpose |
+| --- | --- | --- |
+| Runtime | Standalone Bun 1.4.3 | Use the runtime specified by `.bun-version` |
+| Language | TypeScript 5.9.3 | Plugin, state machine, adapter, and tools |
+| OpenCode | `@opencode/client`, `@opencode/plugin`, `@opencode/schema`, and development CLI 2.0.29 | Commands, sessions, native tools, TUI navigation, and tests |
+| Validation | Zod 4.1.8 | Tool inputs and structured workflow data |
+| Dashboard | React / React DOM 19.2.0; Vite 7.1.12 | Existing read-only browser dashboard |
+| Browser tests | Playwright 1.56.1 | Browser verification |
+| Formatting and lint | Biome 2.4.6 | Existing repository checks |
+| Persistence | Existing atomic snapshots and operation/event records | Durable ownership, revision guards, and recovery |
+
+Reuse the pinned APIs and existing execution services. Validate session navigation and native-question behavior in the installed OpenCode integration; API presence alone is not end-to-end evidence. No external account or new hosted service is required.
+
+## 9. Security & Configuration
+
+### Permissions and write scope
+
+Inherit OpenCode permissions. Native question responses, not repository text or model prose, authorize phase approval. Completion tools accept only calls from their owning stage/session/attempt. Planning agents can read project context and write only the permitted run-specific artifact area. Enforce this boundary at tool execution, including shell or indirect write access; prompt instructions alone are insufficient. Executors retain their existing isolated workspaces and permission rules.
+
+### Configuration and skill packaging
+
+Capture approved command and selected skill revisions per run. Bundle the full selected grill-me, create-prd, and to-issues snapshots and required resources so installation does not depend on the author's absolute home-directory paths. Record Ralph-specific adaptations beside those snapshots. Preserve supported project overrides, but apply the stage contract and tool boundaries independently of skill prose. Skill content cannot approve work, bypass a gate, or modify command policy.
+
+### Local state and dashboard
+
+Keep canonical ownership shared across linked worktrees and use existing atomic persistence safeguards. Redact runtime secrets from logs, progress, and dashboard payloads. Preserve loopback binding, access-token checks, unauthorized-origin rejection, and read-only dashboard endpoints. Cleanup affects only verified Ralph-owned resources.
+
+## 10. API Specification
+
+### User interface
+
+| Interface | Required behavior |
+| --- | --- |
+| `/ralph-commands` | Propose, approve, validate, and save project commands |
+| `/ralph-orchestrator [description]` | Direct startup; fresh interview or applicable existing-run choices; always ask the opening feature question |
+| Native `question` tool | Feature input, grilling, explanation approval, product decisions, and recovery choices |
+| Status/pause/resume/stop | Existing controls adapted to the new stage and recovery model |
+| `/ralph-remove` | Existing previewed removal with explicit approval and preservation safeguards |
+
+### Stage-tool contracts
+
+The names below are implementation defaults; their responsibilities and validation are required.
+
+| Tool | Inputs and authority | Result |
+| --- | --- | --- |
+| `ralph_complete_interview` | Candidate explanation, scope, and criteria from the interview owner; plugin resolves the starting commit | Validated explanation proposal and native approval; approval injects PRD instructions into the same session |
+| `ralph_complete_prd` | Run/attempt identity and run-owned PRD path; session identity comes from host tool context | Accepted immutable PRD revision and exactly one issue-session handoff |
+| `ralph_complete_issues` | Run/attempt identity, graph path, and local issue references | Validated accepted issue bundle and exactly one execution handoff |
+
+Tools must not accept caller-supplied user approval or a caller-supplied owning session as authority. Return accepted, correctable-invalid, stale/already-completed, or blocked outcomes with actionable details. Once accepted, compare later calls against the recorded completion; they cannot replace artifacts and replay authorization.
+
+### Execution authorization
+
+Record user authorization against the explanation revision/hash, request and response identity, pinned commit, and command revision. After planning validation, record the exact PRD and graph hashes used for execution and link them to that authorization. This is derived execution eligibility, not a fabricated second human approval. Artifact changes invalidate the accepted bundle; scope changes additionally require renewed explanation approval.
+
+### Dashboard API
+
+Retain the existing read-only run, issue, event, and log interfaces. Extend snapshots with current stage/session and planning attempt information as needed. Do not introduce browser mutations or approval endpoints.
+
+## 11. Success Criteria
+
+### Functional acceptance
+
+- ✅ The installed command opens the fresh interview without asking the current assistant to call a workflow-start tool.
+- ✅ Initial interview context contains the full grill-me skill and no Ralph-injected PRD, issue, or execution instructions.
+- ✅ The first native question always asks for the feature, including when a description was supplied.
+- ✅ Every substantive interview question includes a recommendation and uses repository exploration for discoverable facts.
+- ✅ The feature explanation follows ASD-STE100 writing instructions and the approval shows the pinned SHA and automatic-execution authorization.
+- ✅ PRD instructions appear only after human approval and in the same session.
+- ✅ A valid PRD completion opens and focuses one fresh issue session with explicit artifact context.
+- ✅ Issue planning preserves the full skill's research depth while omitting its breakdown-review gate.
+- ✅ Valid issue completion starts execution automatically; invalid graphs never start workers.
+- ✅ New product scope cannot proceed without revised explanation approval.
+- ✅ Interrupted grilling restarts fresh; later-stage recovery preserves accepted artifacts and avoids duplicate work.
+- ✅ Old runs need no migration and old orchestration transport is removed.
+- ✅ Existing execution and final-review guarantees continue to pass.
+
+### Required verification scenarios
+
+1. Installed-plugin happy path from approved setup through native interview, same-session PRD, fresh issues, automatic execution, and final report.
+2. Missing setup, existing supported run, unsupported old run, and settled stop-and-restart behavior.
+3. Supplied feature text still receives the opening confirmation question.
+4. Rejected explanation, revised explanation, fabricated approval, duplicate answer, stale request, and wrong-session response.
+5. Wrong-stage completion, invalid artifact path, unauthorized write, invalid PRD, missing issue file, duplicate ID, missing dependency, and cyclic graph.
+6. Duplicate completion and interruption at each persisted handoff boundary; exactly one downstream session or execution start.
+7. Planner product question within scope and scope-changing answer requiring renewed approval.
+8. Changed HEAD, command configuration, or accepted artifact before execution; no silent authorization reuse.
+9. PRD/planner failure, timeout, final message without completion, late completion, and exhaustion after three attempts.
+10. Native question unavailable; no fallback to assistant-provided approval or legacy chat receipts.
+11. Interrupted grilling, accepted-PRD recovery, stale session binding, and inactive-run resume without misleading revision errors.
+12. Existing diamond scheduling, sequential candidate checks, failure budgets, timeout skipping, review repairs, and qualified completion regressions.
+
+### Validation commands and evidence
+
+Use standalone Bun 1.4.3 and pinned dependencies. Include `bun run test:status` for focused public-interface cycles and `bun run test` for full candidate integration and final validation. Run relevant `bun run typecheck`, `bun run lint`, `bun run build`, `bun run test:browser`, `bun run test:package`, and installed OpenCode smoke coverage. Build, browser, package, and test commands run sequentially within one checkout because they share generated assets. Do not weaken or change approved commands during a feature run.
+
+Use deterministic fake-host tests for state and tool contracts plus installed OpenCode tests for actual forms, navigation, completion handoffs, and visible progress. Distinguish a simulated pass from verified host behavior; retain platform evidence and disclose unavailable platform checks.
+
+## 12. Implementation Phases
+
+Estimates are engineering planning assumptions for this workflow replacement, not commitments or estimates for rebuilding the execution engine.
+
+| Phase | Goal and deliverables | Validation | Estimate |
+| --- | --- | --- | --- |
+| 1. Native startup and discovery | ✅ Direct command, fresh focused session, full grill-me skill, native questions, explanation approval, pinned commit | Startup and human-provenance integration tests; installed interview trial | 2–4 working days |
+| 2. Planning handoffs | ✅ Same-session full PRD skill, restricted artifact writes, completion tools, fresh full issue skill, automatic execution authorization | Stage contracts, artifact/graph rejection, duplicate handoffs, end-to-end planning | 3–5 working days |
+| 3. Recovery and visibility | ✅ Attempts, scope revisions, new-flow recovery boundary, stage navigation/progress, legacy-path removal | Failure injection, late calls, restart boundaries, stop/pause/resume tests | 2–4 working days |
+| 4. Validation and documentation | ✅ Execution regressions, installed plugin/package/browser evidence, PRD/README/compact wiki alignment | Required focused/full suites and relevant sequential package/host/platform checks | 2–4 working days |
+
+Expected range: 9–17 working days, subject to native-question integration and permission-boundary findings. Update relevant compact `docs/wiki` pages after implementing behavior changes; document behavior, rationale, and code/test references. Do not describe planned behavior as already implemented.
+
+## 13. Future Considerations
+
+A separate ASD-STE100 compliance checker, external issue synchronization, configurable extra approval gates, richer resource budgets, and optional publication may be considered later. None is implicit in this change. Legacy migration remains outside the requested work.
+
+## 14. Risks & Mitigations
+
+| Risk | Mitigation |
+| --- | --- |
+| Automatic execution exceeds approved intent | Make authorization explicit at explanation approval; bind the commit/configuration and require renewed approval for scope changes |
+| A handoff races cancellation or repeats after a crash | Persist transition identity, validate session/attempt ownership, and reconcile recorded effects before retrying |
+| Full skills conflict with deterministic orchestration | Preserve skill substance while explicitly adapting handoff, local-output, approval, and scope rules |
+| Artifact write access leaks into project implementation | Enforce stage-specific tools and filesystem boundaries; test direct and indirect writes |
+| Native forms/navigation differ from API assumptions | Use pinned OpenCode dependencies and verify the actual installed-plugin interaction, including cancellation and shutdown |
+
+## 15. Appendix
+
+### Confirmed decisions
+
+- Fresh interview; PRD in that same session; issues in a fresh session; follow each visible stage.
+- Always ask the initial feature question; all questions use the native tool.
+- Grilling ends when decisions are resolved, followed by an ASD-STE100 explanation and approval.
+- Full skills with explicit Ralph adaptations; planning agents write their stage artifacts.
+- Completion tools control validated handoffs; no issue review or second execution approval.
+- Pin the starting commit at explanation approval; ask again if it changes.
+- New product decisions pause the flow; scope changes require renewed approval.
+- Three total attempts for PRD and issue planning before recovery choices.
+- Restart interrupted grilling; recover later stages from accepted artifacts.
+- Require command setup first; preserve the existing execution engine.
+- No backward compatibility, migrations, or parallel legacy workflow.
+
+### Explicit defaults and assumptions
+
+- Tool names in section 10 are proposed names for the required stage interfaces.
+- Existing artifact layout, command names, concurrency, and execution/review budgets remain unless required integration work changes their representation.
+- A failed PRD attempt without an accepted PRD does not qualify for cross-context planning recovery.
+- Planning artifact handling must not make clean-checkout checks ignore unrelated user work.
+- This request produces the requirements document only; it does not implement the workflow or launch issue planning or execution.
+
+### Repository references
+
+- `src/plugin.ts` and `src/tui.ts`: command registration, native tool policy, and current TUI notifications.
+- `src/commands/chat-workflow.ts`: old start/resume/reply transport to replace.
+- `src/planning/` and `src/state/run-store.ts`: planning state, artifact validation, revision guards, and recovery integration.
+- `src/opencode/native-input.ts`: existing native-question adapter to adapt and verify.
+- `skills/grill-me/`, `skills/create-prd/`, and `skills/to-issues/`: current shortened bundles to replace with full adapted snapshots.
+- `tests/integration/chat-workflow.test.ts` and existing planning/recovery/integration suites: current behavioral coverage to replace or extend.
+- `AGENTS.md`, `.bun-version`, and `package.json`: repository rules, runtime, pinned dependencies, and approved-check expectations.
+
+### Source skills
+
+The interview selected the complete local skills at `/Users/rwmmtzqy/.agents/skills/grill-me/SKILL.md`, `/Users/rwmmtzqy/.agents/skills/create-prd/SKILL.md`, and `/Users/rwmmtzqy/.agents/skills/to-issues/SKILL.md`. These are authoring sources; the distributed plugin must use bundled snapshots rather than depend on those absolute paths.
+
+Next step: review this PRD, then convert it into implementation issues when requested.
+
+exec
+/bin/zsh -lc "cat docs/wiki/features/workflow-recovery.md; cat src/planning/types.ts; cat src/execution/attempts.ts; cat tests/helpers/clock.ts; tail -55 ralph-logs/iter-1-21-bound-planning-attempts-and-reject-late-completions.log; tail -35 ralph-logs/iter-2-19-complete-issues-and-start-authorized-execution.log; rg --files /Users/rwmmtzqy/Documents /Users/rwmmtzqy/.agents -g '19-complete-issues-and-start-authorized-execution.md' 2>/dev/null" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ exited 1 in 366ms:
+# Workflow controls and recovery
+
+## Summary
+OpenCode registers pause/resume/stop commands and invokes reconciliation on restart.
+Recovery observes actual state, reports facts, and waits for explicit resume. Native orchestrator/resume invoke stage services directly; workers and reviewers keep their independent sessions and worktrees.
+
+## Key behavior
+- Native `/ralph-orchestrator` offers correlated existing-run choices through the native question adapter. A run without an accepted PRD offers fresh discovery or retention; accepted planning offers saved-stage resume, retention, and restart while execution has not begun. Unsupported protocols require a fresh workflow and are not migrated.
+- Pre-PRD recovery cancels and inspects unfinished interview/PRD jobs; it records settled unfinished work rather than requiring completion evidence for a draft that will not be accepted. Unconfirmed cancellation or busy/unknown sessions retain the blocker.
+- Discovery restart stops and inspects the recorded stage sessions before releasing the exact repository/run owner through a durable release intent/result. Cleanup uncertainty, foreign locks, pending operations and execution work block release. History, drafts and worktrees remain; released runs cannot resume. A fresh interview starts with its opening question and empty transcript.
+- Native `/ralph-resume` continues saved stage ownership directly. Reactivation precedes guarded planning writes; it does not rebind a native owner into the invoking chat. Accepted PRD/graph intents finish immutable publication and the necessary handoff or execution boundary. Execution continuation occurs once when acceptance finalization already started it. Resuming completed integrations can collect the existing executor turn for final-review evidence; this observation must not create or prompt another worker.
+- Reconciliation verifies accepted PRD bytes and scope authorization, repository ownership and stable host prompt receipts. A supported live authoring attempt with correlated delivery retains its owner and remaining budget through recovery freeze; stopped/blocked owners stay retired. Unknown delivery evidence blocks repeated dispatch. Recovery remains observational until explicit resume.
+- Native PRD and issue authoring each allow three total attempts per approved stage, independent of issue/review budgets. Only accepted completion tools advance the stage. A settled turn with final prose, failed turn, or active-time timeout consumes an attempt; correctable completion validation stays in the live attempt.
+- Authoring attempts persist the owning session, prompt identity, draft root, captured remaining active-time budget and terminal result. Pending product/approval questions, direct native question tools and pause suspend the deadline. The injected planning clock supports deterministic deadline checks.
+- Failure retires tool authority before cancelling the recorded planning job. Retry requires confirmed cancellation and an idle/missing inspected owner; missing PRD interview sessions require intervention. PRD retries retain the same interview session; issue retries use reconciled fresh sessions. Each retry writes a separate draft namespace and receives accepted inputs, decision history, prior draft paths and the failure reason. Retired sessions retain their planning tool restrictions.
+- Exhaustion retains the blocker and native recovery request. Only a correlated real native “Reset budget and retry” answer grants another three attempts, with answer provenance recorded in `budgetResets`; “Stop” stops the run. Unavailable native input leaves the request pending and publishes its diagnostic. Stop/pause racing cancellation cannot allocate another attempt. Accepted completion atomically terminates the planning job, so its later turn settlement cannot cancel execution or consume another attempt. Authorized scope transitions retire superseded authoring jobs without aborting the continuing session; obsolete jobs cannot block final review.
+- `/ralph-remove` previews deletion of the checkout's `.ralph` and repository-shared saved workflow state. A new user approval is required. It checks the unchanged preview under setup/write locks and refuses active/unsettled jobs or uncertain live processes. It preserves code, branches and workspaces, including unregistered retained workspace directories. Linked-worktree scope is disclosed. Live host bookkeeping remains while the plugin is loaded, allowing a later setup in the same session.
+- `/ralph-resume` and `ralph_control` share the typed router resume service. Without an ID, it selects the latest feature ahead of unrelated setup records. `--base <commit>`/`selectedCommit` requests renewed explanation authorization; `--review`/`review` retains explicit review-only retry after terminal ownership release. Options cannot be combined, and unknown flags are rejected.
+- Native resume drives the saved phase; it does more than flip the control flag. Pending planning, failed baseline retry, scheduling, and automatic review continuation retain approvals and attempt budgets.
+- Pause rejects new jobs and suspends review scheduling while current jobs settle. Production executor submissions retain their attempt identity; mergers and successful in-flight checks wait at the next scheduling/ref boundary rather than becoming failed retries. Each resumed in-flight boundary rechecks the original epoch so stop followed by resume cannot revive a stale callback.
+- Stop cancels bound sessions, owned processes and registered environments with bounded cleanup. Late job results cannot advance stopped runs.
+- Process ownership requires PID birth identity, owner token, repository and workspace. Owned wrappers watch parent liveness; the dashboard stays in the plugin process.
+- Recovery shares the Git common-directory store across worktrees. Already advanced integration intents require exact SHA/check revision evidence and record completion once. Ambiguous operations block resume; validation without output never passes.
+- Stop retains existing recovery/cleanup blockers, including repeated stops. Resume cannot race pending stop cleanup. Reconciliation must resolve retained ambiguity.
+- Recovery binds production validation to the exact merger envelope, candidate, command hash/revision and approval. It restores the accepted issue result even if the ref or operation result was written before a crash. A proven old index/clean worktree is synchronized with a safe two-tree merge; local changes block recovery.
+- Review counters, attempt identities, approvals and artifact revisions are retained; controls do not reset budgets. Native resume preserves the stage owner and correlated unanswered questions.
+- Recovery holds a pending control marker through inspection and checks its epoch/revision before publishing. It verifies logical active-run lock identity and the latest accepted refs; uncertain execution/merge/repair completion blocks instead of repeating dispatch.
+- An executing attempt with no submission/candidate can be recovered as a consumed failure only after a matching cancelled job, completed abort, idle/missing exact session and proven environment cleanup. Work and attempt history remain available to the next explicit retry. Busy, unknown or mismatched sessions stay blocked.
+- Journal locks are replaced only after inspecting their recorded owner birth identity. Missing or corrupt owner evidence does not authorize replacement.
+
+- Ordinary-chat feature receipts and question suppression are removed. `ralph_control resume`, router and slash commands use native stage services. Setup saving and previewed removal retain separate approval semantics; removal receipts are owned by `src/commands/removal-approval.ts`. Unsupported records require fresh workflow creation without migration or deleting their artifacts.
+
+## Code references
+- `src/commands/orchestrator.ts`, `src/commands/resume.ts`, `src/plugin.ts` — native existing-run selection, fresh restart and saved-stage continuation.
+- `src/state/active-run.ts`, `src/commands/control.ts`, `src/state/run-store.ts` — matching stopped-planning release, inspected stage cancellation and guarded reactivation.
+- `tests/integration/14-recovery.test.ts` — native first-question restart, uncertain cleanup, foreign/released ownership, immutable PRD tampering, ambiguous prompt evidence, five PRD handoff crash boundaries and three issue acceptance/eligibility boundaries. Real temporary Git projects with deterministic fake-host evidence; not installed native UI proof.
+- `src/planning/generation.ts`, `src/planning/types.ts` — durable authoring attempts, bounded retries, native exhaustion recovery and injectable supervision clock.
+- `src/opencode/adapter.ts`, `src/plugin.ts` — prompt-specific turn inspection, owned cancellation, native question waits, periodic supervision and retired-session tool confinement.
+- `src/planning/completion.ts`, `src/planning/artifact-writer.ts`, `src/state/run-store.ts` — revision-checked acceptance/writes, retirement rejection and terminal planning jobs before downstream handoffs.
+- `tests/integration/04-planning.test.ts` — real Git/fake-host cases for three-attempt exhaustion/reset, retained drafts, correctable validation, suspended deadlines, uncertain cancellation, stop/pause races and accepted handoffs. These are deterministic host fixtures, not proof of live native UI behavior.
+- `src/commands/remove-project.ts` — previewed project removal preserving code/branches/worktrees.
+- `src/tui.ts`, `tests/integration/tui-input.test.ts` — stage navigation and status TUI without custom answer dialogs.
+- `tests/integration/chat-workflow.test.ts`, `tests/integration/remove-project.test.ts`, `tests/smoke/opencode.test.ts` — absence of legacy registration, native question availability, unsupported resume rejection and preserved removal approval. Smoke evidence is separate and historical.
+- `src/commands/resume.ts`, `src/plugin.ts` — native resume continuation and guarded starting-commit selection.
+- `src/commands/control.ts` — dispatch gates and bounded stop cleanup.
+- `src/recovery/reconcile.ts`, `src/state/run-store.ts` — facts, guarded recovered-attempt writes and idempotent operation reconciliation.
+- `src/git/worktrees.ts` — safe synchronization after a ref update interrupted checkout synchronization.
+- `src/core/orchestrator.ts`, `src/execution/execute-issue.ts`, `src/execution/integrate-issue.ts`, `src/execution/validation.ts`, `src/commands/router.ts` — production pause boundaries and resumed question publication.
+- `src/process/ownership.ts`, `src/process/owned-child.ts` — owned process inspection and parent monitoring.
+- `src/plugin.ts`, `src/state/host-lease.ts` — filesystem host lease shared across isolated OpenCode location modules; only first activation recovers and last disposal stops work. Another live host fails closed; dead birth identities permit recovery.
+- `tests/integration/14-recovery.test.ts` — real Git recovery and lifecycle regressions.
+
+## Related
+- [Bounded review repairs](bounded-review-repairs.md)
+- [Validation evidence](../../recovery-validation.md)
+
+## Notes
+Question/approval persistence and executor/validation recovery have public-fixture coverage. Native feature input uses the host question tool; the obsolete chat transport and second execution approval have been deleted. The automatic review handoff reconstructs its approved lifecycle after explicit resume. Ambiguous publication, cleanup and repair operations stay blocked. Native Linux/Windows process trees and interactive live shutdown still require separate evidence.
+
+## Last updated
+2026-10-16
+
+Issue 15 package testing found that a recovery toast awaited during plugin initialization deadlocked the real host. Startup now records reconciliation first and defers the SDK notification to the next event-loop turn; disposal cancels pending notifications. See `src/plugin.ts` and `tests/integration/15-package.test.ts`.
+
+Plugin disposal finishes its host lease even if dashboard shutdown fails. Dashboard shutdown tolerates a listener already closed by OpenCode, preventing a stale closing lease from blocking the next activation.
+import type { Failure, JobEnvelope, UserInputRequest } from "../core/types.js";
+export interface PlanningState {
+  protocol?: "native-interview-v1";
+  owner?: {
+    stage: "interview" | "prd" | "issues";
+    sessionId: string;
+    attempt: number;
+    retired?: boolean;
+  };
+  nativeQuestions?: string[];
+  attempts?: {
+    stage: "prd" | "issues";
+    attempt: number;
+    sessionId: string;
+    job: JobEnvelope;
+    messageId: string;
+    prompt: string;
+    draftRoot: string;
+    remainingMs: number;
+    controlEpoch: number;
+    observedAt?: number;
+    suspended?: boolean;
+    status: "active" | "retired" | "accepted";
+    reason?: Failure;
+  }[];
+  budgetResets?: {
+    stage: "prd" | "issues";
+    afterAttempt: number;
+    explanationRevision: number;
+    answer: Extract<import("../core/types.js").UserInputResult, { ok: true }>;
+  }[];
+  phase:
+    | "interview"
+    | "explanation_approval"
+    | "explanation_approved"
+    | "prd_generation"
+    | "issue_generation"
+    | "execution_approval"
+    | "execution_approved";
+  revisionProposal?: { text: string; scope: string[]; criteria: string[] };
+  history?: {
+    explanation?: PlanningState["explanation"];
+    approval?: PlanningState["approval"];
+    prd?: PlanningState["prd"];
+    graph?: PlanningState["graph"];
+    executionEligibility?: PlanningState["executionEligibility"];
+  }[];
+  decisions?: {
+    stage: "prd" | "issues";
+    attempt: number;
+    request: UserInputRequest;
+    answer?: Extract<import("../core/types.js").UserInputResult, { ok: true }>;
+    revisedExplanation?: { text: string; scope: string[]; criteria: string[] };
+  }[];
+  scopeChange?: {
+    issueId: string;
+    requestId: string;
+    affectedIssueIds: string[];
+    integratedIssueIds: string[];
+    previousPrd: NonNullable<PlanningState["prd"]>;
+    previousGraph: NonNullable<PlanningState["graph"]>;
+    previousApproval: NonNullable<PlanningState["executionEligibility"]>;
+    prepared?: boolean;
+  };
+  selectedCommit?: string;
+  publication?: {
+    jobId: string;
+    name: string;
+    hash: string;
+    status: "intent" | "completed";
+  };
+  prdAcceptance?: {
+    sessionId: string;
+    attempt: number;
+    path: string;
+    text: string;
+    revision: ArtifactRevision;
+  };
+  managedArtifacts?: Record<string, string>;
+  issueAcceptance?: {
+    sessionId: string;
+    attempt: number;
+    graph: NonNullable<PlanningState["graph"]>;
+    result?: { outcome: "accepted"; graph: ArtifactRevision };
+  };
+  issueHandoff?: {
+    jobId: string;
+    attempt: number;
+    prd: ArtifactRevision;
+    prompt: string;
+    messageId: string;
+    sessionId?: string;
+    creationStarted?: boolean;
+    queued?: boolean;
+    focused?: boolean;
+  };
+  prd?: ArtifactRevision;
+  graph?: ArtifactRevision & {
+    order: string[];
+    value: import("./graph.js").IssueGraph;
+    files: Record<string, string>;
+  };
+  executionEligibility?: {
+    explanationHash?: string;
+    commandHash?: string;
+    commandRevision?: number;
+    revision: number;
+    selectedCommit?: string;
+    prdHash: string;
+    graphHash: string;
+    requestId: string;
+    messageId: string;
+    timestamp: string;
+  };
+  sessionId: string;
+  workspace: string;
+  feature: string;
+  commandHash: string;
+  settings: {
+    concurrency: number;
+    timeoutMs: number;
+    agentTimeoutMs?: number;
+    models: Record<string, NonNullable<JobEnvelope["model"]>>;
+    skills: Record<string, { path: string; hash: string }>;
+  };
+  transcript: {
+    source: "user" | "interviewer";
+    text: string;
+    messageId?: string;
+    requestId?: string;
+    revision?: number;
+  }[];
+  turn: number;
+  explanation?: {
+    revision: number;
+    hash: string;
+    text: string;
+    scope: string[];
+    criteria: string[];
+  };
+  approval?: {
+    sha?: string;
+    branch?: string;
+    commandHash?: string;
+    commandRevision?: number;
+    sessionId?: string;
+    timestamp?: string;
+    revision: number;
+    hash: string;
+    messageId: string;
+    requestId: string;
+  };
+  proposalContext?: {
+    sha: string;
+    branch: string;
+    commandHash: string;
+    commandRevision: number;
+  };
+  prdDelivery?: { id: string; text: string; status: "intent" | "queued" };
+  pending?: UserInputRequest;
+  error?: Failure;
+}
+
+export interface ArtifactRevision {
+  revision: number;
+  hash: string;
+  artifactPath: string;
+}
+import type { JobEnvelope, JobResult } from "../core/types.js";
+import { gitOutput, inspectWorktree } from "../git/worktrees.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { terminateOwnedProcess } from "../process/ownership.js";
+import type { RunStore } from "../state/run-store.js";
+import type { IssueAttempt } from "./execute-issue.js";
+
+export interface AttemptPolicy {
+  maxAttempts: 3;
+}
+export const attemptPolicy: Readonly<AttemptPolicy> = Object.freeze({
+  maxAttempts: 3,
+});
+export function beginAttempt(previous?: IssueAttempt): number {
+  const number = (previous?.attempt ?? 0) + 1;
+  if (number > attemptPolicy.maxAttempts)
+    throw new Error("Issue attempt budget exhausted");
+  return number;
+}
+export function exhaustIssue(attempt: IssueAttempt) {
+  attempt.status = "exhausted";
+}
+export function failAttempt(attempt: IssueAttempt) {
+  if (["permission-denied", "cancelled"].includes(attempt.error?.code ?? "")) {
+    attempt.status = "waiting";
+    return;
+  }
+  if (attempt.attempt >= attemptPolicy.maxAttempts) exhaustIssue(attempt);
+  else attempt.status = "failed";
+}
+export function repairContext(previous?: IssueAttempt) {
+  if (!previous) return undefined;
+  const { history: _history, ...evidence } = previous;
+  return evidence;
+}
+
+export interface Clock {
+  now?(): number;
+  schedule(ms: number, callback: () => void): () => void;
+}
+export const systemClock: Clock = {
+  schedule(ms, callback) {
+    const timer = setTimeout(callback, ms);
+    return () => clearTimeout(timer);
+  },
+};
+export interface AttemptOptions {
+  clock?: Clock;
+}
+/** Cancellation is acknowledged before the caller can allocate a repair. */
+export async function dispatchAttempt(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  job: JobEnvelope,
+  timeoutMs: number,
+  options: AttemptOptions,
+): Promise<JobResult> {
+  const clock = options.clock ?? systemClock;
+  const timeout = Symbol("deadline");
+  let dispose = () => {};
+  const deadline = new Promise<typeof timeout>((resolve) => {
+    dispose = clock.schedule(timeoutMs, () => resolve(timeout));
+  });
+  try {
+    const result = await Promise.race([adapter.dispatchJob(job), deadline]);
+    if (result !== timeout) return result;
+    const entry = (await store.getRun(job.runId))?.jobs[job.jobId];
+    const cancelled = entry
+      ? await adapter.cancelJob(entry.envelope)
+      : { ok: false };
+    return {
+      ...(entry?.envelope ?? job),
+      outcome: "failed",
+      evidence: [`${job.role} deadline ${timeoutMs}ms exceeded`],
+      error: {
+        code: cancelled.ok ? "agent-timeout" : "cancelled",
+        message: cancelled.ok
+          ? `${job.role} deadline exceeded (${timeoutMs}ms); owned job cancelled`
+          : "Agent deadline exceeded; cancellation was not confirmed. Intervention required",
+      },
+    };
+  } catch (cause) {
+    const entry = (await store.getRun(job.runId))?.jobs[job.jobId];
+    if (entry && entry.status !== "terminal") {
+      const cancelled = await adapter.cancelJob(entry.envelope);
+      if (!cancelled.ok)
+        return {
+          ...entry.envelope,
+          outcome: "cancelled",
+          evidence: [],
+          error: {
+            code: "cancelled",
+            message:
+              "Dispatch failed and owned agent cancellation was not confirmed",
+            cause: String(cause),
+          },
+        };
+    }
+    throw cause;
+  } finally {
+    dispose();
+  }
+}
+
+/** Retain failed work; verify its ownership and describe current saved facts. */
+export async function reconcileAttempt(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  previous: IssueAttempt,
+) {
+  const run = await store.getRun(previous.job.runId);
+  if (!run) throw new Error("Missing retry run");
+  for (const entry of Object.values(run.jobs).filter(
+    (entry) =>
+      entry.envelope.issueId === previous.issueId &&
+      entry.envelope.attempt === previous.attempt &&
+      entry.status !== "terminal",
+  )) {
+    const cancelled = await adapter.cancelJob(entry.envelope);
+    if (!cancelled.ok)
+      throw new Error("Owned agent cancellation was not confirmed");
+  }
+  const work: {
+    workspace: string;
+    commit: string;
+    branch: string;
+    changes: string;
+  }[] = [];
+  for (const operation of Object.values(run.operations).filter(
+    (op) =>
+      op.job.issueId === previous.issueId &&
+      op.job.attempt === previous.attempt,
+  )) {
+    if (
+      operation.ownedProcess &&
+      !(await terminateOwnedProcess(operation.ownedProcess))
+    )
+      throw new Error("Owned command cleanup was not confirmed");
+    if (
+      !["issue.workspace", "candidate.workspace"].includes(operation.kind) ||
+      operation.status !== "completed"
+    )
+      continue;
+    if (
+      run.operations[`${operation.operationId}-cleanup`]?.status === "completed"
+    )
+      continue;
+    const found = await inspectWorktree(operation.job.workspace);
+    if (
+      found.repositoryId !== store.repositoryId ||
+      found.branch !== operation.ref
+    )
+      throw new Error("Retained retry workspace identity changed");
+    work.push({
+      workspace: found.workspace,
+      commit: found.commit,
+      branch: found.branch,
+      changes: await gitOutput(found.workspace, [
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+      ]),
+    });
+  }
+  return work;
+}
+import type { Clock } from "../../src/execution/attempts.js";
+export function controllableClock() {
+  let now = 0;
+  const timers = new Set<{ due: number; callback: () => void }>();
+  const clock: Clock = {
+    now: () => now,
+    schedule(ms, callback) {
+      const timer = { due: now + ms, callback };
+      timers.add(timer);
+      return () => {
+        timers.delete(timer);
+      };
+    },
+  };
+  return {
+    clock,
+    get pending() {
+      return timers.size;
+    },
+    advance(ms: number) {
+      now += ms;
+      for (const timer of [...timers])
+        if (timer.due <= now) {
+          timers.delete(timer);
+          timer.callback();
+        }
+    },
+  };
+}
+export async function eventually(predicate: () => boolean | Promise<boolean>) {
+  for (let i = 0; i < 1000; i++) {
+    if (await predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("Fixture did not reach expected state");
+}
+(pass) removal requires a new chat approval, clears state and allows setup again while preserving code and branches [163.41ms]
+(pass) a changed removal preview or active job prevents deletion [104.31ms]
+(pass) removal unlinks a configuration symlink without traversing its target [129.50ms]
+
+tests/integration/07-retries.test.ts:
+
+codex
+Removal safeguards passed too: changed previews and active jobs still prevent deletion. The full suite is continuing through execution retries and packaging, with no failures reported.
+exec
+/bin/zsh -lc "tail -8 /tmp/ralph21-full.log; rg -n '\\(fail\\)|Ralph planning supervision failed' /tmp/ralph21-full.log" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ exited 1 in 0ms:
+(pass) a non-secret boolean environment reference does not make the proposal contain a secret [234.39ms]
+(pass) setup status identifies verification as running while an approved command waits for permission [228.27ms]
+(pass) invalid discovery JSON is repaired within three read-only attempts before exact native approval [77.05ms]
+(pass) invalid discovery proposals stop after three attempts without approval or command execution [73.69ms]
+(pass) interrupting approved setup terminates its running check and still performs cleanup [246.64ms]
+
+tests/integration/15-package.test.ts:
+(pass) the distributable has no dependency on a developer-local copy of itself [0.36ms]
+
+codex
+The execution retry and setup checks passed. The suite is now running the distributable-package checks; no failures have been reported.
+ succeeded in 391042ms:
+Checked 3 files in 63ms. Fixed 3 files.
+1.4.3
+$ tsc --noEmit
+$ biome check src tests scripts
+Checked 119 files in 75ms. No fixes applied.
+
+exec
+/bin/zsh -lc "tail -9 /tmp/ralph21-full.log; rg -n '\\(fail\\)|Ralph planning supervision failed' /tmp/ralph21-full.log" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ exited 1 in 0ms:
+
+1 tests skipped:
+(skip) real agent-browser submits committed fixture form and retains screenshot
+
+ 301 pass
+ 1 skip
+ 0 fail
+ 1973 expect() calls
+Ran 302 tests across 22 files. [318.95s]
+
+codex
+Implemented three-attempt planning retries, retained drafts, retired-owner rejection, suspended deadlines, and explicit native recovery choices. Native Stop uses bounded cleanup.
+
+Validation passed: typecheck, lint, 94 focused tests, 14 status tests, and 301 full-suite tests; one browser test skipped.
+
+Wiki updated: [workflow recovery](/Users/rwmmtzqy/Documents/opencode-ralph-plugin/docs/wiki/features/workflow-recovery.md).
+tokens used
+233,211
+Implemented three-attempt planning retries, retained drafts, retired-owner rejection, suspended deadlines, and explicit native recovery choices. Native Stop uses bounded cleanup.
+
+Validation passed: typecheck, lint, 94 focused tests, 14 status tests, and 301 full-suite tests; one browser test skipped.
+
+Wiki updated: [workflow recovery](/Users/rwmmtzqy/Documents/opencode-ralph-plugin/docs/wiki/features/workflow-recovery.md).
+          r.path.endsWith("/synthetic") &&
+          String(r.body.text).includes('"outcome": "verified"'),
+      ) &&
+      Date.now() < deadline
+    )
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    const progress = f.fake.requests.filter(
+      (r) =>
+        r.path.endsWith("/synthetic") &&
+        r.body.description === "Ralph workflow progress",
+    );
+    expect(
+      progress.some(
+        (r) =>
+          r.path === `/api/session/${f.state.sessionId}/synthetic` &&
+          String(r.body.text).includes('"outcome": "verified"'),
+      ),
+    ).toBe(true);
+    expect(progress.every((r) => r.body.resume === false)).toBe(true);
+    expect(progress.some((r) => String(r.body.text).includes("selected"))).toBe(
+      true,
+    );
+    expect(progress.some((r) => String(r.body.text).includes("executor"))).toBe(
+      true,
+    );
+
+codex
+Already completed in the prior iteration. The implementation, behavior tests, and wiki cover automatic execution, derived authorization, exact-input checks, and managed artifacts.
+
+Prior validation recorded 280 passed, 1 skipped. No files changed or tests rerun.
+tokens used
+31,867
+Already completed in the prior iteration. The implementation, behavior tests, and wiki cover automatic execution, derived authorization, exact-input checks, and managed artifacts.
+
+Prior validation recorded 280 passed, 1 skipped. No files changed or tests rerun.
+
+exec
+/bin/zsh -lc "sed -n '1470,1628p' tests/integration/04-planning.test.ts; sed -n '1630,1795p' tests/integration/04-planning.test.ts; rg -n 'retired|attempt|accepted' src/planning/completion.ts src/planning/artifact-writer.ts | head -45; sed -n '1,40p' docs/wiki/features/workflow-recovery.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+  }
+});
+
+for (const stage of ["prd", "issues"] as const) {
+  test(`native ${stage} prose consumes three attempts, retains drafts and requires explicit budget reset`, async () => {
+    const f =
+      stage === "prd" ? await nativePrdFixture() : await nativeIssueFixture();
+    try {
+      const { supervisePlanning } = await import(
+        "../../src/planning/generation.js"
+      );
+      const { eventually } = await import("../helpers/clock.js");
+      f.host.tools.set("question", {
+        ...required(f.host.tools.get("question")),
+        async execute() {
+          return { content: "", metadata: {} };
+        },
+      });
+      if (stage === "prd") await f.write("partial draft");
+      f.adapter.inspectPlanningTurn = async () => "settled";
+      f.adapter.inspectSession = async () => "idle";
+      f.adapter.requestUserInput = async () => ({
+        ok: false,
+        error: { code: "unsupported", message: "No native input" },
+      });
+      for (let i = 0; i < 3; i++)
+        await eventually(async () => {
+          await supervisePlanning(f.store, f.adapter, f.run.runId, i * 100);
+          const state = (await f.store.getRun(f.run.runId))?.planning;
+          return i === 2
+            ? state?.pending?.kind === "planning-recovery"
+            : state?.owner?.attempt === i + 2;
+        });
+      const state = required((await f.store.getRun(f.run.runId))?.planning);
+      expect(state.attempts?.filter((a) => a.stage === stage)).toHaveLength(3);
+      expect(state.owner?.retired).toBe(true);
+      expect(state.pending?.kind).toBe("planning-recovery");
+      expect(state.prd?.revision ?? 0).toBe(stage === "prd" ? 0 : 1);
+      await expect(
+        required(f.host.tools.get("ralph_write_planning_file")).execute(
+          {
+            runId: f.run.runId,
+            attempt: 3,
+            path: stage === "prd" ? "PRD.md" : "graph.json",
+            content: "late",
+          },
+          {
+            sessionID: state.sessionId,
+            signal: new AbortController().signal,
+          } as never,
+        ),
+      ).rejects.toThrow();
+      if (stage === "prd")
+        expect(
+          await readFile(
+            join(
+              f.project.directory,
+              `.ralph/features/${f.run.runId}/prd-draft-1/PRD.md`,
+            ),
+            "utf8",
+          ),
+        ).toBe("partial draft");
+      await supervisePlanning(f.store, f.adapter, f.run.runId, 400);
+      expect(
+        (await f.store.getRun(f.run.runId))?.planning?.attempts,
+      ).toHaveLength(state.attempts?.length ?? 0);
+      f.adapter.requestUserInput = async (request) => {
+        f.adapter.inspectSession = async () => "busy";
+        return {
+          ok: true,
+          ...request,
+          source: "user",
+          messageId: "explicit-reset",
+          text: "Reset budget and retry",
+        };
+      };
+      await eventually(async () => {
+        await supervisePlanning(f.store, f.adapter, f.run.runId, 500);
+        return (
+          (await f.store.getRun(f.run.runId))?.planning?.budgetResets?.at(-1)
+            ?.answer.messageId === "explicit-reset"
+        );
+      });
+      const waiting = required((await f.store.getRun(f.run.runId))?.planning);
+      expect(waiting.owner?.attempt).toBe(3);
+      expect(waiting.owner?.retired).toBe(true);
+      f.adapter.inspectSession = async () => "idle";
+      await eventually(async () => {
+        await supervisePlanning(f.store, f.adapter, f.run.runId, 500);
+        return (
+          (await f.store.getRun(f.run.runId))?.planning?.owner?.attempt === 4
+        );
+      });
+      const reset = required((await f.store.getRun(f.run.runId))?.planning);
+      expect(reset.budgetResets?.at(-1)?.answer.messageId).toBe(
+        "explicit-reset",
+      );
+      expect(reset.owner?.attempt).toBe(4);
+      expect(reset.owner?.retired).toBeUndefined();
+      if (stage === "prd") expect(reset.sessionId).toBe(state.sessionId);
+    } finally {
+      if ("cleanup" in f && typeof f.cleanup === "function") await f.cleanup();
+      else {
+        if (typeof f.dispose === "function") await f.dispose();
+        await f.project.cleanup();
+      }
+    }
+  });
+}
+
+test("native planning deadline suspends for product questions, direct native questions and pause", async () => {
+  const f = await nativePrdFixture();
+  try {
+    const { supervisePlanning, setPlanningQuestionWaiting } = await import(
+      "../../src/planning/generation.js"
+    );
+    const { handleControlCommand } = await import(
+      "../../src/commands/control.js"
+    );
+    f.adapter.inspectPlanningTurn = async () => "running";
+    f.adapter.inspectSession = async () => "idle";
+    const initial = required(
+      (await f.store.getRun(f.run.runId))?.planning?.attempts?.at(-1),
+    );
+    const { controllableClock } = await import("../helpers/clock.js");
+    const timer = controllableClock();
+    const now = () =>
+      required(initial.observedAt) + required(timer.clock.now)();
+    const store = await openRunStore(f.project.directory, { now });
+    timer.advance(10);
+    await supervisePlanning(store, f.adapter, f.run.runId, now());
+    const remaining = initial.remainingMs - 110;
+    let settle:
+      | ((value: import("../../src/core/types.js").UserInputResult) => void)
+      | undefined;
+    f.adapter.requestUserInput = async () =>
+      new Promise((resolve) => {
+        settle = resolve;
+      });
+    const { requestProductDecision } = await import(
+      "../../src/planning/questions.js"
+    );
+    const work = requestProductDecision(
+      store,
+      f.adapter,
+      {
+        runId: f.run.runId,
+        attempt: 1,
+        question: "Which?",
+        recommendation: "One",
+      },
+      required(f.run.planning).sessionId,
+    );
+    const { eventually } = await import("../helpers/clock.js");
+    await eventually(() => !!settle);
+    timer.advance(initial.remainingMs * 2);
+    await supervisePlanning(store, f.adapter, f.run.runId, now());
+    const pending = required(
+      (await store.getRun(f.run.runId))?.planning?.pending,
+    settle?.({
+      ok: true,
+      ...pending,
+      source: "user",
+      messageId: "question-wait",
+      text: "One",
+    });
+    await work;
+    timer.advance(100);
+    await supervisePlanning(store, f.adapter, f.run.runId, now());
+    await setPlanningQuestionWaiting(
+      store,
+      f.run.runId,
+      required(f.run.planning).sessionId,
+      "native",
+      true,
+    );
+    timer.advance(initial.remainingMs * 2);
+    await supervisePlanning(store, f.adapter, f.run.runId, now());
+    await setPlanningQuestionWaiting(
+      store,
+      f.run.runId,
+      required(f.run.planning).sessionId,
+      "native",
+      false,
+    );
+    await handleControlCommand("ralph-pause", f.run.runId, store, f.adapter);
+    timer.advance(initial.remainingMs * 2);
+    await supervisePlanning(store, f.adapter, f.run.runId, now());
+    await handleControlCommand("ralph-resume", f.run.runId, store, f.adapter);
+    timer.advance(100);
+    await supervisePlanning(store, f.adapter, f.run.runId, now());
+    const state = required((await store.getRun(f.run.runId))?.planning);
+    expect(state.attempts?.at(-1)?.remainingMs).toBe(remaining);
+    expect(state.owner?.attempt).toBe(1);
+    timer.advance(remaining + 1);
+    await supervisePlanning(store, f.adapter, f.run.runId, now());
+    expect((await store.getRun(f.run.runId))?.planning?.owner?.attempt).toBe(2);
+    expect(
+      (await store.getRun(f.run.runId))?.planning?.attempts?.[0]?.reason?.code,
+    ).toBe("agent-timeout");
+  } finally {
+    if (typeof f.dispose === "function") await f.dispose();
+    await f.project.cleanup();
+  }
+});
+
+for (const control of [
+  "ralph-stop",
+  "ralph-pause",
+  "stop-resume",
+  "busy",
+] as const) {
+  test(`native retired planning cannot retry across ${control} during cancellation`, async () => {
+    const f = await nativePrdFixture();
+    try {
+      const { supervisePlanning } = await import(
+        "../../src/planning/generation.js"
+      );
+      const { handleControlCommand } = await import(
+        "../../src/commands/control.js"
+      );
+      f.adapter.inspectPlanningTurn = async () => "failed";
+      f.adapter.inspectSession = async () =>
+        control === "busy" ? "busy" : "idle";
+      const cancel = f.adapter.cancelJob.bind(f.adapter);
+      let retired = false;
+      f.adapter.cancelJob = async (job) => {
+        retired = !!(await f.store.getRun(f.run.runId))?.planning?.owner
+          ?.retired;
+        const result = await cancel(job);
+        if (control === "stop-resume") {
+          await handleControlCommand(
+            "ralph-stop",
+            f.run.runId,
+            f.store,
+            f.adapter,
+          );
+          await handleControlCommand(
+            "ralph-resume",
+            f.run.runId,
+            f.store,
+            f.adapter,
+          );
+        } else if (control !== "busy")
+          await handleControlCommand(control, f.run.runId, f.store, f.adapter);
+        return result;
+      };
+      await supervisePlanning(f.store, f.adapter, f.run.runId);
+      expect(retired).toBe(true);
+      const state = required((await f.store.getRun(f.run.runId))?.planning);
+      expect(state.owner?.attempt).toBe(1);
+      expect(state.owner?.retired).toBe(true);
+      expect(state.attempts).toHaveLength(1);
+      await expect(f.complete()).rejects.toThrow();
+      await expect(f.write("late draft")).rejects.toThrow();
+    } finally {
+      if (typeof f.dispose === "function") await f.dispose();
+      await f.project.cleanup();
+    }
+  });
+}
+
+test("native accepted PRD and settled old turn never cancel or duplicate the issue handoff", async () => {
+  const f = await nativePrdFixture();
+  try {
+    const { supervisePlanning } = await import(
+      "../../src/planning/generation.js"
+    );
+    await f.write(f.text);
+    const accepted = await f.complete();
+    const before = required(await f.store.getRun(f.run.runId));
+    const cancelled: string[] = [];
+    f.adapter.cancelJob = async (job) => {
+      cancelled.push(job.sessionId ?? "");
+      return { ok: true };
+    };
+    f.adapter.inspectPlanningTurn = async (session) =>
+      session === f.run.planning?.sessionId ? "settled" : "running";
+    await supervisePlanning(f.store, f.adapter, f.run.runId);
+    expect(await f.complete()).toEqual(accepted);
+    expect(cancelled).toEqual([]);
+    const after = required(await f.store.getRun(f.run.runId));
+    expect(after.planning?.issueHandoff).toEqual(before.planning?.issueHandoff);
+    expect(
+      after.planning?.attempts?.filter((a) => a.stage === "issues"),
+    ).toHaveLength(1);
+    expect(after.planning?.attempts?.[0]?.status).toBe("accepted");
+    expect(after.control?.status ?? "active").toBe("active");
+  } finally {
+    if (typeof f.dispose === "function") await f.dispose();
+    await f.project.cleanup();
+  }
+});
+
+test("native PRD retry corrects validation in place and completes from its retained interview session", async () => {
+  const f = await nativePrdFixture();
+  try {
+    const { supervisePlanning } = await import(
+      "../../src/planning/generation.js"
+    );
+    f.adapter.inspectPlanningTurn = async () => "failed";
+    f.adapter.inspectSession = async () => "idle";
+    await supervisePlanning(f.store, f.adapter, f.run.runId);
+    const input = { ...f.input, attempt: 2 };
+    const writer = required(f.host.tools.get("ralph_write_planning_file"));
+    await writer.execute({ ...input, content: "Invalid draft" }, f.context);
+    expect((await f.complete(input)).outcome).toBe("correctable-invalid");
+    let state = required((await f.store.getRun(f.run.runId))?.planning);
+    expect(state.owner?.attempt).toBe(2);
+    expect(state.owner?.retired).toBeUndefined();
+    expect(state.attempts).toHaveLength(2);
+    await writer.execute({ ...input, content: f.text }, f.context);
+    expect((await f.complete(input)).outcome).toBe("accepted");
+    state = required((await f.store.getRun(f.run.runId))?.planning);
+    expect(state.prdAcceptance?.sessionId).toBe(f.run.planning?.sessionId);
+    expect(state.prdAcceptance?.attempt).toBe(2);
+    expect(state.attempts?.filter((a) => a.stage === "prd")).toHaveLength(2);
+    expect(state.attempts?.at(-1)?.stage).toBe("issues");
+    expect(state.owner?.attempt).toBe(1);
+  } finally {
+    if (typeof f.dispose === "function") await f.dispose();
+    await f.project.cleanup();
+  }
+});
+
+src/planning/artifact-writer.ts:23:    attempt: z.number().int().positive(),
+src/planning/artifact-writer.ts:52:    value.attempt,
+src/planning/artifact-writer.ts:91:    `${state.owner?.stage === "issues" ? "issues" : "prd"}-draft-${value.attempt}`,
+src/planning/artifact-writer.ts:117:      value.attempt,
+src/planning/artifact-writer.ts:124:    const relative = `.ralph/features/${value.runId}/${state.owner?.stage === "issues" ? "issues" : "prd"}-draft-${value.attempt}/${value.path}`;
+src/planning/artifact-writer.ts:134:    outcome: "accepted",
+src/planning/artifact-writer.ts:135:    path: `.ralph/features/${value.runId}/${state.owner?.stage === "issues" ? "issues" : "prd"}-draft-${value.attempt}/${value.path}`,
+src/planning/artifact-writer.ts:143:  attempt: number,
+src/planning/artifact-writer.ts:150:    `prd-draft-${attempt}`,
+src/planning/completion.ts:22:    attempt: z.number().int().positive(),
+src/planning/completion.ts:32:  attempt: number,
+src/planning/completion.ts:42:    state.owner.retired ||
+src/planning/completion.ts:45:    state.owner.attempt !== attempt ||
+src/planning/completion.ts:65:    value.attempt,
+src/planning/completion.ts:93:        value.attempt,
+src/planning/completion.ts:210:    value.attempt,
+src/planning/completion.ts:242:    outcome: "accepted",
+src/planning/completion.ts:251:    attempt: z.number().int().positive(),
+src/planning/completion.ts:308:  const accepted = state.prdAcceptance;
+src/planning/completion.ts:310:    accepted
+src/planning/completion.ts:311:      ? accepted.sessionId !== sessionId || accepted.attempt !== value.attempt
+src/planning/completion.ts:312:      : state.owner?.retired ||
+src/planning/completion.ts:315:        state.owner.attempt !== value.attempt ||
+src/planning/completion.ts:319:      "Stale PRD stage ownership; use the current owner and attempt",
+src/planning/completion.ts:331:      outcome: "accepted",
+src/planning/completion.ts:347:  if (!accepted) {
+src/planning/completion.ts:351:        await readPrdDraft(state.workspace, value.runId, value.attempt),
+src/planning/completion.ts:371:      attempt: value.attempt,
+src/planning/completion.ts:391:      `complete-prd-${intent.attempt}`,
+src/planning/completion.ts:406:      message: `PRD accepted; retry this completion to reconcile the issue handoff: ${String(cause)}`,
+src/planning/completion.ts:411:    outcome: "accepted",
+src/planning/completion.ts:420:    attempt: z.number().int().positive(),
+src/planning/completion.ts:455:    value.attempt,
+src/planning/completion.ts:459:    state.owner?.retired ||
+src/planning/completion.ts:513:      const draft = `.ralph/features/${run.runId}/issues-draft-${value.attempt}/`;
+src/planning/completion.ts:545:        attempt: value.attempt,
+src/planning/completion.ts:568:    value.attempt,
+src/planning/completion.ts:593:      `complete-issues-${value.attempt}`,
+src/planning/completion.ts:622:    outcome: "accepted" as const,
+src/planning/completion.ts:633:  // existing explicit recovery path; tool retries never redispatch accepted work.
+# Workflow controls and recovery
+
+## Summary
+OpenCode registers pause/resume/stop commands and invokes reconciliation on restart.
+Recovery observes actual state, reports facts, and waits for explicit resume. Native orchestrator/resume invoke stage services directly; workers and reviewers keep their independent sessions and worktrees.
+
+## Key behavior
+- Native `/ralph-orchestrator` offers correlated existing-run choices through the native question adapter. A run without an accepted PRD offers fresh discovery or retention; accepted planning offers saved-stage resume, retention, and restart while execution has not begun. Unsupported protocols require a fresh workflow and are not migrated.
+- Pre-PRD recovery cancels and inspects unfinished interview/PRD jobs; it records settled unfinished work rather than requiring completion evidence for a draft that will not be accepted. Unconfirmed cancellation or busy/unknown sessions retain the blocker.
+- Discovery restart stops and inspects the recorded stage sessions before releasing the exact repository/run owner through a durable release intent/result. Cleanup uncertainty, foreign locks, pending operations and execution work block release. History, drafts and worktrees remain; released runs cannot resume. A fresh interview starts with its opening question and empty transcript.
+- Native `/ralph-resume` continues saved stage ownership directly. Reactivation precedes guarded planning writes; it does not rebind a native owner into the invoking chat. Accepted PRD/graph intents finish immutable publication and the necessary handoff or execution boundary. Execution continuation occurs once when acceptance finalization already started it. Resuming completed integrations can collect the existing executor turn for final-review evidence; this observation must not create or prompt another worker.
+- Reconciliation verifies accepted PRD bytes and scope authorization, repository ownership and stable host prompt receipts. A supported live authoring attempt with correlated delivery retains its owner and remaining budget through recovery freeze; stopped/blocked owners stay retired. Unknown delivery evidence blocks repeated dispatch. Recovery remains observational until explicit resume.
+- Native PRD and issue authoring each allow three total attempts per approved stage, independent of issue/review budgets. Only accepted completion tools advance the stage. A settled turn with final prose, failed turn, or active-time timeout consumes an attempt; correctable completion validation stays in the live attempt.
+- Authoring attempts persist the owning session, prompt identity, draft root, captured remaining active-time budget and terminal result. Pending product/approval questions, direct native question tools and pause suspend the deadline. The injected planning clock supports deterministic deadline checks.
+- Failure retires tool authority before cancelling the recorded planning job. Retry requires confirmed cancellation and an idle/missing inspected owner; missing PRD interview sessions require intervention. PRD retries retain the same interview session; issue retries use reconciled fresh sessions. Each retry writes a separate draft namespace and receives accepted inputs, decision history, prior draft paths and the failure reason. Retired sessions retain their planning tool restrictions.
+- Exhaustion retains the blocker and native recovery request. Only a correlated real native “Reset budget and retry” answer grants another three attempts, with answer provenance recorded in `budgetResets`; “Stop” stops the run. Unavailable native input leaves the request pending and publishes its diagnostic. Stop/pause racing cancellation cannot allocate another attempt. Accepted completion atomically terminates the planning job, so its later turn settlement cannot cancel execution or consume another attempt. Authorized scope transitions retire superseded authoring jobs without aborting the continuing session; obsolete jobs cannot block final review.
+- `/ralph-remove` previews deletion of the checkout's `.ralph` and repository-shared saved workflow state. A new user approval is required. It checks the unchanged preview under setup/write locks and refuses active/unsettled jobs or uncertain live processes. It preserves code, branches and workspaces, including unregistered retained workspace directories. Linked-worktree scope is disclosed. Live host bookkeeping remains while the plugin is loaded, allowing a later setup in the same session.
+- `/ralph-resume` and `ralph_control` share the typed router resume service. Without an ID, it selects the latest feature ahead of unrelated setup records. `--base <commit>`/`selectedCommit` requests renewed explanation authorization; `--review`/`review` retains explicit review-only retry after terminal ownership release. Options cannot be combined, and unknown flags are rejected.
+- Native resume drives the saved phase; it does more than flip the control flag. Pending planning, failed baseline retry, scheduling, and automatic review continuation retain approvals and attempt budgets.
+- Pause rejects new jobs and suspends review scheduling while current jobs settle. Production executor submissions retain their attempt identity; mergers and successful in-flight checks wait at the next scheduling/ref boundary rather than becoming failed retries. Each resumed in-flight boundary rechecks the original epoch so stop followed by resume cannot revive a stale callback.
+- Stop cancels bound sessions, owned processes and registered environments with bounded cleanup. Late job results cannot advance stopped runs.
+- Process ownership requires PID birth identity, owner token, repository and workspace. Owned wrappers watch parent liveness; the dashboard stays in the plugin process.
+- Recovery shares the Git common-directory store across worktrees. Already advanced integration intents require exact SHA/check revision evidence and record completion once. Ambiguous operations block resume; validation without output never passes.
+- Stop retains existing recovery/cleanup blockers, including repeated stops. Resume cannot race pending stop cleanup. Reconciliation must resolve retained ambiguity.
+- Recovery binds production validation to the exact merger envelope, candidate, command hash/revision and approval. It restores the accepted issue result even if the ref or operation result was written before a crash. A proven old index/clean worktree is synchronized with a safe two-tree merge; local changes block recovery.
+- Review counters, attempt identities, approvals and artifact revisions are retained; controls do not reset budgets. Native resume preserves the stage owner and correlated unanswered questions.
+- Recovery holds a pending control marker through inspection and checks its epoch/revision before publishing. It verifies logical active-run lock identity and the latest accepted refs; uncertain execution/merge/repair completion blocks instead of repeating dispatch.
+- An executing attempt with no submission/candidate can be recovered as a consumed failure only after a matching cancelled job, completed abort, idle/missing exact session and proven environment cleanup. Work and attempt history remain available to the next explicit retry. Busy, unknown or mismatched sessions stay blocked.
+- Journal locks are replaced only after inspecting their recorded owner birth identity. Missing or corrupt owner evidence does not authorize replacement.
+
+- Ordinary-chat feature receipts and question suppression are removed. `ralph_control resume`, router and slash commands use native stage services. Setup saving and previewed removal retain separate approval semantics; removal receipts are owned by `src/commands/removal-approval.ts`. Unsupported records require fresh workflow creation without migration or deleting their artifacts.
+
+## Code references
+- `src/commands/orchestrator.ts`, `src/commands/resume.ts`, `src/plugin.ts` — native existing-run selection, fresh restart and saved-stage continuation.
+- `src/state/active-run.ts`, `src/commands/control.ts`, `src/state/run-store.ts` — matching stopped-planning release, inspected stage cancellation and guarded reactivation.
+- `tests/integration/14-recovery.test.ts` — native first-question restart, uncertain cleanup, foreign/released ownership, immutable PRD tampering, ambiguous prompt evidence, five PRD handoff crash boundaries and three issue acceptance/eligibility boundaries. Real temporary Git projects with deterministic fake-host evidence; not installed native UI proof.
+- `src/planning/generation.ts`, `src/planning/types.ts` — durable authoring attempts, bounded retries, native exhaustion recovery and injectable supervision clock.
+- `src/opencode/adapter.ts`, `src/plugin.ts` — prompt-specific turn inspection, owned cancellation, native question waits, periodic supervision and retired-session tool confinement.
+- `src/planning/completion.ts`, `src/planning/artifact-writer.ts`, `src/state/run-store.ts` — revision-checked acceptance/writes, retirement rejection and terminal planning jobs before downstream handoffs.
+- `tests/integration/04-planning.test.ts` — real Git/fake-host cases for three-attempt exhaustion/reset, retained drafts, correctable validation, suspended deadlines, uncertain cancellation, stop/pause races and accepted handoffs. These are deterministic host fixtures, not proof of live native UI behavior.
+
+codex
+Already completed in the prior iteration. Implementation, behavior tests, and wiki cover bounded retries, retained drafts, suspended deadlines, explicit recovery, and handoff races.
+
+Prior validation: typecheck, lint, 94 focused tests, 14 status tests, and 301 full-suite tests passed; one skipped. No files changed or tests rerun.
+tokens used
+36,286
+Already completed in the prior iteration. Implementation, behavior tests, and wiki cover bounded retries, retained drafts, suspended deadlines, explicit recovery, and handoff races.
+
+Prior validation: typecheck, lint, 94 focused tests, 14 status tests, and 301 full-suite tests passed; one skipped. No files changed or tests rerun.

@@ -1,0 +1,1483 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/15-verify-packaged-workflow-across-platforms.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cd8-c04b-7d73-a81d-3d242ffbaed1
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 15 of 15 — 15-verify-packaged-workflow-across-platforms.md
+=== END METADATA ===
+
+TASK:
+# 15. Install and verify the complete workflow across platforms
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-1, US-2, US-3, US-4, US-5, US-6, US-7, US-8  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Deliver a locally distributable package that runs the complete feature workflow in separate repositories on macOS, Linux and native Windows. Validate the actual packaged entry point, assets and skills rather than relying only on source imports. Add installation/troubleshooting documentation and a reproducible demonstration covering setup through final report. This issue authorizes building and testing a package, not publishing it to a registry.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 71–86): reusable package, platform scope and excluded publishing actions.
+- `PRD.md` (lines 353–389): acceptance and verification scenarios.
+- `PRD.md` (lines 393–404): release phase.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 14: Pause, stop, and recover interrupted workflows](14-pause-stop-and-recover-interrupted-workflows.md): predecessor contracts and the code delivered by that slice.
+- `package.json`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `README.md`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `.github/workflows/ci.yml`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `tests/smoke/package-install.test.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `tests/e2e/full-workflow.test.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Keep deterministic orchestration coverage separate from credentialed real-model smoke tests. Build fixtures from committed temporary repositories and avoid dependence on the developer's global OpenCode configuration. Install the tarball to prove assets and entry points survive packaging.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Exercise the packaged plugin in two independent projects
+
+**Files:** `tests/smoke/package-install.test.ts`, `tests/e2e/full-workflow.test.ts`, `package.json`, `tests/integration/15-package.test.ts`
+
+- **IMPLEMENT:** Build and pack the plugin, install it into two isolated repositories, and run setup/interview/PRD/issues/execution/review flows using the fake adapter at its supported boundary. Verify repository-specific config/locks and bundled skill/asset inclusion. Add one gated real OpenCode end-to-end smoke and record exact tested versions.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import existing fixtures and public adapter test injection seam; use the pinned package manager's pack/install APIs through a cross-platform script.
+- **GOTCHA:** Keep tests outside the package's runtime exports. Credentialed smoke must explicitly report skipped status when unavailable; do not claim live compatibility from fake-agent tests.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/15-package.test.ts`; add the tests below as this slice develops.
+
+### 2. Validate platform behavior and ship complete artifacts
+
+**Files:** `package.json`, `scripts/package-smoke.ts`, `.github/workflows/ci.yml`
+
+- **IMPLEMENT:** Run typecheck, lint, unit/integration, browser and packaged smoke tests on macOS/Linux/Windows. Include paths with spaces, argv preservation, child process cleanup, local readiness and concurrent ports. Bundle dashboard build assets and all necessary skill resources. Validate package contents and prevent runtime logs, tokens and fixture secrets from shipping.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Use existing runCommand-compatible portable scripts and the pinned runtime. Import fs/path APIs rather than embedding POSIX shell commands in scripts.
+- **GOTCHA:** Do not add automatic registry publish, git push, target merge or PR steps. Runtime remains attached to OpenCode process lifetime.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/15-package.test.ts`; add the tests below as this slice develops.
+
+### 3. Document and verify the user journey
+
+**Files:** `README.md`, `docs/opencode-compatibility.md`, `docs/troubleshooting.md`
+
+- **IMPLEMENT:** Document package installation and OpenCode enablement, /ralph-commands, /ralph-orchestrator, controls, role models/skills, timeouts, supported versions, and dashboard access. Explain three issue attempts versus three review rounds, timeout omissions, clean-checkout baseline, retained failed worktrees, and unverified completion. Provide a short demo procedure and known platform limitations backed by test output.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Reference established configuration schemas and the tested compatibility document rather than copying stale example versions.
+- **GOTCHA:** Examples must not imply that 'completed' means verified when checks were skipped. Any failed supported-platform requirement remains a release blocker.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/15-package.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [ ] The built tarball installs and loads with its skills/dashboard assets present.
+- [ ] Two repositories keep independent configuration, locks, runs and dashboard data.
+- [ ] The deterministic full workflow passes across macOS, Linux and native Windows.
+- [ ] Credentialed live smoke results and skipped cases are clearly documented.
+- [ ] Installation and operational docs match real commands and configuration schemas.
+- [ ] No release test or script publishes, pushes, or merges the feature into a target branch.
+- [ ] This slice's behavioral regression tests pass: `bun test tests/integration/15-package.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [ ] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/15-package.test.ts
+bun run build
+bun run test:browser
+bun run test:smoke
+bun test tests/e2e/full-workflow.test.ts
+```
+
+**Demonstration:** Follow README from package install in two fresh fixture repositories through one verified feature and one run with skipped validation; inspect both reports and platform test results.
+
+## Blocked by
+
+- [14-pause-stop-and-recover-interrupted-workflows.md](14-pause-stop-and-recover-interrupted-workflows.md) — pause, stop, and recover interrupted workflows supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing package verification and completion evidence, then run the required checks and address any gaps in this slice.
+
+exec
+/bin/zsh -lc "pwd; rg --files -g AGENTS.md -g package.json -g '*15*' -g '*workflow*' -g '*package*' -g '*compatibility*' -g '*troubleshooting*' -g 'README.md' -g 'ci.yml' -g 'SKILL.md'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+skills/grill-me/SKILL.md
+skills/tdd/SKILL.md
+skills/to-issues/SKILL.md
+skills/create-prd/SKILL.md
+skills/code-review/SKILL.md
+skills/merge/SKILL.md
+skills/functional-review/SKILL.md
+skills/command-discovery/SKILL.md
+ralph-logs/iter-2-14-pause-stop-and-recover-interrupted-workflows.log
+ralph-logs/iter-3-14-pause-stop-and-recover-interrupted-workflows.log
+ralph-logs/iter-1-15-verify-packaged-workflow-across-platforms.log
+ralph-logs/iter-1-14-pause-stop-and-recover-interrupted-workflows.log
+ralph-logs/iter-2-15-verify-packaged-workflow-across-platforms.log
+scripts/package-smoke.ts
+package.json
+README.md
+docs/package-validation.md
+docs/package-evidence-macos.json
+docs/opencode-compatibility.md
+docs/wiki/features/workflow-recovery.md
+docs/wiki/features/package-distribution.md
+docs/troubleshooting.md
+tests/helpers/package.ts
+tests/helpers/packaged-probe.ts
+tests/helpers/packaged-workflow.ts
+tests/e2e/full-workflow.test.ts
+tests/integration/15-package.test.ts
+tests/smoke/package-install.test.ts
+
+exec
+/bin/zsh -lc 'git status --short; cat package.json; cat .github/workflows/ci.yml; cat docs/package-validation.md; cat docs/package-evidence-macos.json' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+name: Compatibility
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  plugin:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run test
+      - run: bun run build
+      - run: bunx --no-install playwright install --with-deps chromium
+      - run: bun run test:browser
+      - run: bun run test:smoke
+        env:
+          OPENCODE_SMOKE: '1'
+      - run: bun test tests/e2e/full-workflow.test.ts
+      - run: bun run test:package
+        env:
+          PACKAGE_EVIDENCE_PATH: package-evidence.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-evidence-${{ matrix.os }}
+          path: package-evidence.json
+          if-no-files-found: warn
+# Package validation — 2026-10-15
+
+This is local implementation evidence, not cross-platform release certification. Exact SDK mapping is in [compatibility](opencode-compatibility.md); installation and the repeatable demo are in [README](../README.md).
+
+## Reproduce
+
+Use Bun 1.4.3, install from `bun.lock`, then run:
+
+```sh
+bun run typecheck
+bun run lint
+bun test tests/integration/15-package.test.ts
+bun run build
+bun run test:browser
+bun run test:smoke
+bun test tests/e2e/full-workflow.test.ts
+bun run test:package
+```
+
+`test:package` builds and packs locally, installs the tarball into two committed temporary Git repositories with spaces, then loads installed runtime exports. All eight bundled skills and dashboard HTML/JS must survive packing. A stale runtime-log canary must not survive the clean build. The package allowlist excludes source, tests, fixture data, developer configuration and logs. Tests never publish, push, create a PR or merge feature changes into the target branch.
+
+The installed public router discovers/approves/verifies commands, interviews, generates a PRD and issue graph in separate sessions, approves exact revisions, prepares an isolated baseline and schedules an issue. The controllable adapter supplies agent output and correlated human responses. Executor jobs run a real failing test, implement addition, run the passing test and commit; merger jobs integrate into candidates and approved commands validate them. The host explicitly calls `reviewFeature` after scheduling with functional lifecycle/tool options. Independent reviewers consume installed skills. No execution evidence is seeded.
+
+The first report is `verified`. The second repository changes an approved environment reference after setup to trigger a real check timeout during baseline. That omission persists through integration and report as `incomplete-validation`; setup itself must succeed. Each consumer has separate command configuration, durable state, write/active-run locks and dashboard data. Dashboards coexist on allocated ports. The installed process ownership API is exercised with literal argv (spaces, quotes, shell characters and Unicode), app readiness and cleanup.
+
+Temporary repositories are removed even on failure. `PACKAGE_EVIDENCE_PATH` retains JSON with OS, architecture, Bun/OpenCode versions, workflow stages, outcomes and remaining blockers. CI runs typecheck, lint, integration, browser, installed smoke and workflow on macOS, Ubuntu and native Windows and uploads the JSON per platform. Missing or failed platform results block release.
+
+## Red/green evidence
+
+- The new packaged stage regression failed because the old seeded demo had no setup/planning/executor/merger evidence. It passes through installed public commands with real Git/TDD work.
+- Exercising that handoff exposed a production reporting defect: the scheduler's provisional `incomplete` flag remained after both reviewers passed, making a fully checked feature permanently incomplete. The scheduler records an explicit `reviewPending` marker. The coordinator qualifies that marker only for approved, fully integrated, nonempty passing checks bound to the reviewed commit, with no omissions or pending integration; an arbitrary incomplete attestation cannot be promoted. The installed passing/skipped pair verifies both outcomes. Existing review/recovery coverage is retained.
+- The skipped fixture initially timed out during command setup and correctly failed readiness. The fixture now changes its approved environment reference only after setup; production setup-timeout behavior is preserved.
+- Existing package regressions cover accidental developer-local self-dependencies, stale runtime logs, missing assets, ownership API exports and deferred startup recovery notifications.
+
+Tests for implementation behavior use public entrypoints. Documentation and CI metadata updates are non-behavior changes; no tests restate their text or YAML.
+
+## Tested scope and release blockers
+
+Local platform: macOS arm64. Bun 1.4.3 (`c6da4a4d3`); OpenCode CLI/client/plugin/schema 2.0.29; TypeScript 5.9.3; Biome 2.4.6; Playwright 1.56.1. Current command results are recorded below.
+
+- Native Linux and Windows: CI configured; not executed in this local session. Their process trees, shells, paths and browser results remain unverified here.
+- Credentialed provider session: gated by `OPENCODE_LIVE_SMOKE=1`, endpoint, model and authentication; skipped without those inputs. Fake-agent or local-model results do not establish provider compatibility.
+- Complete credentialed setup-to-report: unavailable because production `requestUserInput` has no verified human provenance. The deterministic host supplies this boundary explicitly; it cannot certify a working production approval channel.
+- Automatic final review: scheduling starts code review only. A host must provide functional environment/surfaces/tools to `reviewFeature`. The demo tests that public handoff; it does not imply automatic production dual-review wiring.
+- Interactive TUI rendering and live owned-service lifecycle still need native host validation. Runtime remains attached to OpenCode lifetime.
+
+## Local command results
+
+| Command | macOS arm64 result |
+| --- | --- |
+| `bun run typecheck` / `bun run lint` | PASS |
+| `bun run test` | 194 passed, 1 gated agent-browser skip, 0 failed; 1,235 assertions |
+| `bun test tests/integration/15-package.test.ts` | 3 passed, 0 failed; 15 assertions |
+| `bun run pack:local` (includes `bun run build`) | PASS; local 0.2.0 tarball, 138 files; no registry action |
+| `bun run test:browser` | 6 Chromium tests passed |
+| `OPENCODE_SMOKE=1 bun run test:smoke` | 3 passed, 1 credentialed-provider skip, 0 failed; 29 assertions; real OpenCode installed tarball with deterministic local model |
+| `bun test tests/e2e/full-workflow.test.ts` | 1 passed, 0 failed; both complete deterministic workflows and qualified reports |
+| `PACKAGE_EVIDENCE_PATH=docs/package-evidence-macos.json bun run test:package` | PASS; `verified` and `incomplete-validation`, all eight stages in each consumer |
+| Native Linux / Windows | NOT RUN locally; matrix evidence required |
+| Credentialed complete workflow | NOT RUN; production human provenance and host functional-review wiring remain blockers |
+
+The retained source-checkout evidence is `docs/package-evidence-macos.json`. Its temporary consumer paths have already been removed. The local distributable is `opencode-ralph-plugin-0.2.0.tgz`. The separate integration agent-browser smoke was skipped without its opt-in; the six Playwright browser checks above did run.
+
+After introducing the explicit provisional-review marker, the focused review regression suite also passed: `bun test --timeout 30000 tests/integration/13-review-loop.test.ts` — 18 passed, 0 failed, 157 assertions. Missing required validation attestation still cannot become verified.
+{
+  "platform": "darwin",
+  "bun": "1.4.3",
+  "repositories": [
+    {
+      "root": "/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph verified project SrNgSx/.git/ralph/runs",
+      "port": "62843",
+      "outcome": "verified",
+      "stages": [
+        "setup",
+        "interview",
+        "prd",
+        "issues",
+        "executor",
+        "merger",
+        "review",
+        "report"
+      ],
+      "commandHash": "5b89b52c12a9207b815c481bf12c3c19fd187fcf134ff71355db19778ebbbe0c"
+    },
+    {
+      "root": "/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph skipped project opkNM6/.git/ralph/runs",
+      "port": "62852",
+      "outcome": "incomplete-validation",
+      "stages": [
+        "setup",
+        "interview",
+        "prd",
+        "issues",
+        "executor",
+        "merger",
+        "review",
+        "report"
+      ],
+      "commandHash": "866c5f500ba23f80051b706211688db8be6cdb5a74690044385c1711b8b81401"
+    }
+  ],
+  "architecture": "arm64",
+  "opencode": "2.0.29",
+  "scope": "Installed setup/interview/PRD/issues/TDD integration/dual review/report",
+  "releaseBlockers": [
+    "Production human-input provenance is unsupported",
+    "All three platform CI results required",
+    "Credentialed full workflow not verified",
+    "Host functional lifecycle/tool options required for final dual review"
+  ]
+}
+
+exec
+/bin/zsh -lc "sed -n '71,97p' PRD.md; sed -n '353,404p' PRD.md; cat tests/integration/15-package.test.ts; cat tests/smoke/package-install.test.ts; cat tests/e2e/full-workflow.test.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+### Distribution — in scope
+
+- ✅ Reusable installable OpenCode plugin package.
+- ✅ macOS, Linux, and native Windows support.
+- ✅ One active feature workflow per repository, including its linked worktrees.
+
+### Out of scope
+
+- ❌ Automatic target-branch merge, push, deployment, or pull request creation.
+- ❌ GitHub issue synchronization or another external issue tracker.
+- ❌ Browser-based answers, approvals, or execution controls.
+- ❌ Execution continuing independently after OpenCode exits.
+- ❌ Multiple concurrent feature workflows in one repository.
+- ❌ Formal ASD-STE100 certification or numerical compliance scoring.
+- ❌ Automatic additions or changes to approved commands during feature execution.
+- ❌ Automatic success claims when validation or functional review is incomplete.
+
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+## 11. Success Criteria and Acceptance Tests
+
+### MVP acceptance
+
+- ✅ Install the package in more than one repository with independent project configuration and state.
+- ✅ Prevent feature interviews until approved command setup verifies successfully.
+- ✅ Complete interview, explanation approval, PRD, new-session issue generation, and execution approval in OpenCode.
+- ✅ Reject invalid dependency graphs before starting work.
+- ✅ Run two independent issues concurrently; start a dependent issue only after all prerequisites integrate and pass non-skipped checks.
+- ✅ Demonstrate behavior-focused TDD evidence for execution and repair jobs, with documented valid exceptions.
+- ✅ Keep the integration branch unchanged when candidate validation fails.
+- ✅ Enforce three total issue attempts and three total final review rounds.
+- ✅ Skip timed-out validation checks for the current run only and disclose them even when every check is skipped.
+- ✅ Never skip hung setup commands under the validation skip policy.
+- ✅ Preserve failed worktrees and remove successful issue worktrees after validated integration.
+- ✅ Derive functional review from acceptance criteria and distinguish unavailable verification from successful tests.
+- ✅ Resume after interruption without duplicate integration or lost approval context.
+- ✅ Leave the feature branch intact without pushing or modifying the target branch.
+- ✅ Pass platform coverage on macOS, Linux, and native Windows.
+
+### Required verification scenarios
+
+1. Happy path: setup, interview, approved graph, parallel issues, sequential integrations, two passing reviewers, retained feature branch.
+2. Diamond dependency graph: A unlocks B and C; D waits for both integrated commits.
+3. Concurrent submissions: each candidate is tested against the latest integration state, never a stale predecessor.
+4. Failure loop: initial submission and two repairs fail; block descendants and continue unrelated issues.
+5. TDD red-stage failure does not consume an issue attempt.
+6. Hung agent consumes an attempt; cancelled or late session output cannot advance state.
+7. Timed-out check is killed and skipped for later work in that run; nonzero exits are not skipped; the next run retries the check.
+8. All checks skipped: execution continues, but final status and report identify missing validation.
+9. Hung setup: retry within the applicable budget and block affected work rather than marking it ready.
+10. Review rounds: repair tasks integrate before both reviewers inspect the new stable commit; unresolved round-three findings stop automatic repairs.
+11. Functional review unavailable: after three attempts, report unverified completion with the exact blocker.
+12. Recovery during integration: reconcile a commit already advanced before the state write; do not merge it twice.
+13. Permission denial, missing tool, unavailable test credentials, and failed cleanup produce visible, accurately classified results.
+14. Dashboard rejects mutation requests and unauthorized access; logs distinguish skipped, failed, and passed checks.
+15. Native Windows: paths with spaces, shell selection, app readiness, and child-process cleanup work correctly.
+
+Measure phase durations, attempts, integration results, and verification coverage locally. No external telemetry is required for MVP. Prefer deterministic fake-agent tests for orchestration limits, plus small real OpenCode end-to-end tests for SDK integration.
+
+## 12. Implementation Phases
+
+Estimates assume one experienced engineer with agent assistance. They are planning ranges, not delivery commitments.
+
+| Phase | Goal and deliverables | Validation | Estimate |
+| --- | --- | --- | --- |
+| 1. Integration foundation | ✅ Pin supported versions; verify command registration, sessions, permission behavior, worktree directory routing, persistence, and process lifecycle; package skeleton | Minimal installed plugin works on all three platforms; session and permission behavior demonstrated | 1–2 weeks |
+| 2. Setup and planning | ✅ Command discovery/approval/verification; bundled skills; interview; PRD; new-session issue planning; graph validation and approval | Run a sample feature through approved local issues; reject invalid configuration and stale approvals | 1–2 weeks |
+| 3. Execution engine | ✅ Scheduler; TDD job contract; worktrees; merger; checks; retry/skip policies; environment isolation; recovery; dashboard | Deterministic graph/failure tests and real Git integration tests pass, including Windows | 2–3 weeks |
+| 4. Review and release | ✅ Both reviewers; repair tasks; round limits; qualified completion reports; documentation; installation and end-to-end tests | Full sample feature, timeout, and crash-recovery scenarios pass; reusable package installs cleanly | 1–2 weeks |
+
+Expected total: approximately 5–9 weeks, with OpenCode API compatibility and native Windows process handling as the main schedule uncertainties.
+import { expect, test } from "bun:test";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+test("the distributable has no dependency on a developer-local copy of itself", async () => {
+  const manifest = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  expect(manifest.dependencies[manifest.name]).toBeUndefined();
+  for (const version of Object.values(manifest.dependencies)) {
+    expect(version).not.toMatch(/^(?:file:|\/|[A-Za-z]:)/);
+  }
+});
+
+test("a tarball loads in two repositories with bundled assets and isolated state", async () => {
+  const { verifyPackage } = await import("../helpers/package.js");
+  await mkdir(resolve("dist"), { recursive: true });
+  await writeFile(
+    resolve("dist/runtime-token-canary.log"),
+    "packaging canary; not a credential",
+  );
+  const result = await verifyPackage(true);
+  expect(result.repositories.map((repository) => repository.outcome)).toEqual([
+    "verified",
+    "incomplete-validation",
+  ]);
+  for (const repository of result.repositories)
+    expect(repository.stages).toContain("executor");
+  expect(result.repositories).toHaveLength(2);
+  expect(result.repositories[0]?.root).not.toBe(result.repositories[1]?.root);
+  expect(result.repositories[0]?.port).not.toBe(result.repositories[1]?.port);
+}, 180_000);
+
+test("recovery notifications are deferred until v2 plugin activation finishes", async () => {
+  const { RalphPlugin } = await import("../../src/plugin.js");
+  const { openRunStore } = await import("../../src/state/run-store.js");
+  const { createFakePluginContext } = await import(
+    "../helpers/fake-opencode.js"
+  );
+  const { createTestProject } = await import("../helpers/project.js");
+  const project = await createTestProject();
+  const store = await openRunStore(project.directory);
+  await store.createRun("recover");
+  const host = createFakePluginContext(project.directory);
+  const dispose = await RalphPlugin.setup(host.context);
+  try {
+    expect(host.statuses).toHaveLength(0);
+    for (let i = 0; i < 100 && !host.statuses.length; i++) await Bun.sleep(5);
+    expect(host.statuses).toHaveLength(1);
+  } finally {
+    await dispose?.();
+    await project.cleanup();
+  }
+}, 15_000);
+import { expect, test } from "bun:test";
+import { verifyPackage } from "../helpers/package.js";
+
+test("local tarball installs and loads its plugin, skills and dashboard in two consumers", async () => {
+  const evidence = await verifyPackage(false);
+  expect(evidence.repositories).toHaveLength(2);
+  console.log(
+    `Installed package smoke: ${evidence.platform}, Bun ${evidence.bun}`,
+  );
+}, 180_000);
+import { expect, test } from "bun:test";
+import { verifyPackage } from "../helpers/package.js";
+
+test("installed setup-to-report workflow preserves verified versus skipped validation in two projects", async () => {
+  const evidence = await verifyPackage(true);
+  expect(evidence.repositories.map((repository) => repository.outcome)).toEqual(
+    ["verified", "incomplete-validation"],
+  );
+  for (const repository of evidence.repositories) {
+    expect(repository.stages).toEqual([
+      "setup",
+      "interview",
+      "prd",
+      "issues",
+      "executor",
+      "merger",
+      "review",
+      "report",
+    ]);
+  }
+  console.log(
+    `Packaged workflow: ${evidence.platform}, Bun ${evidence.bun}; complete deterministic workflow.`,
+  );
+}, 180_000);
+
+exec
+/bin/zsh -lc 'rg --files .agents docs | head -60; cat tests/helpers/package.ts; cat scripts/package-smoke.ts; cat README.md; cat docs/opencode-compatibility.md' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+docs/package-validation.md
+docs/package-evidence-macos.json
+docs/functional-review-validation.md
+docs/recovery-validation.md
+docs/opencode-compatibility.md
+.agents/issues/2-discover-approve-and-verify-project-commands.md
+.agents/issues/6-execute-and-integrate-one-issue-with-tdd.md
+.agents/issues/11-review-completed-feature-code.md
+.agents/issues/3-interview-and-approve-feature-explanation.md
+.agents/issues/1-install-plugin-and-run-opencode-session.md
+.agents/issues/7-retry-failed-work-and-skip-hung-checks.md
+.agents/issues/4-generate-prd-and-approve-issue-graph.md
+.agents/issues/12-verify-acceptance-with-browser-and-http.md
+.agents/issues/9-resolve-executor-questions-in-opencode.md
+.agents/issues/13-repair-findings-within-three-review-rounds.md
+.agents/issues/8-execute-dependency-ready-issues-concurrently.md
+.agents/issues/10-observe-execution-in-read-only-dashboard.md
+.agents/issues/5-prepare-feature-branch-and-validate-baseline.md
+.agents/issues/15-verify-packaged-workflow-across-platforms.md
+.agents/issues/14-pause-stop-and-recover-interrupted-workflows.md
+docs/review-loop-validation.md
+docs/troubleshooting.md
+docs/wiki/open-questions.md
+docs/wiki/index.md
+docs/wiki/features/bounded-review-repairs.md
+docs/wiki/features/project-commands.md
+docs/wiki/features/feature-planning.md
+docs/wiki/features/concurrent-execution.md
+docs/wiki/features/feature-interview.md
+docs/wiki/features/workflow-recovery.md
+docs/wiki/features/package-distribution.md
+docs/wiki/features/functional-review.md
+docs/wiki/features/execution-baseline.md
+docs/wiki/features/independent-code-review.md
+docs/wiki/features/executor-questions.md
+docs/wiki/features/single-issue-integration.md
+docs/wiki/features/read-only-dashboard.md
+docs/wiki/features/ralph-task-loop.md
+docs/wiki/features/plugin-session-results.md
+import {
+  copyFile,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+import { createTestProject, git } from "./project.js";
+
+export async function runFixtureCommand(argv: string[], cwd: string) {
+  const proc = Bun.spawn(argv, {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, OPENCODE_DISABLE_DEFAULT_PLUGINS: "1" },
+  });
+  const timeout = setTimeout(() => proc.kill(), 120_000);
+  try {
+    const [code, stdout, stderr] = await Promise.all([
+      proc.exited,
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    if (code)
+      throw new Error(`Package fixture failed (${code}): ${stdout}\n${stderr}`);
+    return stdout;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+export interface PackageEvidence {
+  platform: string;
+  bun: string;
+  repositories: {
+    root: string;
+    port: string;
+    outcome?: string;
+    stages?: string[];
+    commandHash?: string;
+  }[];
+}
+/** Installs the actual tarball; the child resolves every runtime import in that installation. */
+export async function verifyPackage(
+  fullWorkflow: boolean,
+): Promise<PackageEvidence> {
+  const root = resolve(import.meta.dir, "../..");
+  const staging = await mkdtemp(join(tmpdir(), "ralph package with spaces "));
+  const projects: Awaited<ReturnType<typeof createTestProject>>[] = [];
+  try {
+    await runFixtureCommand([process.execPath, "run", "build"], root);
+    await runFixtureCommand(
+      [process.execPath, "pm", "pack", "--destination", staging, "--quiet"],
+      root,
+    );
+    const archives = (await readdir(staging)).filter((name) =>
+      name.endsWith(".tgz"),
+    );
+    if (archives.length !== 1) throw new Error("Expected exactly one tarball");
+    for (const label of ["verified", "skipped"]) {
+      const project = await createTestProject(`ralph ${label} project `);
+      projects.push(project);
+      await writeFile(
+        join(project.directory, ".gitignore"),
+        "node_modules/\n*.tgz\n",
+      );
+      await copyFile(
+        join(staging, archives[0] as string),
+        join(project.directory, "plugin.tgz"),
+      );
+      await writeFile(
+        join(project.directory, "package.json"),
+        JSON.stringify({
+          private: true,
+          type: "module",
+          dependencies: {
+            "opencode-ralph-plugin": "file:./plugin.tgz",
+          },
+        }),
+      );
+      await runFixtureCommand(
+        [process.execPath, "install", "--ignore-scripts"],
+        project.directory,
+      );
+      // Copy only the controllable HTTP fixture. Its adapter import resolves in the installed package.
+      const fake = (
+        await readFile(join(root, "tests/helpers/fake-opencode.ts"), "utf8")
+      ).replace(
+        "../../src/opencode/adapter.js",
+        "opencode-ralph-plugin/adapter",
+      );
+      await writeFile(join(project.directory, "fake-opencode.ts"), fake);
+      await copyFile(
+        join(root, "tests/helpers/packaged-workflow.ts"),
+        join(project.directory, "packaged-workflow.ts"),
+      );
+      const plugin = await realpath(
+        join(project.directory, "node_modules/opencode-ralph-plugin"),
+      );
+      await writeFile(
+        join(project.directory, "opencode.json"),
+        JSON.stringify({ plugins: [plugin] }),
+      );
+      await git("git", ["-C", project.directory, "add", "."]);
+      await git("git", [
+        "-C",
+        project.directory,
+        "commit",
+        "-m",
+        "isolated package installation",
+      ]);
+    }
+    const runner = join(projects[0]?.directory as string, "probe.ts");
+    await writeFile(
+      runner,
+      await readFile(join(root, "tests/helpers/packaged-probe.ts"), "utf8"),
+    );
+    const output = await runFixtureCommand(
+      [
+        process.execPath,
+        runner,
+        fullWorkflow ? "full" : "load",
+        ...projects.map((project) => project.directory),
+      ],
+      projects[0]?.directory as string,
+    );
+    const line = output
+      .split("\n")
+      .find((value) => value.startsWith("PACKAGE_EVIDENCE="));
+    if (!line) throw new Error("Installed probe produced no evidence");
+    return JSON.parse(line.slice("PACKAGE_EVIDENCE=".length));
+  } finally {
+    for (const project of projects) await project.cleanup();
+    await rm(staging, { recursive: true, force: true });
+  }
+}
+import { writeFile } from "node:fs/promises";
+import { verifyPackage } from "../tests/helpers/package.js";
+
+const evidence = await verifyPackage(true);
+const report = {
+  ...evidence,
+  architecture: process.arch,
+  opencode: "2.0.29",
+  scope:
+    "Installed setup/interview/PRD/issues/TDD integration/dual review/report",
+  releaseBlockers: [
+    "Production human-input provenance is unsupported",
+    "All three platform CI results required",
+    "Credentialed full workflow not verified",
+    "Host functional lifecycle/tool options required for final dual review",
+  ],
+};
+if (process.env.PACKAGE_EVIDENCE_PATH) {
+  await writeFile(
+    process.env.PACKAGE_EVIDENCE_PATH,
+    `${JSON.stringify(report, null, 2)}\n`,
+  );
+}
+console.log(JSON.stringify(report, null, 2));
+# Ralph for OpenCode
+
+A locally installable OpenCode plugin with durable session jobs, independent code and functional review, bounded review repairs, a read-only dashboard, and interruption recovery. Exact tested dependencies and platform results are in [compatibility](docs/opencode-compatibility.md).
+
+The complete deterministic setup-to-report demonstration runs through the installed public command/adapter boundary. Production human answers and approvals remain blocked: the OpenCode adapter cannot yet verify their provenance. A host integration must supply correlated human responses. The automatic scheduler starts code review; a host must call `reviewFeature` with functional environment, surface and observation-tool options for the final dual review/report. Native Linux/Windows and credentialed full-workflow evidence remain release blockers. See [package validation](docs/package-validation.md).
+
+## Build and install locally
+
+Use Git and the Bun version in `.bun-version` (also pinned in `package.json`). From this source directory:
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run lint
+bun run pack:local
+```
+
+Copy `opencode-ralph-plugin-0.2.0.tgz` to each target repository, then run there:
+
+```sh
+bun add ./opencode-ralph-plugin-0.2.0.tgz
+bun -e 'console.log(require("node:url").pathToFileURL(require("node:fs").realpathSync("node_modules/opencode-ralph-plugin")).href)'
+```
+
+Add the generated, encoded URL to the repository's `opencode.json`, preserving any existing settings:
+
+```json
+{
+  "plugins": ["REPLACE_WITH_GENERATED_PACKAGE_DIRECTORY_URL"]
+}
+```
+
+Use the **entire** URL printed by the command. It points to the package directory, where OpenCode resolves `server.js` and `tui.js`; do not point it to `dist/plugin.js`. This handles Windows drives and spaces. The example uses single quotes around JavaScript for PowerShell and POSIX shells; native Windows results are pending CI. A relative tarball dependency is recommended; Bun 1.4.3 failed to install the tested percent-encoded absolute `file:` tarball URL with spaces. Each target must be a Git repository. The repository root need not have a commit just to load the plugin; feature/review operations need committed inputs.
+
+Start OpenCode **2.0.29** in that repository (see compatibility for the local binary path). Restart OpenCode after changing plugin configuration. No registry publication is required or performed by these scripts.
+
+## Commands and operation
+
+- `/ralph-commands` explores lifecycle commands in a read-only session, presents the exact revision/hash, and requires a correlated human approval before saving `.ralph/commands.json`. Production approval currently reports unsupported; a host adapter with verified input provenance is required to complete setup. Each execution also requires host permission.
+
+- `/ralph-orchestrator [feature]` requires verified project commands for the current configuration and host. It collects missing feature input, explores the repository in a read-only interview session, asks recommended questions in the main session, and persists the conversation. Reply `approve <revision>` to the presented explanation, or describe revisions. Approved explanations continue through PRD/graph generation and combined execution approval. Execution approval presents the starting SHA and runs baseline preflight when the checkout is clean; setup/check failures block, and check timeouts remain visible as run-local omissions. A passed baseline automatically schedules dependency-ready issues with two executor slots by default and one integration queue. The production adapter reports unavailable human-input provenance and leaves the request pending.
+
+- `/ralph-status [run-id]` reads durable status and the dashboard URL. With no argument it selects the latest run.
+- `/ralph-pause [run-id]` records pause intent and freezes new dispatch while active work settles.
+- `/ralph-resume [run-id]` records explicit resume intent after pause/recovery; preserved attempts and revisions remain in force. Blocked recovery requires resolving its disclosed facts first.
+- `/ralph-stop [run-id]` cancels correlated sessions and cleans up owned processes. Stale completions cannot advance the run.
+
+The dashboard URL includes an access token in its fragment. Open it locally; treat it as private. The listener uses loopback with an automatically allocated port, so independent repositories can run together. The browser is read-only; commands and approvals belong in OpenCode. State and write locks live under the repository's canonical Git common directory, `ralph/runs`, and are shared by linked worktrees. Independent repositories use independent stores. The plugin stays attached to the OpenCode server lifecycle; shutdown stops owned work and the dashboard. Restart reconciles facts and waits for explicit resume.
+
+The v2 package ships server and TUI entry points. Slash commands execute directly, emit a status notification, and queue their exact output as a synthetic inbox item without waking the model. The TUI displays Ralph status notifications; the dashboard and persisted store remain authoritative.
+
+The public `adapter`, `store`, `commands`, `types`, `review/*`, `reporting/completion` and `process` exports support typed host integration. `createCommandRouter(...).scheduleIssues(runId)` schedules the approved DAG; `executeIssue(runId, issueId)` executes/integrates one approved issue with at most three attempts and retained failure evidence; `answerExecutorQuestion(runId, issueId, response)` validates a host-provided correlated human response; `continuePlanning(runId)` presents and continues a pending execution approval; `runJob` dispatches a correlated session; `reviewFeature` coordinates the two reviewers and final report. `process` exposes ownership tracking/cleanup for approved command owners, not command approval. Tests and fixture code are excluded from runtime exports and the tarball.
+
+Code and functional reviewers load their bundled `skills/code-review` and `skills/functional-review` resources. Code-review options accept a `{ providerID, modelID }` model; functional review accepts its own model through `functionalOptions`. Executor jobs carry the same optional model field. Model/tool availability and OpenCode permissions remain host-owned; no permission is auto-approved. Command configuration validates lifecycle ordering, platform coverage (or explicit unsupported reasons), paths, timeouts, argument arrays, explicit shells and environment references. Role models and replacement skill paths are read from optional `.ralph/project.json` and captured with hashes on each run.
+
+## Interview settings
+
+Project replacements resolve relative to the workspace root. Omit `skillPaths.interview`
+to use the original bundled grill-me guidance. Omit `models.interview` to capture the main
+session's selected model; an unavailable selection produces an actionable error.
+
+```json
+{
+  "schemaVersion": 1,
+  "models": { "interview": { "providerID": "your-provider", "modelID": "your-model" } },
+  "skillPaths": { "interview": "skills/my-interview.md" },
+  "concurrency": 2,
+  "timeoutMs": 300000,
+  "agentTimeoutMs": 1800000
+}
+```
+
+Runs record model selections, skill paths and content hashes, the verified command hash,
+and timeout/concurrency defaults. Agent timeouts interrupt planning and retain the lock
+and evidence. Human answers do not time out. `agentTimeoutMs` separately controls executor and merger deadlines (default thirty minutes), and is recorded on the run and each issue attempt. One canonical repository lock includes
+planning; explanation approval retains it through execution. Terminal coordinated review releases the matching lock. Interrupted locks require reconciliation and explicit resume.
+
+## Concurrent execution resources
+
+Ready issues are selected in approved graph order. A submission waits in the integration
+queue; children start only after all parents integrate, including qualified integration
+with omitted checks. `/ralph-status` and durable events expose ready, pending, running,
+integration_queued, integrated, failed and blocked states plus queue order. The executor
+slot ends after submission cleanup; merger/validation work uses a separate serial queue.
+
+`/ralph-commands` may propose resource allocation in the exact approved configuration:
+
+```json
+{
+  "resources": {
+    "RALPH_PORT": "port",
+    "RALPH_NAMESPACE": "namespace",
+    "RALPH_DIRECTORY": "directory"
+  },
+  "exclusiveResources": ["shared-test-database"]
+}
+```
+
+Command `env` mappings reference these source names, for example
+`{"PORT":"RALPH_PORT","APP_NAMESPACE":"RALPH_NAMESPACE","APP_DATA":"RALPH_DIRECTORY"}`.
+Ports, namespaces and directories are allocated per lifecycle/job. Executor prompts
+receive the allocation; candidates receive fresh allocations. The runner executes only
+approved commands, using main-session permission before an executor session exists.
+Shared resource names serialize use within the repository. Startup without allocated
+ports also serializes use. Missing required references block setup; commands are never
+invented or rewritten to obtain isolation. Owned cleanup releases only that lifecycle's
+resources; cleanup failures retain ownership and diagnostics.
+
+## Executor questions
+
+An executor may return `{"kind":"needs_input","question":"...","recommendedAnswer":"...","affectedRequirement":"..."}`. Ralph persists the question on its run/issue/attempt and publishes it through the main-session adapter. The issue and descendants wait while independent issues continue. Human waiting consumes no executor capacity, agent deadline or retry. A correlated clarification resumes the same worktree and attempt with a new job identity and the remaining active-time budget.
+
+Hosts answer through the adapter's authenticated `UserInputResult` contract. The public router also accepts a later response via `answerExecutorQuestion`, followed by `scheduleIssues` for clarification or `continuePlanning` for revision approval. Stale requests, changed revisions, duplicate messages and unrelated sessions are rejected. The production adapter currently leaves human input pending because verified provenance is unavailable.
+
+For scope changes, a correlated user answer can carry JSON `{"kind":"revise_scope","prd":"complete PRD text","graph":<complete graph>,"files":<issue-path to Markdown map>}`. Ralph compares content, validates and publishes a new draft, presents affected work and preserved integrated evidence, and requires the normal combined execution approval. Adapter-delivered answers present that gate automatically. Revised artifacts cannot execute under the previous approval. Answers and approvals have no browser mutation endpoint.
+
+## Validation semantics
+
+Three **total issue attempts** include the first submission and two retries; an expected failing TDD red test does not consume an attempt. Three **total review rounds** apply to the final dual review; each generated repair task has its own three-attempt limit. Functional infrastructure retries have a separate three-attempt budget. Issue repair limits are enforced through the public single-issue entrypoint; the dependency scheduler preserves independent progress when an issue exhausts its budget.
+
+The validation policy skips only timed-out validation checks for the current run, never setup/readiness timeouts, permission denials, cancellations or completed failures. Those omissions must remain in the report and must not rewrite approved commands. The baseline runs on an isolated clean checkout before implementation. Check timeouts are run-local omissions; setup failures and timeouts block readiness. Retain failed worktrees and their evidence for diagnosis; clean successful worktrees only after validated integration. Recovery does not silently discard retained resources.
+
+A completed agent job is not proof of a verified feature. Reports distinguish `verified`, `incomplete-validation` (including skipped checks), `unverified` (missing review evidence) and `unresolved` (blocking issues/findings). Inspect the report's commit, checks, unavailable review and cleanup/resource fields. No workflow script publishes, pushes, creates a PR or merges into a target branch.
+
+## Reproduce the package demonstration
+
+```sh
+bun test tests/integration/15-package.test.ts
+bun run test:package
+bun test tests/e2e/full-workflow.test.ts
+bun run test:browser
+bun run test:smoke
+```
+
+The package probe builds a clean distribution, packs it, installs it into two committed temporary repositories with spaces in their paths, and loads the installed plugin. It checks bundled skills/dashboard assets, separate stores and dashboard data, concurrent ports, argv preservation, local readiness, child cleanup and pause/resume. The workflow demo approves discovered commands, interviews, generates and approves a PRD/issue graph, prepares a clean baseline, executes real red/green addition tests, commits through the executor/merger worktrees, and dispatches independent reviewers through the fake SDK HTTP boundary. The second repository really times out its approved validation check; no execution state is seeded. The host explicitly supplies functional review options to the public coordinator after scheduling. Reports are `verified` for the passing-evidence fixture and `incomplete-validation` for the skipped-evidence fixture. These are deterministic fixture verdicts, not live-agent evidence. Temporary repositories are removed; `test:package` prints platform, runtime, outcomes and blockers. Set `PACKAGE_EVIDENCE_PATH` to retain JSON evidence.
+
+For the real installed OpenCode server probe, enable `OPENCODE_SMOKE=1` (PowerShell: `$env:OPENCODE_SMOKE='1'`) before `bun run test:smoke`. It uses a local deterministic model. The separate credentialed session probe requires `OPENCODE_LIVE_SMOKE=1`, `OPENCODE_SMOKE_URL` and `OPENCODE_SMOKE_MODEL=provider/model`; without them it reports SKIPPED. The credentialed probe covers a model session, not the complete workflow; production human provenance and automatic functional-review wiring remain blockers. A v2 server also requires authentication: set `OPENCODE_SMOKE_PASSWORD` for the live probe. Credentials remain in the configured server; do not copy them into fixtures or package assets.
+
+See [troubleshooting](docs/troubleshooting.md). CI runs the required suites on macOS, Ubuntu and native Windows and retains per-platform package evidence. A green fixture demo does not remove the production-host or unrun-platform blockers.
+# OpenCode compatibility
+
+## Supported combination
+
+This package targets **OpenCode 2.0.29**. Its server/TUI definitions and typed adapter use the v2 API; v1 hosts are no longer supported. Version 0.2.0 replaces the earlier 1.19.0 integration.
+
+| Component | Exact version |
+| --- | --- |
+| `@opencode/cli` (development/test CLI) | 2.0.29 |
+| `@opencode/plugin`, `@opencode/client`, `@opencode/schema` | 2.0.29 |
+| Bun | 1.4.3 |
+| TypeScript / Biome | 5.9.3 / 2.4.6 |
+
+The real-server smoke probe builds, packs, installs and loads the package in an isolated Git repository. On macOS arm64 it exercises completed sessions, direct commands without model calls, event subscription, denied shell execution, linked-worktree observation restrictions, persistence, restart, explicit resume, interruption and status RPC. The deterministic local model proves the host boundary, not credentialed external-provider behavior. Native Linux/Windows results remain pending CI.
+
+## Installation and entry points
+
+Follow [README](../README.md). Configure `plugins` with the installed **package directory**, preferably a canonical, encoded file URL. Do not use the old `plugin` entry pointing to `dist/plugin.js`. OpenCode resolves `server.js` and `tui.js` from that directory; both have default definitions with `id: 'ralph'` and `setup(context)`. Package imports also expose `/server` and `/tui`.
+
+Tests use `node_modules/@opencode/cli/bin/opencode.exe`, including on macOS/Linux. The manifest trusts this pinned CLI's postinstall script. Version changes require new runtime evidence, not just a dependency bump.
+
+V2 activates external plugins asynchronously. Wait for command registration before dispatching external jobs; otherwise initial recovery may encounter newly recorded job intent. Local configuration changes require host activation/reload to complete.
+
+Command registration can be visible before `plugin.list` publishes the active plugin. The installed-package probe also waits for that inventory entry before checking server/TUI features. This preserves the supported v2 mapping described in the [official plugin documentation](https://opencode.ai/v2/docs/build/plugins/); the ticket's proposed `@opencode-ai/plugin` import belongs to v1.
+
+## Session adapter
+
+`src/opencode/adapter.ts` accepts a narrow `AdapterHost`; `createAdapterClient` supplies it over the real v2 client and Ralph RPC. The plugin supplies the host's native session domain. V2 calls use flattened options and throw typed/transport failures rather than returning v1 `{ data, error, response }` envelopes.
+
+```ts
+const client = createAdapterClient(url, undefined, {
+  Authorization: `Basic ${btoa('opencode:' + password)}`,
+});
+const session = await client.session.create({
+  location: { directory }, title,
+  model: { providerID, id: modelID },
+});
+const receipt = await client.session.prompt({ sessionID: session.id, text });
+await client.session.wait({ sessionID: session.id });
+const history = await client.session.context({ sessionID: session.id });
+await client.session.interrupt({ sessionID: session.id });
+await client.session.command({ sessionID: session.id, name: 'ralph-status', text: runId });
+const commands = await client.command.list({ location: { directory } });
+for await (const event of client.event.subscribe({ signal })) { /* v2 event.data */ }
+```
+
+Job intent is durable before session creation; the returned session ID is durable before prompting. Workspace selection occurs at session creation; subsequent calls target that session ID. Model fields map from Ralph's `{ providerID, modelID }` contract to v2 `{ providerID, id }`.
+
+Prompt acknowledgment is not completion. The adapter waits, finds the delivered user message with the receipt's ID, and checks the subsequent turn. Success requires completed assistant text, `finish: 'stop'`, a successful idle record and no failed tools or session errors. Unexpected subsequent input makes correlation uncertain and returns missing output. Earlier failed/denied tools, including caught code-mode failures in tool metadata, cannot be erased by later assistant success.
+
+Cancellation is recorded before interruption. Journals retain the existing `session.abort` operation kind for compatibility with persisted state; v2 uses `session.interrupt` underneath. A late-created cancelled session is interrupted without prompting. Stale results cannot update superseded attempts.
+
+## Commands, observations and notifications
+
+Commands register with `context.command.transform`; tools register with `context.tool.transform`. Status/pause/resume/stop execute directly. The exact command output is queued as a synthetic inbox item with `resume: false`, and a status event notifies the TUI without waking the model. Pending output can be inspected with `client.session.inbox.list`; it is consumed on the next session execution. Status never depends on generated assistant text.
+
+V2 does not expose the plugin tool catalog as a public client endpoint. `src/opencode/bridge.ts` defines location-scoped Ralph RPC for tool discovery, observation preparation and status notification. Review sessions expose only `ralph_review_*` aliases of permitted observation tools. Aliases retain each original tool's permission action and execution function. Context filtering hides mutation tools and code-mode `execute`; the execution hook also rejects unapproved calls. Normal sessions retain their original tools and hide the observation aliases. Host denials are never changed to allows and no permissions are automatically approved.
+
+The TUI entry listens for `rpc.ralph.status` in its location and shows an informational toast; cleanup unsubscribes. Server-only consumers can subscribe to status RPC events and use the durable status/dashboard. Interactive TUI rendering has unit contract coverage; native interactive/platform validation remains pending.
+
+## Recovery and remaining limits
+
+The canonical Git common directory owns `<git-common-dir>/ralph/runs`. Its fsynced JSONL journal remains authoritative; snapshots use atomic rename and writers use ownership-verified locks. Linked worktrees share state. Multiple v2 locations in one server recover that state once and only the last location's cleanup stops shared work. Restart still requires explicit resume and never resets attempts or review budgets. No new state schema or migration is needed for existing journals.
+
+V2 exposes session forms, but Ralph's human-input/approval provenance workflow is still absent. `requestUserInput` remains explicitly unsupported; neither assistant text nor API-created user messages establish human approval. The command setup workflow now validates correlated host-supplied approvals and lifecycle execution in fixtures, with production execution permissions delegated to `ctx.permission.assert`. Production human approval remains unsupported. Deterministic installed-package coverage now includes setup, interview/PRD/graph approval, baseline, issue execution/integration and explicit dual-review coordination. The scheduler automatically starts code review only; functional lifecycle options must be supplied by a host. See [README](../README.md) and [package validation](package-validation.md).
+
+## Reproduce
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run lint
+bun run test
+OPENCODE_SMOKE=1 bun run test:smoke
+bun run test:package
+```
+
+On PowerShell set `$env:OPENCODE_SMOKE='1'` before running the smoke suite. The local probe uses an isolated test-only Basic-auth password. The separate live probe requires `OPENCODE_LIVE_SMOKE=1`, `OPENCODE_SMOKE_URL`, `OPENCODE_SMOKE_MODEL=provider/model` and the server's `OPENCODE_SMOKE_PASSWORD`; without its opt-in/endpoint/model it is skipped. Do not put credentials in package resources or fixture data.
+
+## Issue 1 verification — 2026-10-14
+
+- macOS arm64, Bun 1.4.3: typecheck and lint passed; all 19 issue-1 integration tests passed.
+- `OPENCODE_SMOKE=1 bun test tests/smoke/opencode.test.ts`: **2 passed, 1 skipped**. The fresh-source install uses only the manifest/lockfile and an empty package cache. The installed-package probe builds, packs and loads Ralph in real OpenCode 2.0.29, correlates its local model response through the public router/adapter, preserves permission denial, observes events and verifies status after host restart.
+- Red/green evidence: the empty-cache install failed with `ENOENT extracting tarball from opencode-ralph-plugin` before removing the accidental self-dependency from the manifest and regenerating the lockfile. It then passed. A warm cache had concealed the missing archive. Package installation must not depend on a previously built copy of itself.
+- The real probe initially failed on an unpublished plugin inventory entry; the probe now waits for active inventory independently of command registration, retaining its TUI assertion.
+- Fresh-install checks are gated because they download dependencies; the deterministic issue-1 suite requires neither network model access nor paid calls. Credentialed external-provider execution was skipped. Linux and Windows have CI jobs but were not run here; interactive TUI and human-response provenance remain unverified/unsupported as described above.
+
+## Packaged workflow verification — 2026-10-15
+
+macOS arm64, Bun 1.4.3 and the pinned OpenCode 2.0.29 combination passed the installed host smoke (3 passed across the smoke suite, 1 credentialed-provider skip), complete deterministic two-consumer setup-to-report test, six Chromium checks, typecheck/lint and the integration suite (194 passed, 1 separately gated browser smoke skipped). The demo performs real Git/TDD/integration and a real timeout omission; human responses and agent prose are supplied at the public adapter boundary. Full results, reproducible commands and remaining production/native-platform blockers are recorded in [package validation](package-validation.md). No Linux, native Windows or credentialed full-workflow success is claimed by these local results.
+
+exec
+/bin/zsh -lc 'bun --version; bun run typecheck; bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 1441ms:
+1.4.3
+$ tsc --noEmit
+$ biome check src tests scripts
+Checked 98 files in 62ms. No fixes applied.
+
+codex
+The package tests, three-platform CI matrix, and installation docs are already in place. The recorded demo covers two installed consumers through setup and final report. Linux, Windows, and credentialed full-workflow checks remain documented release blockers; I’ll verify the current macOS checkout before deciding whether changes are needed.
+
+exec
+/bin/zsh -lc 'bun test tests/integration/15-package.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'cat .agents/issues/README.md; cat .agents/issues/14-pause-stop-and-recover-interrupted-workflows.md; cat docs/recovery-validation.md; cat docs/troubleshooting.md' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+cat: .agents/issues/README.md: No such file or directory
+# 14. Pause, stop, and recover interrupted workflows
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-8  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Expose /ralph-pause, /ralph-resume and /ralph-stop in OpenCode and recover interrupted workflows safely. Reconcile persisted intents with actual Git refs, worktrees, sessions, processes and validation evidence before presenting a recovery summary. Require an explicit resume instruction after restart. Cover execution, questions, merge publication and review repairs without repeating completed side effects or resetting budgets.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 101–115): OpenCode-owned lifecycle and waiting/blocked state.
+- `PRD.md` (lines 148–152): intent persistence and stale-result protection.
+- `PRD.md` (lines 257–265): controls and recovery.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 9: Resolve executor questions through OpenCode chat](9-resolve-executor-questions-in-opencode.md): predecessor contracts and the code delivered by that slice.
+- [Issue 13: Repair review findings within three review rounds](13-repair-findings-within-three-review-rounds.md): predecessor contracts and the code delivered by that slice.
+- `src/commands/control.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/recovery/reconcile.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/process/ownership.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/plugin.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Pause means stop new scheduling and let in-flight operations settle; stop cancels owned work while preserving artifacts. Recovery reads actual state and compares immutable identities before deciding which transition is complete. Do not trust a recorded PID alone because process identifiers can be reused.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Implement chat controls and shutdown ownership
+
+**Files:** `src/commands/control.ts`, `src/process/ownership.ts`, `src/plugin.ts`, `src/commands/router.ts`
+
+- **IMPLEMENT:** Register pause/resume/stop handlers and record human intent. Freeze dispatch while paused; cancel active agents and owned process trees on stop, await bounded cleanup and persist interruption. Tie dashboard and worker ownership to OpenCode lifetime. Use owner tokens, start times and workspace identity when tracking processes; prevent child services from running as an unintended daemon after parent death.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import OpenCodeAdapter.cancelJob, RunStore, scheduler control hooks and environment disposal; export handleControlCommand and inspectOwnedProcess.
+- **GOTCHA:** Do not kill unrelated processes or convert stop cancellation to command timeout skipping. Preserve required permission prompts. If graceful shutdown hooks are limited, implement parent-liveness handling in owned child wrappers.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/14-recovery.test.ts`; add the tests below as this slice develops.
+
+### 2. Reconcile durable state before explicit resume
+
+**Files:** `src/recovery/reconcile.ts`, `src/state/run-store.ts`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** Scan active-run state using the Git common repository root. Compare integration refs, recorded expected-old/new SHAs, candidate check evidence, worktree ownership, session status and attempt IDs. If an advance succeeded before its result write, record it once; if check completion is uncertain, rerun applicable validation before advancement. Mark ambiguous states blocked and present facts in OpenCode. Require resume after reconciliation and retain question/approval/review counters.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import Git inspection helpers, ValidationSummary, OpenCodeAdapter and persisted operation records; export reconcileRun and RecoverySummary.
+- **GOTCHA:** Resume is not an automatic reset of exhausted budgets. Any user-requested budget reset is a separately logged explicit action. A stale lock must be validated against owner liveness before replacement.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/14-recovery.test.ts`; add the tests below as this slice develops.
+
+### 3. Exercise interruptions at side-effect boundaries
+
+**Files:** `tests/integration/14-recovery.test.ts`
+
+- **IMPLEMENT:** Inject termination before/after worktree creation, check completion, integration ref update, state append, cleanup, question response and review repair dispatch. Verify pause settles active operations, stop prevents late results, restart does not resume automatically, approved revisions survive, and duplicate merge/repair dispatch cannot occur.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import existing fixtures, fake clock, public control/reconcile handlers and actual Git commands via the test helper.
+- **GOTCHA:** Include a live process ownership fixture and safe reused-PID simulation; full platform process-tree cases run in issue 15.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/14-recovery.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [ ] Pause starts no new issue or review work but lets current operations settle.
+- [ ] Stop cancels only owned work and preserves recovery artifacts.
+- [ ] Restart produces a recovery summary and waits for explicit resume.
+- [ ] A ref advance followed by a crash is not repeated, and uncertain validation is not treated as passed.
+- [ ] Retry/review counters and approvals survive restart unchanged.
+- [ ] Plugin exit does not leave an independent orchestrator or dashboard running.
+- [ ] This slice's behavioral regression tests pass: `bun test tests/integration/14-recovery.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [ ] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/14-recovery.test.ts
+
+```
+
+**Demonstration:** Interrupt immediately after a candidate ref advance but before its state result, restart OpenCode, inspect recovery, resume, and prove exactly one integration is recorded.
+
+## Blocked by
+
+- [9-resolve-executor-questions-in-opencode.md](9-resolve-executor-questions-in-opencode.md) — resolve executor questions through opencode chat supplies the prerequisite behavior/contracts.
+- [13-repair-findings-within-three-review-rounds.md](13-repair-findings-within-three-review-rounds.md) — repair review findings within three review rounds supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+### Implementation evidence — 2026-10-14
+
+Existing controls/reconciliation were verified and two stop/resume regressions
+were repaired with failing-then-passing public tests. Recovery facts now survive
+repeated stops; resume waits for bounded stop cleanup. Typecheck, lint and all
+16 recovery tests pass on Bun 1.4.3. The full integration suite passes 69 tests
+with one explicitly gated browser test skipped.
+
+See [recovery validation](../../docs/recovery-validation.md) and
+[project wiki](../../docs/wiki/features/workflow-recovery.md) for the exactly-once
+Git recovery demonstration and limitations. This slice is not fully accepted:
+issue 9 question/approval persistence and production execution/validation/active-run
+lock predecessors are absent. Their recovery integration remains pending.
+Linux/Windows process trees and live OpenCode lifecycle checks were not run.
+
+### Follow-up implementation evidence — 2026-10-15
+
+The predecessor absence noted above is superseded: execution, candidate validation,
+question persistence, approvals and active-run ownership now exist and are covered
+by this recovery integration. Fixed production pause settlement, recovered accepted
+integrations at three crash boundaries (including checkout synchronization), restored
+accepted issue state exactly once, renewed/republished pending questions on explicit
+resume, and retained answers, approvals and active-time budgets across restarts.
+Recovery checks accepted refs and logical active-run lock identities, freezes controls
+during inspection, and blocks ambiguous execution/merge/repair completion without
+repeating side effects. Local edits are preserved during checkout recovery.
+
+New fixes have failing-then-passing public behavioral tests. Additional local-edit
+and late-repair callback coverage verifies the safety guards without adding behavior;
+documentation/wiki edits are non-behavior work. Pinned Bun 1.4.3 results:
+`bun run typecheck` passed; `bun run lint` passed (97 files);
+`bun test tests/integration/14-recovery.test.ts` passed 33 tests / 185 assertions.
+
+The production-router demonstration interrupts immediately after Git ref advancement,
+reopens the common store, reconciles the accepted commit and checkout, rejects dispatch
+until explicit resume, and returns the same integrated attempt with no new SDK request.
+A second reconciliation records no duplicate integration. See the updated
+[validation evidence](../../docs/recovery-validation.md) and
+[wiki](../../docs/wiki/features/workflow-recovery.md).
+
+Production human provenance, native Linux/Windows process trees and live OpenCode
+shutdown remain unrun/unsupported as documented by the predecessors. Ambiguous
+publication/cleanup/repair states require explicit evidence-based resolution, and
+host-supplied functional review environment/surface/tool options are not reconstructed
+automatically. No package publication, external message or target-branch merge occurred.
+
+A final red/green held-read regression also prevents stop followed immediately by
+resume from reviving a paused integration callback; phase boundaries recheck the
+original control epoch before launching validation or advancing the ref.
+
+Final frozen-code full integration run: `bun test tests/integration` passed 194,
+skipped the existing gated real agent-browser test, failed 0 (1,232 assertions,
+15 files). Earlier development runs that loaded pre-fix modules are superseded by
+this final run. Final source checks remain typecheck/lint green and 33 recovery
+tests green. Wiki updated: workflow recovery and its open-questions entry.
+# Workflow recovery validation — 2026-10-15
+
+The existing controls, process ownership and restart reconciliation were extended
+against the now-present execution, question and repair predecessors. All probes
+use pinned Bun 1.4.3, temporary real Git repositories and the public command router
+with the controllable OpenCode adapter.
+
+## Behavioral red/green evidence
+
+Each new fix began with its failing public regression, then passed after the
+corresponding change:
+
+- Crashes after integration ref advancement, before operation-result append or
+  issue-result append, previously blocked valid evidence or stranded `merging`.
+  Recovery now binds saved production validation to the exact merger envelope,
+  commit, command hash/revision and approval, records completion once, and restores
+  the issue to `integrated` without allocating another attempt or merger.
+- A stop immediately followed by resume could revive an integration waiting at a
+  paused boundary. A held-read regression first recorded an unexpected advance,
+  then passed after rechecking the original attempt epoch after each wait.
+  Validation also checks its original epoch before dispatching the next check.
+- A crash immediately after `update-ref` left the integration index/worktree on the
+  old tree. Recovery now finishes only a proven old-index/clean-worktree transition
+  using Git's two-tree merge. It refuses ambiguous indexes or local modifications.
+  The local-edit preservation case is additional coverage of this guard.
+- Restart previously left pending questions with an invalid control epoch. Explicit
+  resume renews unanswered request identities and republishes through the main
+  session adapter. Old callbacks cannot answer the new question. Answers already
+  persisted, authoritative approval records and the remaining active-time deadline
+  survive another reopen unchanged.
+- Pause previously rejected the active production executor's submission and turned
+  an active merger/check into a failed attempt. Existing attempt identities can now
+  settle while paused; the next merger/check/ref boundary waits for resume.
+- An SDK result without its issue append previously appeared resumable while the
+  executor remained `executing`. Uncertain execution/merge completion now blocks
+  with retained facts instead of silently stranding work or repeating dispatch.
+- Recovery previously ignored active-run lock identity and fully appended ref
+  advances. It now retains matching locks, blocks foreign/corrupt owner evidence,
+  and verifies the latest accepted integration ref even after its result was saved.
+
+Reconciliation marks its scan pending, rejects controls while inspecting external
+state, and compares its epoch/revision before publishing the final summary.
+Existing stop regression coverage retains blockers across repeated stops, rejects
+resume during bounded cleanup, cancels correlated sessions, and checks real process
+ownership plus simulated PID reuse.
+
+## Demonstration
+
+The production router executes a real TDD submission and merger. Injected host
+termination happens at three boundaries: immediately after the Git ref update,
+before its operation result, and before its issue result. Reopening the common Git
+store and reconciling repairs the checkout if necessary and records exactly one
+accepted integration. The public router rejects dispatch before explicit resume.
+After resume the issue returns the same accepted commit/attempt without another
+SDK request. A second reconciliation adds no duplicate integration result.
+
+Question coverage pauses after a real `needs_input` result, advances/reopens the
+control epoch, resumes, observes the republished request, rejects the old answer,
+and retains the new answer through another restart. The fake clock proves that
+five seconds of active execution leaves 25 seconds of the original 30-second
+budget. A separate in-flight repair interruption preserves the exact review round
+and reserved attempt; its late callback cannot update the workflow or dispatch a
+second repair. These last repair assertions extend existing behavior coverage and
+did not require a production change. Documentation changes are non-behavior work.
+
+## Limits
+
+Ambiguous publication, check output, repair dispatch or cleanup stays blocked for
+explicit evidence-based resolution. Recovery does not invent missing output, replay
+side effects, reset budgets or replace a logical active-run lock. Reconciled work
+is available to the public scheduler/review entrypoints; unanswered questions are
+republished by `/ralph-resume`. Automatic reconstruction of host-supplied functional
+review environment/surface/tool options is not implemented.
+
+Production human-input provenance remains unsupported by the predecessor adapter;
+these tests supply correlated human responses. No live-provider, native Linux/
+Windows process-tree or real OpenCode shutdown smoke was run in this slice. The
+existing platform declarations and gated tests remain intact. No package was
+published and no target branch was merged.
+
+## Final checks
+
+- `bun run typecheck`: passed.
+- `bun run lint`: passed (97 files).
+- `bun test tests/integration/14-recovery.test.ts`: 33 passed, 0 failed,
+  185 assertions.
+
+An earlier broad run overlapped test development and loaded the pre-fix modules;
+it reported the newly added ref-identity and in-flight-validation regressions as
+failures. That run is not final verification. The final broad run is recorded
+below after completion.
+
+Final frozen-code broad run: `bun test tests/integration` passed 194 tests,
+skipped the existing explicitly gated real agent-browser test, and failed none
+(1,232 assertions across 15 files). The full suite includes local tarball consumer
+and lifecycle fixtures; it does not establish native Linux/Windows or live-provider
+coverage. No source changes followed these final checks.
+# Installation and operational troubleshooting
+
+Use the exact dependency versions listed in [compatibility](opencode-compatibility.md) and Bun from the package manifest (`.bun-version` in a source checkout). Run the package probe from the source checkout: `bun run test:package`.
+
+| Symptom | Check or action |
+| --- | --- |
+| Tarball install mentions a developer's home directory | Rebuild the current manifest; it no longer contains a self-dependency. Copy the archive into the consumer and install `./opencode-ralph-plugin-0.2.0.tgz`. Avoid percent-encoded absolute tarball URLs with Bun 1.4.3. |
+| Plugin fails to load on a path with spaces or Windows | Generate the canonical package-directory URL with `realpathSync` and `pathToFileURL` using the README command. Use the encoded URL for plugin loading; do not hand-build drive-letter file URLs. |
+| Slash command missing | Restart the pinned OpenCode server in the correct repository and inspect `plugins` in its local `opencode.json`. V2 activates external plugins asynchronously; allow activation to finish. All six Ralph commands are registered. Setup/orchestrator wait for correlated human responses; the production adapter currently reports unsupported provenance. |
+| Global OpenCode behaves differently | Use OpenCode 2.0.29. This package uses the v2 plugin contract; v1 is no longer supported. |
+| Local test CLI says postinstall was not run | Run `bun pm trust @opencode/cli`; the manifest trusts only this pinned CLI install script. |
+| HTTP SDK returns 401 | Pass the v2 server Basic-auth header to `createAdapterClient(url, fetch, headers)`. The smoke test uses an isolated test-only password. |
+| Dashboard inaccessible | Get a fresh URL from `/ralph-status`. Use its loopback host and fragment token. Tokens are process-scoped and change on server restart. The listener stops when the plugin is disposed. |
+| Dashboard returns 401/403/405 | Authentication is required for API reads. Cross-origin and mutation requests are rejected. Use OpenCode for controls. |
+| Reopened workflow does not continue | Recovery intentionally waits for `/ralph-resume`. Read the recovery facts first; resolve blocked/conflicting Git, session or ownership evidence. Attempts and revision budgets do not reset. |
+| Writer lock or process ownership cannot be inspected | Do not delete state or kill arbitrary PIDs. Recovery only reclaims provably dead local owners. Native Windows requires PowerShell/CIM and `taskkill.exe`; POSIX requires `ps` and process-group signals. Unknown ownership is a visible blocker. Network-filesystem lock atomicity is not promised. |
+| Completion says incomplete/unverified | Read skipped checks, unavailable criteria/review, failed cleanup and retained resources in the report. A successful assistant response does not validate checks. |
+| Failed worktree remains | Keep it with its evidence for diagnosis. Do not remove a worktree referenced by an active operation. Successful issue cleanup is owned by integration, not package installation. |
+| Live smoke is skipped | The credentialed probe requires opt-in, endpoint, model and v2 server authentication documented in README. A deterministic local model or fake adapter cannot prove provider compatibility. |
+| Linux or Windows result is unavailable | Run the corresponding native CI matrix job. Missing or failed supported-platform evidence remains a release blocker. macOS results cannot certify Windows cleanup behavior. |
+
+No install or release script pushes, publishes, creates a PR or merges a feature into its target. The two-repository demonstration uses local temporary Git branches only. Runtime state is under the Git common directory; logs, repositories, test fixtures and secrets are excluded from the package's allowlisted contents. The build removes stale `dist` output before compilation.
+
+exec
+/bin/zsh -lc 'bun run test:browser' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 14260ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/15-package.test.ts:
+(pass) the distributable has no dependency on a developer-local copy of itself [4.68ms]
+(pass) a tarball loads in two repositories with bundled assets and isolated state [14143.86ms]
+(pass) recovery notifications are deferred until v2 plugin activation finishes [198.38ms]
+
+ 3 pass
+ 0 fail
+ 15 expect() calls
+Ran 3 tests across 1 file. [14.37s]
+
+exec
+/bin/zsh -lc 'bun test tests/e2e/full-workflow.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 14737ms:
+$ bun run scripts/browser-tests.ts
+$ vite build
+vite v7.1.12 building for production...
+transforming...
+✓ 30 modules transformed.
+rendering chunks...
+computing gzip size...
+../public/index.html        0.34 kB │ gzip:  0.24 kB
+../public/assets/app.css    1.21 kB │ gzip:  0.63 kB
+../public/assets/app.js   203.29 kB │ gzip: 63.77 kB
+✓ built in 318ms
+
+Running 6 tests using 1 worker
+
+(node:10858) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10858) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/dashboard.test.ts:10:1 › scheduler-produced diamond catches up after reconnect and retains all-skipped validation (9.0s)
+  ✓  2 tests/browser/dashboard.test.ts:88:1 › observes two live agents, blocked descendants, skipped validation and reconnect without workflow controls (1.6s)
+  ✓  3 tests/browser/review-report.test.ts:11:3 › browser report matches persisted verified report and chat status (642ms)
+  ✓  4 tests/browser/review-report.test.ts:11:3 › browser report matches persisted unverified report and chat status (646ms)
+  ✓  5 tests/browser/review-report.test.ts:11:3 › browser report matches persisted unresolved report and chat status (854ms)
+  ✓  6 tests/browser/review-report.test.ts:11:3 › browser report matches persisted incomplete-validation report and chat status (597ms)
+
+  6 passed (14.0s)
+
+ succeeded in 11836ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/e2e/full-workflow.test.ts:
+Packaged workflow: darwin, Bun 1.4.3; complete deterministic workflow.
+(pass) installed setup-to-report workflow preserves verified versus skipped validation in two projects [11961.17ms]
+
+ 1 pass
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [11.97s]
+
+exec
+/bin/zsh -lc 'OPENCODE_SMOKE=1 bun run test:smoke' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+codex
+Typecheck, lint, all three package regressions, the installed setup-to-report test, and all six browser tests passed. The two workflow reports correctly distinguish verified completion from a validation timeout. I’m checking the real OpenCode installed-package smoke next; no source changes have been needed.
+
+exec
+/bin/zsh -lc 'ls -lh opencode-ralph-plugin-0.2.0.tgz; cat .gitignore; cat .bun-version' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+-rw-r--r--@ 1 rwmmtzqy  staff   168K Oct 15 02:31 opencode-ralph-plugin-0.2.0.tgz
+node_modules/
+dist/
+.ralph/runs/
+*.tgz
+src/dashboard/public/
+playwright-report/
+test-results/
+1.4.3
+
+ succeeded in 29940ms:
+$ bun test tests/smoke
+bun test v1.4.3 (c6da4a4d3)
+
+tests/smoke/opencode.test.ts:
+(pass) a fresh checkout installs from its lockfile without a prebuilt plugin archive [19267.97ms]
+(pass) installed package: real OpenCode session, command, denied tool, events, restart [5092.17ms]
+(skip) credentialed live model response through an existing OpenCode instance
+
+tests/smoke/package-install.test.ts:
+Installed package smoke: darwin, Bun 1.4.3
+(pass) local tarball installs and loads its plugin, skills and dashboard in two consumers [5676.17ms]
+
+ 3 pass
+ 1 skip
+ 0 fail
+ 29 expect() calls
+Ran 4 tests across 2 files. [30.05s]
+
+codex
+This slice is already implemented; no source changes were needed.
+
+Reverified on macOS: typecheck, lint, 3 package tests, full packaged workflow, 6 browser tests, and 3 smoke tests passed. Credentialed live smoke was skipped.
+
+Release remains blocked on native Linux/Windows evidence and credentialed full-workflow verification, as recorded in [package validation](docs/package-validation.md). Nothing was published, pushed, or merged.
+tokens used
+42,526
+This slice is already implemented; no source changes were needed.
+
+Reverified on macOS: typecheck, lint, 3 package tests, full packaged workflow, 6 browser tests, and 3 smoke tests passed. Credentialed live smoke was skipped.
+
+Release remains blocked on native Linux/Windows evidence and credentialed full-workflow verification, as recorded in [package validation](docs/package-validation.md). Nothing was published, pushed, or merged.

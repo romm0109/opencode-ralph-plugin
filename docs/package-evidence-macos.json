@@ -1,0 +1,47 @@
+{
+  "platform": "darwin",
+  "bun": "1.4.3",
+  "repositories": [
+    {
+      "root": "/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph verified project SrNgSx/.git/ralph/runs",
+      "port": "62843",
+      "outcome": "verified",
+      "stages": [
+        "setup",
+        "interview",
+        "prd",
+        "issues",
+        "executor",
+        "merger",
+        "review",
+        "report"
+      ],
+      "commandHash": "5b89b52c12a9207b815c481bf12c3c19fd187fcf134ff71355db19778ebbbe0c"
+    },
+    {
+      "root": "/private/var/folders/d9/tzgr9knx2zq6sdk72hs18h2m0000gn/T/ralph skipped project opkNM6/.git/ralph/runs",
+      "port": "62852",
+      "outcome": "incomplete-validation",
+      "stages": [
+        "setup",
+        "interview",
+        "prd",
+        "issues",
+        "executor",
+        "merger",
+        "review",
+        "report"
+      ],
+      "commandHash": "866c5f500ba23f80051b706211688db8be6cdb5a74690044385c1711b8b81401"
+    }
+  ],
+  "architecture": "arm64",
+  "opencode": "2.0.29",
+  "scope": "Installed setup/interview/PRD/issues/TDD integration/dual review/report",
+  "releaseBlockers": [
+    "Production human-input provenance is unsupported",
+    "All three platform CI results required",
+    "Credentialed full workflow not verified",
+    "Host functional lifecycle/tool options required for final dual review"
+  ]
+}

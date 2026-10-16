@@ -1,0 +1,628 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/10-observe-execution-in-read-only-dashboard.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cc7-d38a-7c80-bfc8-30896c99d864
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 2 of 3
+File      : 10 of 15 — 10-observe-execution-in-read-only-dashboard.md
+=== END METADATA ===
+
+TASK:
+# 10. Observe execution in the read-only browser dashboard
+
+**Type:** AFK  
+**Status:** Implemented; predecessor integration verified locally  
+**User stories:** US-8  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Deliver a browser dashboard connected to real persisted execution events. Display phase, DAG, agents, attempts, integration queue, checks, skipped validation and bounded logs, with distinct waiting/failed/skipped/passed states. Serve authenticated read-only endpoints on loopback and reconnect event streams without losing ordering. The dashboard does not approve, answer, pause, retry or stop anything.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 257–261): read-only dashboard and chat controls.
+- `PRD.md` (lines 291–293): loopback, access token and secrets.
+- `PRD.md` (lines 314–341): read-only endpoints and snapshot example.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 8: Execute dependency-ready issues concurrently](8-execute-dependency-ready-issues-concurrently.md): predecessor contracts and the code delivered by that slice.
+- `src/dashboard/server.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/dashboard/projections.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/dashboard/web/App.tsx`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/dashboard/web/api.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Read from snapshots and ordered events; do not duplicate orchestration policy in UI state. Keep authentication separate from run IDs and map known log IDs to bounded content, never arbitrary filesystem paths. Show missing evidence explicitly instead of deriving green status from completed issue counts.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Serve authenticated snapshots, events, and logs
+
+**Files:** `src/dashboard/server.ts`, `src/dashboard/projections.ts`, `src/plugin.ts`
+
+- **IMPLEMENT:** Implement GET /api/runs, /api/runs/:id, /api/runs/:id/issues, /api/runs/:id/events (SSE), and /api/runs/:id/logs/:logId. Bind 127.0.0.1, select an available port, use a per-process token, enforce origin checks, and reject mutation methods. Authenticate with a bearer token; deliver it to the page through the URL fragment and use fetch-based SSE so tokens are not logged in request URLs.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import RunStore and RunEvent; export startDashboard and projectRunSnapshot. Use built-in HTTP facilities compatible with the pinned runtime.
+- **GOTCHA:** Return 401 for bad/missing auth and 404 for unknown IDs. Sanitize log content at write/display boundaries and prevent path traversal. Shutdown follows plugin lifecycle.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/10-dashboard.test.ts`; add the tests below as this slice develops.
+
+### 2. Render live execution state
+
+**Files:** `src/dashboard/web/App.tsx`, `src/dashboard/web/api.ts`, `src/dashboard/web/main.tsx`, `vite.config.ts`
+
+- **IMPLEMENT:** Create a React/Vite view with run summary, dependency graph, issue details, integration queue, per-check statuses and paged logs. Subscribe by event sequence ID, reconnect with replay or full snapshot fallback, and show connection state. Link the local URL from /ralph-status and feature startup.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import React hooks from react and createRoot from react-dom/client; import shared read-only DTO types from projections.ts without server runtime imports.
+- **GOTCHA:** Do not add buttons that mutate workflow state. Review-specific projections arrive in issue 13; show generic phase/events for unknown future phases.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/10-dashboard.test.ts`; add the tests below as this slice develops.
+
+### 3. Verify API security and browser behavior
+
+**Files:** `tests/integration/10-dashboard.test.ts`, `tests/browser/dashboard.test.ts`
+
+- **IMPLEMENT:** Test unauthorized/cross-origin/mutation requests, known versus traversal log IDs, bounded log reads, SSE replay and missing sequence fallback. Browser-test two running issues, blocked descendants, skipped checks, reconnect, and absence of mutation controls.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Use bun:test for HTTP integration and @playwright/test for browser checks; configure bun run test:browser to run the browser suite.
+- **GOTCHA:** Token validity is process-local. Screenshots or assertions must not include real secret values.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/10-dashboard.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] Status supplies a working loopback dashboard URL showing live execution data.
+- [x] The graph reflects integrated dependencies and blocked descendants accurately.
+- [x] Skipped checks remain visibly distinct from passed checks, including all-checks-skipped runs.
+- [x] Unauthorized reads and all mutation methods are rejected.
+- [x] Reconnect restores ordered current state and logs remain bounded and path-safe.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/10-dashboard.test.ts`.
+- [x] Type checking and lint pass; no unsupported platform is silently excluded.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/10-dashboard.test.ts
+bun run test:browser -- tests/browser/dashboard.test.ts
+```
+
+**Demonstration:** Open the dashboard while a diamond graph runs, induce one skipped check, disconnect/reconnect the stream, and verify the UI catches up without offering workflow controls.
+
+## Blocked by
+
+- [8-execute-dependency-ready-issues-concurrently.md](8-execute-dependency-ready-issues-concurrently.md) — execute dependency-ready issues concurrently supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+## Iteration 1 implementation evidence — 2026-10-14
+
+Dashboard implementation is available against issue 1's persisted jobs/events. **Predecessor integration remains pending:** issue 8's scheduler, issue graph store and validation implementation were absent from this checkout. This slice does not implement those earlier tasks or claim their live demonstration passed.
+
+Changed public behavior:
+- Plugin startup starts an ephemeral-port loopback server; `/ralph-status` supplies its authenticated URL. Disposal closes the server and active streams.
+- All five read-only API routes are implemented with bearer authentication, Host/Origin checks, mutation rejection, safe unknown-ID handling, ordered SSE replay/snapshot fallback and known-log-ID paging.
+- React/Vite displays phase, dependency/blocker evidence, agent session/attempt/revisions, queue, checks, distinct skipped/passed states, connection status and bounded sanitized output. The fragment token is cleared at bootstrap; API requests use authorization headers.
+- `RunStore.recordExecution(runId, expectedRevision, ExecutionEvidence)` is an additive atomic evidence contract for predecessor integration. It rejects stale revisions and journals `execution.observed`. It does not implement scheduling policy. Absent execution evidence is explicitly unavailable; green validation requires explicit complete validation evidence and all checks passed.
+- Builds copy browser assets into the distributable directory. Browser tests run with Playwright instead of the previous SKIP placeholder. CI includes the dashboard suite for macOS, Linux and Windows; those remote jobs were not run here.
+
+Red/green evidence:
+- Initial HTTP test failed because `server.ts` did not exist, then passed after implementation.
+- Execution projection/replay failed on missing `recordExecution`, then passed with the persisted revision-checked contract.
+- Public status URL failed before plugin wiring, then passed including server disposal.
+- Browser offline test initially remained "connected"; aborting the stream on offline signals made reconnect/catch-up pass.
+- Explicit secret-value persistence test failed before store redaction options, then passed.
+- A passed check without complete validation evidence initially produced a green summary; conservative projection made the regression pass.
+- Malformed encoded log IDs initially returned 500; they now return 404.
+
+Commands executed successfully with Bun 1.4.3 on macOS:
+- `bun run typecheck`
+- `bun run lint`
+- `bun test tests/integration/10-dashboard.test.ts` — 7 passed.
+- `bun test tests/integration` — 22 passed across issues 1 and 10.
+- `bun run build` — TypeScript and packaged Vite assets built.
+- `bun run test:browser -- tests/browser/dashboard.test.ts` — 1 Chromium scenario passed.
+
+Demonstrated scenario: two held jobs dispatched through the public command router and verified SDK adapter; persisted A→B/C→D evidence shows an integrated A, concurrent B/C and blocked D. A skipped check stays incomplete. Browser offline/online reconnect replays the agent completions and queue updates, preserves the blocked join and skipped state, and retrieves terminal output without workflow controls. Graph/queue/check evidence in this test is fixture-authored, not scheduler-produced.
+
+Remaining limitations: automatic scheduler publication and a true scheduler-driven integration demonstration await issue 8. The current adapter persists terminal output only, so intermediate log chunks cannot be displayed. No credentialed live-provider smoke, remote CI, Linux or Windows browser checks were run for this slice. See `docs/wiki/features/read-only-dashboard.md` for the producer and security contracts.
+
+## Predecessor integration verification — 2026-10-15
+
+The earlier implementation is present and issue 8 now publishes real scheduler evidence. No dashboard runtime rewrite was needed. Added a Playwright regression plus a Bun fixture subprocess using `createCommandRouter.scheduleIssues`, real temporary Git worktrees/integrations, and the controllable SDK adapter. It holds B/C concurrently after A integrates, verifies D is pending, disconnects the browser, completes the entire diamond plus independent E offline, and reconnects to five integrated issues. A seeded prior run-local validation timeout propagates through actual integrations into five skipped checks; verification stays incomplete. The test retrieves persisted executor output and asserts no workflow controls exist. The existing authored-evidence browser scenario still covers blocked descendants and integration queue updates.
+
+This is additional coverage of existing behavior, a non-behavior TDD exception. Initial harness runs failed on multiline status parsing and a five-second assertion deadline during real Git work. Single-line IPC and an explicit scheduler-settled signal fixed the harness; the browser remains offline until execution finishes, making replay/catch-up observable. No product behavior was changed to satisfy these tests.
+
+Successful local acceptance commands (Bun 1.4.3, macOS):
+- `bun run typecheck`
+- `bun run lint`
+- `bun test tests/integration/10-dashboard.test.ts` — 7 passed.
+- `bun run test:browser -- tests/browser/dashboard.test.ts` — 2 Chromium scenarios passed.
+
+Updated `docs/wiki/features/read-only-dashboard.md` to remove the resolved scheduler integration blocker. The timeout itself is seeded, not induced by a live provider in this browser test. Intermediate log chunks, credentialed live-provider smoke, remote CI and native Linux/Windows execution remain unverified/limited as described above. No publication, external messages or target-branch merge occurred.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing dashboard code and completion evidence to confirm whether this task needs any further work.
+exec
+/bin/zsh -lc "pwd; rg --files -g 'AGENTS.md' -g '*dashboard*' -g 'package.json' -g 'README.md' -g '10-observe*' -g 'PRD.md' -g 'projections.ts' -g 'App.tsx' -g 'api.ts' -g 'server.ts' -g 'main.tsx' -g '*read-only-dashboard*'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+src/dashboard/server.ts
+src/dashboard/web/api.ts
+src/dashboard/web/main.tsx
+src/dashboard/web/App.tsx
+src/dashboard/projections.ts
+ralph-logs/iter-1-10-observe-execution-in-read-only-dashboard.log
+scripts/copy-dashboard.ts
+package.json
+README.md
+docs/wiki/features/read-only-dashboard.md
+tests/helpers/dashboard-scheduler.ts
+tests/browser/dashboard.test.ts
+tests/integration/10-dashboard.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc 'git status --short' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+
+exec
+/bin/zsh -lc "cat package.json; sed -n '1,160p' docs/wiki/features/read-only-dashboard.md; sed -n '1,120p' tests/browser/dashboard.test.ts; sed -n '1,110p' src/dashboard/server.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+# Read-only execution dashboard
+
+## Summary
+The plugin starts an HTTP server on `127.0.0.1` with an ephemeral port. `/ralph-status` and its status tool return `dashboardUrl`, including when there is no run. Plugin disposal closes listeners and streams.
+
+## Key behavior
+- All API reads require a process-local bearer token. The page reads the URL fragment into memory and removes it; requests use headers. Cross-origin requests and unexpected Host headers are rejected. Only GET is accepted. Public static assets contain no run data or token.
+- GET `/api/runs`, `/api/runs/:id`, `/api/runs/:id/issues`, `/api/runs/:id/events`, and `/api/runs/:id/logs/:logId` read the committed journal. The browser never approves, answers, pauses, retries, resumes or stops execution.
+- SSE IDs are repository-wide sequences, which can have gaps within a run. `after` or `Last-Event-ID` replays subsequent events. An absent/unknown cursor returns the latest snapshot. The fetch client ignores duplicate events, reconnects from its last cursor and aborts its stream on browser offline signals.
+- `RunRecord.execution` is optional evidence. `RunStore.recordExecution(runId, expectedRevision, evidence)` records it atomically as `execution.observed`; stale revisions are rejected. This method reports evidence and does not schedule or integrate work. Producers supply issue dependencies/status/blockers, queue order and checks with attempt, candidate SHA and command revision.
+- A passed summary requires explicit `execution.verification: "passed"` and nonempty, all-passed check evidence. Empty checks are unavailable; skipped/waiting/running checks are incomplete. Agent completion cannot establish dependency integration or successful validation.
+- DTOs omit prompts, workspace paths, raw SDK causes and model/environment configuration. Output is redacted when persisted and displayed, including known runtime secret values, explicit store/server redaction values, credential patterns and terminal controls.
+- Known logs are immutable persisted job output identified by `jobId--attempt`, including historical attempts. No log path is opened. Pages contain at most 4096 characters from a 65536-character bounded window and report omitted output.
+
+## Code references
+- `src/dashboard/server.ts` — security, journal reads, SSE and lifecycle.
+- `src/dashboard/projections.ts` — shared DTOs and conservative evidence projection.
+- `src/dashboard/web/App.tsx`, `api.ts` — read-only views, log paging and reconnect.
+- `src/state/run-store.ts`, `src/core/types.ts` — optional persisted execution evidence contract.
+- `src/state/sanitize.ts` — credential/control redaction.
+- `src/plugin.ts`, `src/commands/router.ts` — startup, status URL and disposal.
+- `tests/integration/10-dashboard.test.ts`, `tests/browser/dashboard.test.ts` — HTTP security, replay, authored blocked-descendant evidence and scheduler-produced diamond progress with offline catch-up.
+- `tests/helpers/dashboard-scheduler.ts` — Bun subprocess for the Node Playwright harness; uses the public scheduler/router, real Git integrations and the controllable SDK adapter.
+
+## Notes
+Run `bun run build` to include Vite assets in `dist/dashboard/public` for distribution. The exact dashboard integration test builds its own source assets; `bun run test:browser -- tests/browser/dashboard.test.ts` also builds assets. Install the browser first with `bunx --no-install playwright install chromium`.
+
+Issue 8 now publishes revision-checked execution evidence through `recordExecution`. The scheduler browser regression holds B/C concurrently after A integrates, shows D pending until both integrate, completes all five issues while offline, and reconnects to the persisted current graph. It seeds a prior run-local validation timeout; actual omission propagation through integrations produces five skipped checks and incomplete verification. The separate authored-evidence browser scenario covers blocked descendants and queue changes. Current adapter output is available at job termination, so intermediate agent log chunks are unavailable. No SDK streaming API was invented. Chromium and HTTP tests ran on macOS; Linux/Windows and credentialed live OpenCode behavior remain unverified locally.
+
+## Related
+- [Plugin and durable session results](plugin-session-results.md)
+
+## Last updated
+2026-10-15
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+import { expect, test } from "@playwright/test";
+import { createCommandRouter } from "../../src/commands/router.js";
+import { startDashboard } from "../../src/dashboard/server.js";
+import { createOpenCodeAdapter } from "../../src/opencode/adapter.js";
+import { openRunStore } from "../../src/state/run-store.js";
+import { createFakeOpenCode } from "../helpers/fake-opencode.js";
+import { createTestProject } from "../helpers/project.js";
+
+test("scheduler-produced diamond catches up after reconnect and retains all-skipped validation", async ({
+  page,
+  context,
+}) => {
+  const child = spawn("bun", ["run", "tests/helpers/dashboard-scheduler.ts"], {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let diagnostics = "";
+  child.stderr.on("data", (chunk) => {
+    diagnostics += String(chunk);
+  });
+  const exited = new Promise<number | null>((resolve) =>
+    child.on("exit", resolve),
+  );
+  const lines = createInterface({ input: child.stdout });
+  const settled = new Promise<void>((resolve) => {
+    lines.on("line", (line) => {
+      if (JSON.parse(line).settled) resolve();
+    });
+  });
+  try {
+    const status = await new Promise<{ dashboardUrl: string }>(
+      (resolve, reject) => {
+        child.once("error", reject);
+        child.once("exit", () =>
+          reject(new Error(`Scheduler fixture exited: ${diagnostics}`)),
+        );
+        lines.once("line", (line) => resolve(JSON.parse(line)));
+      },
+    );
+    await page.goto(status.dashboardUrl);
+    const graph = page.getByRole("region", { name: "Dependency graph" });
+    const issue = (id: string) =>
+      graph.getByRole("article").filter({
+        has: page.getByRole("heading", { name: new RegExp(`^${id}:`) }),
+      });
+    await expect(page.getByRole("status")).toContainText("connected");
+    await expect(
+      issue("A").getByText("integrated", { exact: true }),
+    ).toBeVisible();
+    await expect(graph.getByText("running", { exact: true })).toHaveCount(2);
+    await expect(
+      issue("D").getByText("pending", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("skipped", { exact: true })).not.toHaveCount(0);
+    await context.setOffline(true);
+    await expect(page.getByRole("status")).toContainText("reconnecting");
+    child.stdin.write("release\n");
+    await settled;
+    await context.setOffline(false);
+    await expect(graph.getByText("integrated", { exact: true })).toHaveCount(5);
+    await expect(page.getByRole("status")).toContainText("connected");
+    await expect(page.getByText("skipped", { exact: true })).toHaveCount(5);
+    await expect(page.getByText("incomplete", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: /approve|answer|pause|retry|stop|resume/i,
+      }),
+    ).toHaveCount(0);
+    await page
+      .getByRole("button", { name: /^View log/ })
+      .first()
+      .click();
+    await expect(page.getByRole("region", { name: "Logs" })).toContainText(
+      "submittedCommit",
+    );
+  } finally {
+    child.stdin.end("close\n");
+    await exited;
+    lines.close();
+  }
+});
+
+test("observes two live agents, blocked descendants, skipped validation and reconnect without workflow controls", async ({
+  page,
+  context,
+}) => {
+  const project = await createTestProject();
+  const store = await openRunStore(project.directory);
+  const dashboard = await startDashboard(store, { pollIntervalMs: 50 });
+  const fake = createFakeOpenCode();
+  fake.hold();
+  const router = createCommandRouter(
+    store,
+    createOpenCodeAdapter(fake.client, store),
+    dashboard.url,
+  );
+  const pending = ["B", "C"].map((id) =>
+    router.runJob({
+      runId: "diamond",
+      jobId: id,
+      issueId: id,
+      attempt: 1,
+      role: "executor",
+      workspace: project.directory,
+      inputRevisions: { graph: 1 },
+      baseCommit: project.commit,
+      prompt: "fixture",
+    }),
+  );
+  try {
+    await expect
+      .poll(
+        () =>
+          fake.requests.filter((request) => request.path.endsWith("/prompt"))
+            .length,
+      )
+      .toBe(2);
+    const execution = {
+      issues: [
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import type { ServerResponse } from "node:http";
+import { createServer } from "node:http";
+import type { RunEvent } from "../core/types.js";
+import type { RunStore } from "../state/run-store.js";
+import { runtimeSecretValues } from "../state/sanitize.js";
+import {
+  logId,
+  MAX_LOG_CHARS,
+  MAX_PAGE_CHARS,
+  projectRunSnapshot,
+  sanitizeDisplay,
+} from "./projections.js";
+
+const processToken = randomBytes(32).toString("hex");
+const validId = (id: string) => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(id);
+export async function startDashboard(
+  store: RunStore,
+  options: { secrets?: readonly string[]; pollIntervalMs?: number } = {},
+) {
+  const secrets = [
+    processToken,
+    ...runtimeSecretValues(),
+    ...(options.secrets ?? []),
+  ];
+  const clients = new Set<ServerResponse>();
+  let stopped = false;
+  let origin = "";
+  const snapshot = (event: RunEvent) =>
+    projectRunSnapshot(event.snapshot, event.sequence, secrets);
+  const server = createServer(async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'",
+    );
+    const reply = (status: number, data: unknown) => {
+      res.writeHead(status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(data));
+    };
+    try {
+      if (req.headers.host !== new URL(origin).host)
+        return reply(403, { error: "Invalid host" });
+      if (req.headers.origin && req.headers.origin !== origin)
+        return reply(403, { error: "Cross-origin access denied" });
+      if (req.method !== "GET")
+        return reply(405, { error: "Read-only dashboard" });
+      const url = new URL(req.url ?? "/", origin);
+      if (!url.pathname.startsWith("/api/")) {
+        const assets: Record<string, [string, string]> = {
+          "/": ["index.html", "text/html"],
+          "/assets/app.js": ["assets/app.js", "text/javascript"],
+          "/assets/app.css": ["assets/app.css", "text/css"],
+        };
+        const asset = assets[url.pathname];
+        if (!asset) return reply(404, { error: "Unknown asset" });
+        try {
+          const content = await readFile(
+            new URL(`./public/${asset[0]}`, import.meta.url),
+          );
+          res.writeHead(200, { "Content-Type": asset[1] });
+          res.end(content);
+        } catch {
+          reply(503, {
+            error: "Dashboard assets unavailable; run bun run build",
+          });
+        }
+        return;
+      }
+      const auth = Buffer.from(req.headers.authorization ?? "");
+      const expected = Buffer.from(`Bearer ${processToken}`);
+      if (auth.length !== expected.length || !timingSafeEqual(auth, expected))
+        return reply(401, { error: "Unauthorized" });
+      if (url.pathname === "/api/runs") {
+        const runs = await store.listRuns();
+        return reply(
+          200,
+          runs.map((run) => ({
+            runId: run.runId,
+            phase: run.phase,
+            revision: run.revision,
+          })),
+        );
+      }
+      let parts: string[];
+      try {
+        parts = url.pathname.split("/").slice(1).map(decodeURIComponent);
+      } catch {
+        return reply(404, { error: "Unknown ID" });
+      }
+      const runId = parts[2];
+      if (
+        parts[0] !== "api" ||
+        parts[1] !== "runs" ||
+        !runId ||
+        !validId(runId)
+      )
+        return reply(404, { error: "Unknown run" });
+      // Journal is the committed source of truth, including after torn snapshot writes.
+      const events = await store.events(runId);
+      const last = events.at(-1);
+      if (!last) return reply(404, { error: "Unknown run" });
+      if (parts.length === 3) return reply(200, snapshot(last));
+      if (parts.length === 4 && parts[3] === "issues")
+        return reply(200, snapshot(last).issues);
+      if (parts.length === 5 && parts[3] === "logs") {
+        const known = events
+
+codex
+The task is already complete. The dashboard implementation, security and replay tests, scheduler-driven browser regression, and completion documentation are present. No changes were needed; I did not rerun the recorded acceptance checks.
+tokens used
+16,164
+The task is already complete. The dashboard implementation, security and replay tests, scheduler-driven browser regression, and completion documentation are present. No changes were needed; I did not rerun the recorded acceptance checks.

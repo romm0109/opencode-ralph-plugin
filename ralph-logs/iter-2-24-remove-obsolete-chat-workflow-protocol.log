@@ -1,0 +1,1938 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/24-remove-obsolete-chat-workflow-protocol.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a1442a-a724-76e2-a82c-b71bbe5f01c8
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 2 of 3
+File      : 9 of 10 — 24-remove-obsolete-chat-workflow-protocol.md
+=== END METADATA ===
+
+TASK:
+# 24. Remove the obsolete workflow protocol and align public documentation
+
+**Type:** AFK  
+**User stories:** PRD §5 stories 1, 3, 5, 7  
+**Requirements:** PRD §§4, 7.12, 10, 15
+
+## What to build
+
+Remove the old model-selected ralph_workflow start/resume/reply transport, stale execution-approval prompts, and feature-specific chat receipt/question-suppression code. Finish wiring all public controls and exports to the new stage workflow with no compatibility fallback or old-state migration. Preserve unrelated project setup and previewed removal authorization, which currently share some helpers with the old transport. Align README, compatibility, troubleshooting and compact wiki descriptions with actual behavior. Old run detection may explain that a fresh workflow is required but must not become a legacy execution path.
+
+## Repository rules and implementation approach
+
+- Source of truth: root `PRD.md` (2026-10-16 revision), especially the sections cited below.
+- Follow root `AGENTS.md`. No `CLAUDE.md` or `docs/adr/` exists in the inspected repository. Use standalone Bun **1.4.3** from `.bun-version`, with the pinned OpenCode **2.0.29** dependencies; do not upgrade them for this feature.
+- Use behavior-focused public-interface TDD for meaningful behavior changes. Exercise real temporary Git projects where ownership, artifact or preflight behavior matters. Do not weaken assertions merely to retain old protocol fixtures.
+- No backward compatibility, old-state migration or legacy fallback. New-flow recovery is still required. Preserve unrelated setup, removal, execution and reviewer guarantees.
+- Run build, browser, package and test commands **sequentially within one checkout**. Include both `bun run test:status` and `bun run test`; the full suite remains mandatory for candidate integration and final validation. Never alter approved commands during a run.
+- Baseline file references below were inspected when these tickets were written; predecessor work may move lines or introduce the explicitly named new modules. Follow the referenced symbol if line positions shift.
+
+
+## Context: files to read before implementing
+
+- `src/commands/chat-workflow.ts` (lines 1–75) — old prompt, receipts, affirmation parsing and protocol schema.
+- `src/core/chat-input.ts` (lines 1–8) — old wait-boundary exception.
+- `src/plugin.ts` (lines 6–25) — legacy imports shared with removal helpers.
+- `src/plugin.ts` (lines 367–390) — removal explicitly relies on approvesChat and receipt provenance.
+- `src/plugin.ts` (lines 425–510) — control resume, prompt receipts and native question suppression.
+- `src/commands/router.ts` (lines 169–220) — public command routing and resume continuation.
+- `tests/integration/chat-workflow.test.ts` (lines 95–140) — old tests assert no direct start and question suppression.
+- `tests/integration/remove-project.test.ts` (lines 1–85) — preview/approval removal regression coverage.
+- `docs/wiki/features/workflow-recovery.md` (lines 1–40) — current documentation describes the obsolete feature protocol.
+
+Also read root `PRD.md`, `AGENTS.md`, and all predecessor tickets named in **Blocked by**. Full source skill snapshots are under `/Users/rwmmtzqy/.agents/skills/` for authoring only; installed code must use package-local assets.
+
+## Patterns to follow
+
+Delete obsolete branches rather than accepting both new and old wire shapes. Keep only real new-flow schema/version rejection needed at the state boundary. Refactor shared ordinary-chat affirmative/removal receipt helpers into removal-owned code if still needed: absence of legacy feature transport does not authorize deleting removal checks. Public docs must describe native questions, one scope authorization, stage session boundaries and current recovery rules consistently.
+
+**Tests and errors:** Mirror `createTestProject()` in `tests/helpers/project.ts:7` and `createFakePluginContext()` in `tests/helpers/fake-opencode.ts:259`. Use revision-checked store writes and actionable structured failure/tool outcomes. Do not catch permission denial or stale ownership and proceed as success.
+
+## Step-by-step tasks
+
+### REMOVE `src/commands/chat-workflow.ts; src/core/chat-input.ts; src/plugin.ts`
+
+- **IMPLEMENT:** Delete obsolete feature prompt, workflow tool registration, reply receipt consumer and feature question suppression after new-flow callers no longer rely on them. Move narrowly needed removal approval helpers to removal-owned code. Remove old generate-and-approve-graph paths and unused exports rather than leave a silent fallback.
+- **PATTERN:** src/plugin.ts:383 and src/commands/chat-workflow.ts:49.
+- **IMPORTS:** Update imports of approvesChat/ChatReceipt to a removal-specific module if retained; remove ChatInputRequired imports once no nonlegacy caller needs the exception.
+- **GOTCHA:** Audit all call sites before deletion, including ralph_control resume, project setup, tests, server exports, and packaged probes. Do not remove unrelated control/removal authorization.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/chat-workflow.test.ts tests/integration/remove-project.test.ts tests/integration/save-commands.test.ts tests/integration/01-plugin.test.ts`.
+
+### UPDATE `src/commands/router.ts; src/commands/resume.ts; src/state/run-store.ts; tests/integration/chat-workflow.test.ts`
+
+- **IMPLEMENT:** Make all supported entrypoints drive the new stage runner. Replace old protocol tests with direct command/native-form/owner-tool assertions. Unsupported records produce a clear fresh-workflow message without migration, broad directory deletion or fabricated approval.
+- **PATTERN:** src/commands/router.ts:169 and new stage discriminator from issue 16.
+- **IMPORTS:** Reuse the new orchestrator/resume services and existing read-only status data.
+- **GOTCHA:** Do not keep an accepted old action enum or version adapter for convenience in tests; test fixtures must use the real public new interface.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/chat-workflow.test.ts tests/integration/remove-project.test.ts tests/integration/save-commands.test.ts tests/integration/01-plugin.test.ts`.
+
+### UPDATE `README.md; docs/opencode-compatibility.md; docs/troubleshooting.md; docs/wiki/features/feature-interview.md; docs/wiki/features/feature-planning.md; docs/wiki/features/workflow-recovery.md`
+
+- **IMPLEMENT:** Replace old chat-reply/second-approval instructions with the delivered native flow, new completion tools and recovery boundaries. Link code/tests and explain no compatibility. Keep PRD requirements and implementation status distinct.
+- **PATTERN:** docs/wiki/features/workflow-recovery.md:7.
+- **IMPORTS:** Documentation only; use current tool names and tests actually implemented by predecessors.
+- **GOTCHA:** Do not claim platform/live checks that have not run.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/chat-workflow.test.ts tests/integration/remove-project.test.ts tests/integration/save-commands.test.ts tests/integration/01-plugin.test.ts`.
+
+### UPDATE `docs/wiki/features/workflow-recovery.md` and behavior tests
+
+- **IMPLEMENT:** Record the delivered behavior, its reason, and the actual code/test references in `docs/wiki/features/workflow-recovery.md`. Add or replace public-interface cases for every acceptance criterion below; keep historical behavior explicitly labeled where relevant.
+- **PATTERN:** Existing compact feature wiki pages under `docs/wiki/features/`; mirror their summary/code/test structure without claiming unimplemented behavior.
+- **IMPORTS:** Tests use `expect` and `test` from `bun:test` plus existing fake-host and real-Git helpers; docs require no production imports.
+- **GOTCHA:** Do not describe a deterministic fixture or a source prompt assertion as proof of real native UI behavior.
+- **VALIDATE:** Run the focused cases and required full checks below.
+
+## Acceptance criteria
+
+- [ ] No public feature path registers or invokes ralph_workflow start/resume/reply or suppresses native question forms.
+- [ ] Old feature chat receipts and second-execution-approval paths are removed rather than supported alongside new interfaces.
+- [ ] Unsupported saved runs never execute or migrate; their artifacts remain intact.
+- [ ] Project setup saving and removal preview/real-user approval remain covered and functional.
+- [ ] Public docs consistently describe full skills, stage session changes, completion tools, automatic execution, retry budgets and recovery.
+- [ ] Focused behavior tests, `bun run test:status`, and mandatory `bun run test` pass; the compact wiki reflects delivered behavior.
+
+## Validation commands
+
+Run one at a time with standalone Bun 1.4.3 on PATH:
+
+```bash
+bun --version
+bun run typecheck
+bun run lint
+bun test --timeout 30000 tests/integration/chat-workflow.test.ts tests/integration/remove-project.test.ts tests/integration/save-commands.test.ts tests/integration/01-plugin.test.ts
+bun run test:status
+bun run test
+```
+
+Installed-host and cross-platform evidence is completed by issue 25; this slice must still pass its public-interface tests and full integration suite.
+
+## Blocked by
+
+- [22-restart-grilling-and-recover-accepted-planning.md](22-restart-grilling-and-recover-accepted-planning.md) — supplies the predecessor behavior required by this slice.
+- [23-show-stage-and-execution-progress-in-active-chat.md](23-show-stage-and-execution-progress-in-active-chat.md) — supplies the predecessor behavior required by this slice.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+2026-10-16T10:03:41.226511Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 503 Service Unavailable, url: wss://chatgpt.com/backend-api/codex/responses
+codex
+I’ll check what the previous iteration completed, audit the remaining legacy paths, then run the focused tests, status checks, and full suite with the pinned Bun version.
+
+exec
+/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g '*22-restart*' -g '*23-show*' -g '*24-remove*' -g 'PRD.md' -g '.bun-version' -g 'package.json' && git status --short" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+.bun-version
+AGENTS.md
+ralph-logs/iter-2-23-show-stage-and-execution-progress-in-active-chat.log
+ralph-logs/iter-1-22-restart-grilling-and-recover-accepted-planning.log
+ralph-logs/iter-1-23-show-stage-and-execution-progress-in-active-chat.log
+ralph-logs/iter-1-24-remove-obsolete-chat-workflow-protocol.log
+ralph-logs/iter-2-22-restart-grilling-and-recover-accepted-planning.log
+package.json
+PRD.md
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? .ralph/
+?? AGENTS.md
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+
+exec
+/bin/zsh -lc 'cat AGENTS.md .bun-version package.json && cat /Users/rwmmtzqy/.agents/skills/code-wiki/SKILL.md' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+# Working in this repository
+
+Use standalone Bun from `.bun-version` and the pinned OpenCode dependencies.
+
+Project setup must include both `bun run test` and `bun run test:status` among the proposed checks. The focused status command is for quick public-interface TDD cycles; the full integration suite remains mandatory for candidate integration and final validation. Their overlapping coverage is intentional. Do not change approved commands during a feature run. Run build, browser, package and test commands sequentially within one checkout: they share generated assets, so parallel invocation can race file removal and produce misleading tool diagnostics.
+
+After meaningful behavior changes, update the relevant compact page in `docs/wiki` with the behavior, reason and code/test references.
+1.4.3
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "docs/live-opencode-trial.md",
+    "docs/live-opencode-evidence.json",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e",
+    "test:status": "bun test --timeout 30000 tests/integration --test-name-pattern status"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+---
+name: code-wiki
+description: >
+  Use after any meaningful code change that adds, changes, removes, or refactors durable project behavior.
+  Update the compact project wiki in docs/wiki so future AI agents can quickly understand what changed,
+  why it matters, and where to look in the code.
+---
+# Project Wiki Memory
+## Goal
+Maintain a small, accurate project memory under `docs/wiki`.
+The wiki should help future AI agents answer:
+- What exists?
+- Why does it exist?
+- Where is it implemented?
+- What should future changes be careful about?
+Do not duplicate the code. Capture durable knowledge only.
+## When to update the wiki
+Update the wiki after changes involving:
+- new or changed features
+- APIs, routes, commands, jobs, or integrations
+- database/schema changes
+- permissions, auth, billing, security, or data ownership
+- meaningful refactors
+- bug fixes that reveal an important invariant or edge case
+- feature removals or deprecations
+Skip wiki updates for:
+- formatting-only changes
+- typo fixes
+- local variable renames
+- dependency lockfile-only changes
+- temporary experiments
+- trivial internal cleanup with no behavior or architecture impact
+## Wiki structure
+Use this structure:
+```text
+docs/wiki/
+  index.md
+  features/
+  concepts/
+  decisions/
+  open-questions.md
+  ```
+
+Create folders/files if they do not exist.
+
+### Workflow
+
+1. Review the task and changed files.
+2. Decide whether durable project knowledge changed.
+3. Search docs/wiki for an existing relevant page.
+4. Prefer updating an existing page over creating a new one.
+5. Create a new page only for a genuinely new feature, concept, or decision.
+6. Add source references to relevant code files.
+7. Update docs/wiki/index.md if a new page is created.
+8. Record uncertainty or future work in docs/wiki/open-questions.md when useful.
+
+Page format
+
+Use this compact format for feature or concept pages:
+
+# <Name>
+## Summary
+One or two paragraphs explaining what this is and why it exists.
+## Key behavior
+- Important behavior or flow.
+- Important invariant.
+- Important edge case.
+## Code references
+- `path/to/file.ts` — why this file matters.
+- `path/to/test.ts` — what behavior this test covers.
+## Related
+- [Other page](../concepts/example.md)
+## Notes
+- Limitation, uncertainty, or future work.
+## Last updated
+YYYY-MM-DD
+
+Use this compact format for decision pages:
+
+# Decision: <Title>
+## Date
+YYYY-MM-DD
+## Context
+What problem or tradeoff caused this decision?
+## Decision
+What was chosen?
+## Consequences
+- Important upside.
+- Important downside or follow-up.
+## Code references
+- `path/to/file.ts`
+## Last updated
+YYYY-MM-DD
+
+Writing rules
+
+* Be concise.
+* Prefer facts from code, tests, migrations, PR text, or user instructions.
+* Do not invent product intent.
+* If unsure, write it as uncertainty.
+* Do not describe every function call.
+* Do not create duplicate pages.
+* Keep links relative.
+* Keep pages useful for future AI retrieval.
+
+Completion response
+
+After updating the wiki, report briefly:
+
+Wiki updated:
+- Created: ...
+- Updated: ...
+- Open questions: ...
+
+If no wiki update was needed, say:
+
+No wiki update needed: this change did not affect durable project knowledge.
+And in your root `AGENTS.md`, I’d add only this:
+```md
+## Project wiki memory
+This repo uses a compact AI-maintained wiki under `docs/wiki`.
+After any meaningful code change, use `.skills/code-wiki/SKILL.md` to update the wiki.
+A meaningful change includes new features, changed behavior, APIs, migrations, permissions, integrations, important refactors, durable bug-fix lessons, or removals.
+Do not update the wiki for formatting-only, typo-only, or trivial cleanup changes.
+exec
+/bin/zsh -lc 'rg --files .ralph .agents | head -60; cat PRD.md' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+.ralph/commands.json
+.agents/ralph-workflow-issues.md
+.agents/issues/20-reapprove-product-scope-changes-through-native-questions.md
+.agents/issues/22-restart-grilling-and-recover-accepted-planning.md
+.agents/issues/18-complete-prd-and-open-fresh-issue-planning.md
+.agents/issues/25-verify-installed-native-workflow-and-release-evidence.md
+.agents/issues/17-approve-explanation-and-author-prd-in-place.md
+.agents/issues/21-bound-planning-attempts-and-reject-late-completions.md
+.agents/issues/24-remove-obsolete-chat-workflow-protocol.md
+.agents/issues/23-show-stage-and-execution-progress-in-active-chat.md
+.agents/issues/16-start-a-fresh-native-feature-interview.md
+.agents/issues/19-complete-issues-and-start-authorized-execution.md
+# Ralph Orchestrator — Product Requirements Document
+
+**Status:** Draft for review; requirements, not an implementation-completion report  
+**Date:** 2026-10-16  
+**Product:** Reusable OpenCode plugin with deterministic stage control  
+**Source:** Repository inspection and the feature interview in this conversation  
+**Revision:** Replaces the previous workflow requirements. No backward compatibility.
+
+## 1. Executive Summary
+
+Ralph turns a feature request into a reviewed implementation. The plugin directly handles `/ralph-orchestrator`, opens a fresh interview session, and supplies the full grill-me skill with instructions for that stage only. The interviewer first asks what feature the user wants to build, explores the repository, and asks recommended questions through OpenCode's native question tool. When the relevant decisions are resolved, it explains the feature using ASD-STE100 writing instructions and requests approval to advance.
+
+That approval authorizes PRD creation, issue planning, and execution within the agreed scope from a displayed, pinned starting commit. The plugin injects the full create-prd skill into the same interview session. Valid PRD completion opens a fresh session containing the full adapted to-issues skill and explicit approved artifacts. Valid issue completion starts execution automatically. There is no issue-breakdown review or second execution-approval gate. Each planning stage must call a completion tool; the plugin validates artifacts and owns every transition.
+
+This change replaces startup, interview, planning, and their integration with execution. It retains the existing isolated workers, dependency scheduling, sequential candidate integration, approved checks, TDD, independent reviewers, and read-only dashboard. The user follows the active stage in OpenCode and sees progress and final results there. Existing workflow protocols and saved runs are not supported or migrated.
+
+## 2. Mission
+
+Make feature development deterministic in its control flow and clear in its human decisions.
+
+- Let plugin code control startup, approvals, handoffs, and execution eligibility.
+- Give each agent only its current stage responsibilities.
+- Resolve product decisions with the user and repository facts through exploration.
+- Bind automatic execution to explicit scope approval and validated artifacts.
+- Preserve bounded execution, evidence, and honest recovery and reporting.
+
+## 3. Target Users
+
+### Primary user
+
+A developer who uses OpenCode and Git, understands project checks, and wants to describe a feature without manually launching each planning stage. The user makes product decisions during discovery and authorizes implementation through the explanation approval.
+
+### Secondary user
+
+A maintainer who installs Ralph in several repositories and needs reusable skills, project-specific command configuration, consistent worker behavior, and visible failure recovery.
+
+### Needs and pain points
+
+The current command delegates startup to an assistant through a workflow prompt. Its chat-reply protocol disables the native question tool while waiting, exposes downstream orchestration instructions, and can report inactive-run resume failures as revision conflicts. The bundled planning skills are shortened versions of the user's actual skills. The new flow must remove these mismatches without redesigning the execution engine.
+
+## 4. MVP Scope
+
+### Core functionality
+
+- ✅ Direct, deterministic slash-command startup after approved project setup.
+- ✅ Fresh interview session and a mandatory opening feature question.
+- ✅ Native question forms for interview input, approvals, product decisions, and recovery choices.
+- ✅ Full grill-me and create-prd skills; full to-issues skill adapted to the agreed workflow.
+- ✅ ASD-STE100 feature explanation, approved before PRD authoring.
+- ✅ PRD authoring in the interview session; issue planning in a fresh session.
+- ✅ Validated completion-tool handoffs and automatic execution after issues.
+- ✅ Renewed explanation approval when product scope changes.
+
+### Technical and integration scope
+
+- ✅ Durable stage/session identity, artifact revisions, attempts, and approval provenance.
+- ✅ Follow the active stage in the OpenCode interface; show execution progress and results in the issue-planning chat.
+- ✅ Stage-specific tool access and planning-artifact write boundaries.
+- ✅ Three total attempts for each PRD or issue-planning stage before intervention.
+- ✅ Restart interrupted grilling; recover later stages from saved artifacts.
+- ✅ Preserve existing execution, review, dashboard, and project-command behavior except where the new flow requires integration changes.
+
+### Distribution and platform scope
+
+- ✅ Reusable installed plugin with bundled skills and pinned OpenCode dependencies.
+- ✅ Existing macOS, Linux, and native Windows product support remains required.
+- ✅ One active feature workflow per repository, including linked worktrees.
+
+### Out of scope
+
+- ❌ Legacy workflow tools, ordinary-chat approval transport, old-state migration, or compatibility shims.
+- ❌ A separate ASD-STE100 compliance checker or certification claim.
+- ❌ User approval of issue granularity or a second approval immediately before execution.
+- ❌ External issue trackers, automatic target-branch merge, push, deployment, or PR creation.
+- ❌ Workflow execution independent of OpenCode's lifetime.
+- ❌ A redesign of scheduling, integration, retry budgets, or final-review policy.
+
+The check marks identify required scope; they do not claim that implementation is complete.
+
+## 5. User Stories
+
+1. **As a developer, I want the plugin to start the interview directly, so that startup does not depend on an assistant choosing a tool.** Invoking `/ralph-orchestrator` opens a fresh interview and its opening question without showing an orchestration prompt.
+2. **As a feature owner, I want focused grilling with recommended answers, so that I resolve requirements before authorizing work.** For a password-reset feature, the agent reads existing authentication code and asks about unresolved expiry and error behavior.
+3. **As a feature owner, I want a clear explanation and one scope approval, so that I know what automatic planning and execution will build.** The approval shows the explanation, criteria, and exact starting commit and states its authorization clearly.
+4. **As a developer, I want each planning stage to receive the intended full skill, so that PRDs and issues retain the detail of my existing workflows.** The PRD uses the full template, while issue files contain concrete code and test references.
+5. **As a developer, I want validated handoffs, so that agent prose cannot accidentally start the next stage.** Repeating a PRD completion call cannot create two planner sessions.
+6. **As a feature owner, I want new product decisions brought back to me, so that automatic execution stays within approved scope.** A planner that discovers an unspecified retention requirement asks through the question tool and obtains revised approval if scope changes.
+7. **As a developer, I want explicit recovery choices, so that interrupted work does not silently restart or use a different interview context.** Interrupted grilling restarts in a fresh context; a completed PRD can support later-stage recovery.
+8. **As a maintainer, I want existing worker and review guarantees preserved, so that the new planning experience does not weaken implementation checks.** Candidates still pass approved checks before integration, and both final reviewers inspect the same stable commit.
+
+## 6. Core Architecture & Patterns
+
+### 6.1 Deterministic state machine
+
+The normal flow is:
+
+`configured → interview → explanation approval → PRD authoring → issue planning → preflight/baseline → execution → final review → result`
+
+The plugin owns state transitions. Agents perform discovery, writing, implementation, and review within their stage. An agent's final message or a successful tool invocation alone is not proof that artifacts, Git operations, or checks are valid. Waiting, paused, interrupted, failed, and blocked conditions are distinct from completed stages.
+
+### 6.2 Session boundaries
+
+| Stage | Context and visible session |
+| --- | --- |
+| Interview | Fresh session; full grill-me skill and interview-only instructions; no injected downstream workflow instructions |
+| PRD | Same session after approval; inject full create-prd skill, stage instructions, approved explanation, and pinned commit |
+| Issues | Fresh session; full adapted to-issues skill, exact PRD, approved explanation, project references, and explicit stage contract |
+| Execution and review | Existing independent worker/reviewer sessions; progress and final report appear in the issue-planning chat |
+
+Use OpenCode session navigation to follow the interview and issue stages. Session switches must not create duplicate work. Context isolation means that Ralph does not inject later-stage instructions into grilling; repository exploration may still encounter documentation that mentions those stages.
+
+### 6.3 Responsibilities
+
+| Component | Responsibility |
+| --- | --- |
+| Command handler | Validate setup and ownership, then initiate the correct workflow action directly |
+| Orchestrator | Durable stage transitions, authorization, attempts, handoffs, and recovery |
+| OpenCode adapter and TUI | Sessions, native questions, navigation, permissions, progress, and lifecycle |
+| Planning agents | Explore code and write only their permitted planning artifacts |
+| Completion tools | Validate stage identity and artifact content, record completion, and trigger one transition |
+| Existing execution services | Workers, candidate integration, approved commands, review, cleanup, and reporting |
+
+### 6.4 Artifacts and durable records
+
+Keep existing per-feature artifact conventions under `.ralph/features/<run-id>/`: a PRD, local Markdown issues, and a machine-readable dependency graph. Keep canonical runtime state and repository ownership shared through the Git common directory. Never replace the repository's own root PRD as a side effect of a feature agent authoring a feature PRD.
+
+Persist stage identity, owning session, attempt, selected skill hashes, pending request identity, user-answer provenance, approved explanation revision, starting SHA, command configuration revision, artifact hashes, and handoff intent/result. Bind completion to exact artifact bytes. New workflow records must be distinguishable from unsupported old records; no old schema needs conversion.
+
+## 7. Tools and Feature Specifications
+
+### 7.1 Project setup and direct startup
+
+`/ralph-commands` continues to explore the project, propose commands, obtain approval, and validate and save configuration without executing it. Missing approved setup prevents interview startup and gives an actionable direction to run setup.
+
+For this repository, proposals must include both `bun run test:status` and `bun run test`. The focused command supports quick public-interface TDD cycles. The full integration suite remains mandatory for candidate integration and final validation. Never change approved commands during a feature run.
+
+`/ralph-orchestrator` must not inject a prompt asking the current assistant to choose start/resume tools. With valid setup and no active run, it creates and focuses the interview session directly. If a supported run owns the repository, show its phase and use the native question tool for applicable recovery or stop-and-restart choices. Starting fresh requires settled cancellation and ownership cleanup; preserve prior artifacts and work.
+
+### 7.2 Grilling, explanation, and approval
+
+Always begin with a native question asking what feature to build. If the slash command included a description, show it for confirmation rather than skipping the question. Use the full grill-me skill: explore discoverable facts, resolve dependent decisions, and provide a recommended answer for each substantive interview question.
+
+Stop grilling when scope, acceptance criteria, constraints, and failure behavior are resolved. Explain the agreed feature using ASD-STE100 writing rules and vocabulary conventions as instructions. This replaces the old informal simplified-English requirement. There is no separate compliance-validation stage and no claim of certification.
+
+Present the explanation, scope, observable criteria, current branch, and full resolved HEAD SHA. Ask through the native question tool whether the user approves advancing through PRD creation, issue planning, and implementation within that scope. The affirmative option must make this authorization clear. Approval is bound to this displayed revision, commit, configuration, and actual human response. Rejection or requested changes return to grilling; a new revision needs new approval.
+
+### 7.3 PRD authoring and issue planning
+
+Approval deterministically injects the full create-prd skill and PRD-stage prompt into the interview session. Preserve its comprehensive section structure. Tell the agent to write the run-specific PRD and finish by calling the PRD completion tool. It may explore the repository and write its stage artifacts, but it may not implement project code or start other stages itself.
+
+The completion tool validates the owning stage/session/attempt, required PRD structure, nonempty content, approved explanation reference, and permitted artifact paths. Missing product decisions require a native question; they must not be silently invented. Record the accepted PRD revision before starting the next stage.
+
+Create and focus a fresh issue-planning session. Supply the exact PRD revision and content, approved explanation, pinned commit, project instructions, approved commands, and full adapted to-issues skill. Retain deep code exploration, thin vertical slices, concrete patterns, dependencies, and self-sufficient implementation/test guidance. Adapt the skill to local feature artifacts, omit its setup/issue-tracker prerequisites, and skip its user breakdown-review step.
+
+The planner writes Markdown issues and a graph, then calls the issue completion tool. Validate unique IDs, safe file references, required content, PRD identity, missing dependencies, and cycles. Invalid submissions stay in the current stage and return actionable errors. Valid completion authorizes preflight and execution automatically under the existing explanation approval. Publish artifact references and an execution summary without asking for another approval.
+
+### 7.4 Scope changes, authorization, and preflight
+
+If authoring or planning discovers a new product decision, ask through the native question tool. If the answer changes scope, revise the explanation, present the resulting scope and criteria, and obtain renewed approval. Invalidate dependent planning outputs and regenerate them as needed. Technical choices within approved scope do not require a new gate.
+
+Before execution, verify the approved explanation, accepted PRD and issue graph, pinned starting SHA, unchanged command configuration, and clean working checkout under existing preflight rules. A changed starting point pauses the workflow and requires the user to approve the revised starting point with the explanation. Do not silently use the newest HEAD.
+
+Generated planning artifacts must be handled consistently with clean-checkout requirements: keep them in the managed artifact area and exclude only known run-owned generated files from dirtiness checks where necessary. Never discard or ignore unrelated user changes. Do not silently commit user files to satisfy preflight.
+
+Create the feature integration branch at the pinned starting commit. Run approved setup and baseline checks before scheduling issues. A completed failing check blocks execution and consumes no issue attempt. A timed-out validation check follows the existing run-local skip policy, including at baseline. Setup and readiness failures cannot be skipped into readiness.
+
+### 7.5 Dependency scheduling and execution
+
+Run up to two eligible issues concurrently by default. An issue is eligible only when every dependency has been integrated and passed all non-skipped checks. Agent completion alone does not satisfy a dependency.
+
+Create each issue's branch and worktree from the latest integration commit when it starts. Executors receive the approved issue, PRD, relevant project instructions, configured model, and TDD instructions. Concurrent environments must have separate resources where isolation is required.
+
+If an executor cannot resolve a requirement from the PRD or code, ask its question through the native question tool in the active workflow chat. Block that issue and its dependents while independent work continues. If the answer changes approved scope, revise the relevant artifacts and obtain renewed explanation approval before dependent implementation.
+
+### 7.6 TDD requirements
+
+Implement one behavior at a time: write a meaningful failing test through a public interface, observe the expected failure, implement the minimum change, then refactor while tests remain green. Do not write a batch of speculative tests before all implementation. Repair executors follow the same process, normally beginning with a regression test.
+
+The approved issue plan supplies the intended behaviors and interface changes, avoiding a redundant approval at every TDD cycle. Record red/green evidence in execution logs. Expected red-stage failures do not consume issue repair attempts. Documentation or configuration changes with no meaningful automated behavior test may use a documented exception plus appropriate validation.
+
+### 7.7 Integration and worktree lifecycle
+
+A separate merge agent combines each completed submission with the latest integration branch in a temporary candidate worktree. Integration is sequential even when execution is parallel.
+
+The merger may resolve mechanical conflicts. Conflicts requiring behavior or feature decisions return to the executor with context and consume the issue's attempt budget. The command runner validates the candidate commit using approved checks. Only then does the orchestrator advance the integration branch to that exact candidate. Never advance the feature branch first and rely on rollback after failed checks.
+
+After successful integration and checks, remove the issue worktree. Retain its commit references, execution evidence, and logs. Preserve failed worktrees for diagnosis. Cleanup failure is reported and must not reverse an otherwise recorded integration or delete unrecognized user work.
+
+### 7.8 Attempts, timeouts, and command skipping
+
+| Event | Required behavior |
+| --- | --- |
+| Issue submission fails completed validation | Return check output to executor; allow three total issue attempts: initial attempt plus two repairs |
+| Agent gets stuck or times out | Stop that attempt and retry from reconciled saved work; consumes the same three-attempt budget |
+| Issue exhausts attempts | Block issue and dependents, continue independent work, request user intervention |
+| Validation check times out | Terminate its owned process tree, skip that check ID for the remainder of the feature run, and record the omission |
+| Every validation check is skipped | Continue execution and review; report missing automated validation and never label it fully verified |
+| Setup or startup times out | Do not skip; retry within the affected task's attempt budget, then block affected work |
+| Check exits nonzero | Treat as a failure, not as a timeout or a reason to disable it |
+
+The skip list is run-local, applies to later issues and review validation, and never modifies approved JSON. Future features try the commands again. Skipping a validation command must not skip environment cleanup or secretly remove another check.
+
+Implementation default: command timeouts are explicit in the approved JSON, with a suggested ten minutes for ordinary checks and configurable longer setup budgets. Agent attempts default to a configurable thirty-minute deadline. These durations were not prescribed by the user and must be visible in configuration.
+
+### 7.9 Final reviewers and repair loop
+
+After all issues integrate, run a code reviewer and a functional reviewer in separate sessions against the same feature commit. Keep that commit stable while both review it.
+
+- The code reviewer checks correctness, security, regressions, and approved requirements.
+- The functional reviewer derives a checklist from PRD and issue acceptance criteria. It uses agent-browser for relevant UI behavior and HTTP requests for relevant backend behavior against the local feature environment.
+- Record evidence for each applicable criterion. A criterion that cannot be tested is unverified, not passed.
+- Blocking findings are bugs, security issues, failing behavior, or unmet acceptance criteria. Optional style and refactoring suggestions do not block completion.
+
+Consolidate blocking findings into dedicated repair tasks. Each repair task receives finding evidence, affected issue context, and acceptance criteria, and uses a new worktree, TDD, the merger, and configured checks. Repair tasks have the same three-attempt execution budget as ordinary issues.
+
+Allow three total review rounds: initial review, repairs and second review, then repairs and third review. If round three still has blocking findings, stop automatic repairs and request intervention. Do not accidentally implement three additional repair-and-review rounds after the initial review.
+
+If a repair executor disputes a finding, return its evidence to the originating reviewer. The reviewer can withdraw the finding or retain it with justification. Unresolved findings remain blocking within the same bounded loop; discussion cannot create an unlimited retry path.
+
+If functional review cannot run after three attempts because of missing credentials, startup failures, or unavailable tools, finish as unverified and identify the blocker. These infrastructure attempts are separately tracked and do not grant extra rounds for fixing functional findings.
+
+### 7.10 Completion and reporting
+
+Leave the feature branch ready for the user. Do not merge into the target branch, push, or open a PR. The report in OpenCode and the dashboard includes:
+
+- Feature branch and final commit.
+- Completed, blocked, and repaired issues, with attempts used.
+- Reviewer results, acceptance-criterion evidence, and unresolved findings.
+- Every timed-out/skipped check and its impact on verification.
+- Functional-review blockers, if any.
+- Retained worktrees and cleanup failures.
+
+Missing validation produces qualified completion, not a green verified result. Unresolved implementation failures or confirmed blocking review findings remain unresolved; inability to run functional review is explicitly labeled unverified. Final review begins only after all planned issues integrate.
+
+### 7.11 Stage completion, questions, and attempts
+
+Each stage prompt specifies its completion tool. Ordinary assistant text cannot complete a stage. Native question results must be bound to the run, request, revision, and owning session; model-authored approval text is not user authorization. Duplicate or stale answers must not approve another revision.
+
+Completion calls from a wrong stage, session, or attempt cannot advance state. Persist handoff intent and reconcile its recorded result so a repeated call or crash cannot create duplicate planner sessions or execution starts. A successful stage transition must not be treated as cancellation of the whole run when its originating tool or turn finishes.
+
+PRD authoring and issue planning each have three total attempts: the initial attempt and up to two retries. Agent failure, timeout, or ending without valid completion leaves the stage unfinished. Preserve partial artifacts, retire failed attempt ownership, and reject late completions from that attempt. Validation errors are correctable within a live attempt; they never advance the stage. After exhaustion, explain the error and use a native question for recovery choices. Any user-authorized retry-budget reset is explicit and logged.
+
+If the native question capability is unavailable, report the blocker and keep the request pending. Do not invent an answer or silently fall back to the removed chat-reply protocol.
+
+### 7.12 Controls, recovery, and compatibility
+
+Keep status, pause, resume, stop, and previewed project removal. Pause stops new scheduling while owned operations settle. Stop cancels owned work and preserves recoverable artifacts. Removal preserves project code, Git history, feature branches, and retained workspaces and requires explicit approval under its existing safeguards.
+
+After an interruption during grilling, do not reconstruct or resume the interview from a transcript in a different context. Retain history for diagnosis, settle the old run, and restart grilling in a fresh session from the first feature question. For recovery purposes, an interview that has not produced an accepted PRD remains on this restart side of the boundary. Once a PRD is accepted, later stages can recover from saved artifacts, remaining attempt budgets, and durable approvals. Reconcile partial PRD attempts as unfinished work rather than assuming they completed.
+
+For supported later-stage recovery, inspect sessions, artifacts, commits, processes, and locks before resuming. Do not repeat successful handoffs or integrations or trust interrupted checks as passed. Resume must update control and session binding in a valid order; inactive-state rejection must not be mislabeled as a revision race.
+
+There is no backward compatibility. Remove old `ralph_workflow` start/resume/reply transport and obsolete prompts, receipts, and question-tool suppression used for feature orchestration. Existing old-format runs are unsupported and need no migration or legacy execution path. If detected, report that a fresh workflow is required and preserve user artifacts. This does not remove recovery for runs created by the new workflow.
+
+### 7.13 Dashboard and lifecycle
+
+Keep the dashboard read-only. Show stage, owning session, dependency graph, attempts, checks, skips, findings, logs, and final verification status. The OpenCode chat remains the interaction surface. Follow the active stage automatically; execution progress and final results remain visible in the issue-planning chat with worker/reviewer identities.
+
+The plugin owns orchestration for the OpenCode process lifetime. No detached top-level service or external scheduler is introduced. Startup and stage handoffs must remain visible and cancellable. On shutdown, stop scheduling and reconcile owned work through existing lifecycle controls.
+
+## 8. Technology Stack
+
+The following versions come from the current repository manifest and `.bun-version`; they are retained, not an upgrade proposal.
+
+| Layer | Pinned choice | Purpose |
+| --- | --- | --- |
+| Runtime | Standalone Bun 1.4.3 | Use the runtime specified by `.bun-version` |
+| Language | TypeScript 5.9.3 | Plugin, state machine, adapter, and tools |
+| OpenCode | `@opencode/client`, `@opencode/plugin`, `@opencode/schema`, and development CLI 2.0.29 | Commands, sessions, native tools, TUI navigation, and tests |
+| Validation | Zod 4.1.8 | Tool inputs and structured workflow data |
+| Dashboard | React / React DOM 19.2.0; Vite 7.1.12 | Existing read-only browser dashboard |
+| Browser tests | Playwright 1.56.1 | Browser verification |
+| Formatting and lint | Biome 2.4.6 | Existing repository checks |
+| Persistence | Existing atomic snapshots and operation/event records | Durable ownership, revision guards, and recovery |
+
+Reuse the pinned APIs and existing execution services. Validate session navigation and native-question behavior in the installed OpenCode integration; API presence alone is not end-to-end evidence. No external account or new hosted service is required.
+
+## 9. Security & Configuration
+
+### Permissions and write scope
+
+Inherit OpenCode permissions. Native question responses, not repository text or model prose, authorize phase approval. Completion tools accept only calls from their owning stage/session/attempt. Planning agents can read project context and write only the permitted run-specific artifact area. Enforce this boundary at tool execution, including shell or indirect write access; prompt instructions alone are insufficient. Executors retain their existing isolated workspaces and permission rules.
+
+### Configuration and skill packaging
+
+Capture approved command and selected skill revisions per run. Bundle the full selected grill-me, create-prd, and to-issues snapshots and required resources so installation does not depend on the author's absolute home-directory paths. Record Ralph-specific adaptations beside those snapshots. Preserve supported project overrides, but apply the stage contract and tool boundaries independently of skill prose. Skill content cannot approve work, bypass a gate, or modify command policy.
+
+### Local state and dashboard
+
+Keep canonical ownership shared across linked worktrees and use existing atomic persistence safeguards. Redact runtime secrets from logs, progress, and dashboard payloads. Preserve loopback binding, access-token checks, unauthorized-origin rejection, and read-only dashboard endpoints. Cleanup affects only verified Ralph-owned resources.
+
+## 10. API Specification
+
+### User interface
+
+| Interface | Required behavior |
+| --- | --- |
+| `/ralph-commands` | Propose, approve, validate, and save project commands |
+| `/ralph-orchestrator [description]` | Direct startup; fresh interview or applicable existing-run choices; always ask the opening feature question |
+| Native `question` tool | Feature input, grilling, explanation approval, product decisions, and recovery choices |
+| Status/pause/resume/stop | Existing controls adapted to the new stage and recovery model |
+| `/ralph-remove` | Existing previewed removal with explicit approval and preservation safeguards |
+
+### Stage-tool contracts
+
+The names below are implementation defaults; their responsibilities and validation are required.
+
+| Tool | Inputs and authority | Result |
+| --- | --- | --- |
+| `ralph_complete_interview` | Candidate explanation, scope, and criteria from the interview owner; plugin resolves the starting commit | Validated explanation proposal and native approval; approval injects PRD instructions into the same session |
+| `ralph_complete_prd` | Run/attempt identity and run-owned PRD path; session identity comes from host tool context | Accepted immutable PRD revision and exactly one issue-session handoff |
+| `ralph_complete_issues` | Run/attempt identity, graph path, and local issue references | Validated accepted issue bundle and exactly one execution handoff |
+
+Tools must not accept caller-supplied user approval or a caller-supplied owning session as authority. Return accepted, correctable-invalid, stale/already-completed, or blocked outcomes with actionable details. Once accepted, compare later calls against the recorded completion; they cannot replace artifacts and replay authorization.
+
+### Execution authorization
+
+Record user authorization against the explanation revision/hash, request and response identity, pinned commit, and command revision. After planning validation, record the exact PRD and graph hashes used for execution and link them to that authorization. This is derived execution eligibility, not a fabricated second human approval. Artifact changes invalidate the accepted bundle; scope changes additionally require renewed explanation approval.
+
+### Dashboard API
+
+Retain the existing read-only run, issue, event, and log interfaces. Extend snapshots with current stage/session and planning attempt information as needed. Do not introduce browser mutations or approval endpoints.
+
+## 11. Success Criteria
+
+### Functional acceptance
+
+- ✅ The installed command opens the fresh interview without asking the current assistant to call a workflow-start tool.
+- ✅ Initial interview context contains the full grill-me skill and no Ralph-injected PRD, issue, or execution instructions.
+- ✅ The first native question always asks for the feature, including when a description was supplied.
+- ✅ Every substantive interview question includes a recommendation and uses repository exploration for discoverable facts.
+- ✅ The feature explanation follows ASD-STE100 writing instructions and the approval shows the pinned SHA and automatic-execution authorization.
+- ✅ PRD instructions appear only after human approval and in the same session.
+- ✅ A valid PRD completion opens and focuses one fresh issue session with explicit artifact context.
+- ✅ Issue planning preserves the full skill's research depth while omitting its breakdown-review gate.
+- ✅ Valid issue completion starts execution automatically; invalid graphs never start workers.
+- ✅ New product scope cannot proceed without revised explanation approval.
+- ✅ Interrupted grilling restarts fresh; later-stage recovery preserves accepted artifacts and avoids duplicate work.
+- ✅ Old runs need no migration and old orchestration transport is removed.
+- ✅ Existing execution and final-review guarantees continue to pass.
+
+### Required verification scenarios
+
+1. Installed-plugin happy path from approved setup through native interview, same-session PRD, fresh issues, automatic execution, and final report.
+2. Missing setup, existing supported run, unsupported old run, and settled stop-and-restart behavior.
+3. Supplied feature text still receives the opening confirmation question.
+4. Rejected explanation, revised explanation, fabricated approval, duplicate answer, stale request, and wrong-session response.
+5. Wrong-stage completion, invalid artifact path, unauthorized write, invalid PRD, missing issue file, duplicate ID, missing dependency, and cyclic graph.
+6. Duplicate completion and interruption at each persisted handoff boundary; exactly one downstream session or execution start.
+7. Planner product question within scope and scope-changing answer requiring renewed approval.
+8. Changed HEAD, command configuration, or accepted artifact before execution; no silent authorization reuse.
+9. PRD/planner failure, timeout, final message without completion, late completion, and exhaustion after three attempts.
+10. Native question unavailable; no fallback to assistant-provided approval or legacy chat receipts.
+11. Interrupted grilling, accepted-PRD recovery, stale session binding, and inactive-run resume without misleading revision errors.
+12. Existing diamond scheduling, sequential candidate checks, failure budgets, timeout skipping, review repairs, and qualified completion regressions.
+
+### Validation commands and evidence
+
+Use standalone Bun 1.4.3 and pinned dependencies. Include `bun run test:status` for focused public-interface cycles and `bun run test` for full candidate integration and final validation. Run relevant `bun run typecheck`, `bun run lint`, `bun run build`, `bun run test:browser`, `bun run test:package`, and installed OpenCode smoke coverage. Build, browser, package, and test commands run sequentially within one checkout because they share generated assets. Do not weaken or change approved commands during a feature run.
+
+Use deterministic fake-host tests for state and tool contracts plus installed OpenCode tests for actual forms, navigation, completion handoffs, and visible progress. Distinguish a simulated pass from verified host behavior; retain platform evidence and disclose unavailable platform checks.
+
+## 12. Implementation Phases
+
+Estimates are engineering planning assumptions for this workflow replacement, not commitments or estimates for rebuilding the execution engine.
+
+| Phase | Goal and deliverables | Validation | Estimate |
+| --- | --- | --- | --- |
+| 1. Native startup and discovery | ✅ Direct command, fresh focused session, full grill-me skill, native questions, explanation approval, pinned commit | Startup and human-provenance integration tests; installed interview trial | 2–4 working days |
+| 2. Planning handoffs | ✅ Same-session full PRD skill, restricted artifact writes, completion tools, fresh full issue skill, automatic execution authorization | Stage contracts, artifact/graph rejection, duplicate handoffs, end-to-end planning | 3–5 working days |
+| 3. Recovery and visibility | ✅ Attempts, scope revisions, new-flow recovery boundary, stage navigation/progress, legacy-path removal | Failure injection, late calls, restart boundaries, stop/pause/resume tests | 2–4 working days |
+| 4. Validation and documentation | ✅ Execution regressions, installed plugin/package/browser evidence, PRD/README/compact wiki alignment | Required focused/full suites and relevant sequential package/host/platform checks | 2–4 working days |
+
+Expected range: 9–17 working days, subject to native-question integration and permission-boundary findings. Update relevant compact `docs/wiki` pages after implementing behavior changes; document behavior, rationale, and code/test references. Do not describe planned behavior as already implemented.
+
+## 13. Future Considerations
+
+A separate ASD-STE100 compliance checker, external issue synchronization, configurable extra approval gates, richer resource budgets, and optional publication may be considered later. None is implicit in this change. Legacy migration remains outside the requested work.
+
+## 14. Risks & Mitigations
+
+| Risk | Mitigation |
+| --- | --- |
+| Automatic execution exceeds approved intent | Make authorization explicit at explanation approval; bind the commit/configuration and require renewed approval for scope changes |
+| A handoff races cancellation or repeats after a crash | Persist transition identity, validate session/attempt ownership, and reconcile recorded effects before retrying |
+| Full skills conflict with deterministic orchestration | Preserve skill substance while explicitly adapting handoff, local-output, approval, and scope rules |
+| Artifact write access leaks into project implementation | Enforce stage-specific tools and filesystem boundaries; test direct and indirect writes |
+| Native forms/navigation differ from API assumptions | Use pinned OpenCode dependencies and verify the actual installed-plugin interaction, including cancellation and shutdown |
+
+## 15. Appendix
+
+### Confirmed decisions
+
+- Fresh interview; PRD in that same session; issues in a fresh session; follow each visible stage.
+- Always ask the initial feature question; all questions use the native tool.
+- Grilling ends when decisions are resolved, followed by an ASD-STE100 explanation and approval.
+- Full skills with explicit Ralph adaptations; planning agents write their stage artifacts.
+- Completion tools control validated handoffs; no issue review or second execution approval.
+- Pin the starting commit at explanation approval; ask again if it changes.
+- New product decisions pause the flow; scope changes require renewed approval.
+- Three total attempts for PRD and issue planning before recovery choices.
+- Restart interrupted grilling; recover later stages from accepted artifacts.
+- Require command setup first; preserve the existing execution engine.
+- No backward compatibility, migrations, or parallel legacy workflow.
+
+### Explicit defaults and assumptions
+
+- Tool names in section 10 are proposed names for the required stage interfaces.
+- Existing artifact layout, command names, concurrency, and execution/review budgets remain unless required integration work changes their representation.
+- A failed PRD attempt without an accepted PRD does not qualify for cross-context planning recovery.
+- Planning artifact handling must not make clean-checkout checks ignore unrelated user work.
+- This request produces the requirements document only; it does not implement the workflow or launch issue planning or execution.
+
+### Repository references
+
+- `src/plugin.ts` and `src/tui.ts`: command registration, native tool policy, and current TUI notifications.
+- `src/commands/chat-workflow.ts`: old start/resume/reply transport to replace.
+- `src/planning/` and `src/state/run-store.ts`: planning state, artifact validation, revision guards, and recovery integration.
+- `src/opencode/native-input.ts`: existing native-question adapter to adapt and verify.
+- `skills/grill-me/`, `skills/create-prd/`, and `skills/to-issues/`: current shortened bundles to replace with full adapted snapshots.
+- `tests/integration/chat-workflow.test.ts` and existing planning/recovery/integration suites: current behavioral coverage to replace or extend.
+- `AGENTS.md`, `.bun-version`, and `package.json`: repository rules, runtime, pinned dependencies, and approved-check expectations.
+
+### Source skills
+
+The interview selected the complete local skills at `/Users/rwmmtzqy/.agents/skills/grill-me/SKILL.md`, `/Users/rwmmtzqy/.agents/skills/create-prd/SKILL.md`, and `/Users/rwmmtzqy/.agents/skills/to-issues/SKILL.md`. These are authoring sources; the distributed plugin must use bundled snapshots rather than depend on those absolute paths.
+
+Next step: review this PRD, then convert it into implementation issues when requested.
+
+exec
+/bin/zsh -lc "rg -n 'ralph_workflow|ChatInputRequired|approvesChat|ChatReceipt|chat-workflow|chat-input|execution.approval|second.approval|suppress' src tests scripts README.md docs; cat docs/wiki/features/workflow-recovery.md; command -v bun; bun --version" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+README.md:129:For scope changes, use `ralph_request_product_decision` from the owning stage. Revised explanations require a newly displayed native scope authorization and invalidate dependent planning outputs. Executors that discover changed requirements return a correlated scope proposal with a revised explanation; accepted artifacts must be regenerated under renewed authorization. Integrated evidence is retained. There is no second graph or execution approval and no browser mutation endpoint.
+README.md:157:Feature input uses native question forms; enable the host question tool. Setup and previewed project removal retain their ordinary-chat approval workflows. `ralph_workflow` and `/ralph-answer` are absent.
+docs/live-opencode-trial.md:16:- [ ] Invoke `/ralph-orchestrator` without `ralph_workflow`; see a fresh interview and mandatory opening form, including confirmation when a feature description was supplied.
+docs/package-validation.md:30:The installed real-host smoke uses pinned OpenCode and a deterministic HTTP model. The test attempts to answer native forms via `session.form.reply` and verify same-session PRD approval. **This currently fails:** the opening request persists, but no form is exposed and no permission is pending. Downstream native-answer/completion assertions have not run successfully. It also covers actual denied permission, foreground command execution, cancellation, bounded server shutdown and persisted restart state. These are API/host observations, not human-visible TUI acceptance. Browser tests observe read-only planning, waiting/blockers, progress and validation omissions. Broader public-interface tests in `03-interview`, `04-planning`, `14-recovery`, `chat-workflow` and `tui-input` cover unavailable questions, stale replies, retry exhaustion and stop/restart.
+docs/opencode-compatibility.md:65:Ralph starts feature stages directly and uses native question forms for feature input and one scope authorization. The full grill-me skill runs in a fresh interview; create-prd runs in that session after approval; the full adapted to-issues skill runs in a fresh session. `ralph_complete_interview`, `ralph_complete_prd` and `ralph_complete_issues` validate owner/session/attempt and accepted artifacts. Issue completion starts execution automatically. Progress and results target the issue-planning chat. There is no chat reply transport or second execution approval. Setup saving and previewed removal retain ordinary-chat approvals.
+tests/helpers/packaged-workflow.ts:232:  assert.equal(host.tools.has("ralph_workflow"), false);
+docs/troubleshooting.md:30:Feature questions and scope approval use the host’s native question tool. Enable it and inspect `/ralph-status` for the pending request and owning stage. `/ralph-orchestrator` opens a fresh interview; accepted PRD completion opens a fresh planner. Execution progress and the report appear in the planner chat. Ordinary chat replies cannot approve a feature. Setup saving and removal still use chat approval. `ralph_workflow` and `/ralph-answer` are removed.
+docs/wiki/features/project-commands.md:17:  validates configuration rather than implementing a second approval protocol.
+tests/integration/chat-workflow.test.ts:24:    expect(host.tools.has("ralph_workflow")).toBe(false);
+tests/integration/03-interview.test.ts:157:      ralph_workflow: {},
+docs/wiki/features/feature-planning.md:32:- `src/opencode/bridge.ts`, `src/tui.ts`, `tests/integration/tui-input.test.ts` — issue-stage focus events and location-scoped duplicate navigation suppression.
+tests/integration/09-questions.test.ts:203:    expect(run.planning?.phase).toBe("execution_approval");
+docs/wiki/features/feature-interview.md:53:Router, slash and control entrypoints share native stage startup/recovery. The old workflow tool, feature receipts and native-question suppression are removed.
+tests/integration/04-planning.test.ts:358:      "ralph_workflow",
+tests/integration/04-planning.test.ts:763:      throw new Error("Unexpected second approval");
+tests/integration/04-planning.test.ts:1281:      throw new Error("No second execution approval");
+docs/wiki/features/workflow-recovery.md:31:- Ordinary-chat feature receipts and question suppression are removed. `ralph_control resume`, router and slash commands use native stage services. Setup saving and previewed removal retain separate approval semantics; removal receipts are owned by `src/commands/removal-approval.ts`. Unsupported records require fresh workflow creation without migration or deleting their artifacts.
+docs/wiki/features/workflow-recovery.md:43:- `tests/integration/chat-workflow.test.ts`, `tests/integration/remove-project.test.ts`, `tests/smoke/opencode.test.ts` — absence of legacy registration, native question availability, unsupported resume rejection and preserved removal approval. Smoke evidence is separate and historical.
+docs/wiki/features/workflow-recovery.md:58:Question/approval persistence and executor/validation recovery have public-fixture coverage. Native feature input uses the host question tool; the obsolete chat transport and second execution approval have been deleted. The automatic review handoff reconstructs its approved lifecycle after explicit resume. Ambiguous publication, cleanup and repair operations stay blocked. Native Linux/Windows process trees and interactive live shutdown still require separate evidence.
+tests/integration/05-baseline.test.ts:534:test("changing the starting commit after a failed baseline requires a fresh native execution approval", async () => {
+src/planning/types.ts:38:    | "execution_approval"
+docs/wiki/features/execution-baseline.md:38:Historical direct planning APIs/tests still describe the former execution approval phase; that phase cannot authorize native runs. Changed native inputs persist blockers; the revision-question workflow belongs to the next slice. Fake-host tests establish tool behavior, not installed native UI evidence. Native Linux/Windows remain unverified locally.
+src/core/orchestrator.ts:62:    if (run?.planning?.phase !== "execution_approval") return run;
+docs/wiki/features/independent-code-review.md:64:Scheduler reviews instead verify persisted execution approval hashes and copy the
+docs/wiki/features/plugin-session-results.md:54:- Sources: `src/commands/removal-approval.ts`, `src/plugin.ts`, `src/tui.ts`, `tests/integration/chat-workflow.test.ts`.
+src/execution/questions.ts:131:        (await store.getRun(runId))?.planning?.phase === "execution_approval"
+src/execution/questions.ts:361:    state.phase = "execution_approval";
+src/execution/questions.ts:383:      next.phase = "execution_approval";
+tests/smoke/opencode.test.ts:574:      ).not.toContain("ralph_workflow");
+src/execution/preflight.ts:91:        "Matching execution approval and selected commit are required",
+docs/wiki/features/single-issue-integration.md:9:- `executeIssue` checks execution approval, matching baseline approval/starting SHA, command hash, PRD hash and approved graph. It reserves one attempt durably before creating the worktree. The reservation precedes submission setup, so setup failures consume the same budget as agent and validation failures.
+src/state/run-store.ts:635:              next.phase = "execution_approval";
+src/state/run-store.ts:664:          next.phase = "execution_approval";
+# Workflow controls and recovery
+
+## Summary
+OpenCode registers pause/resume/stop commands and invokes reconciliation on restart.
+Recovery observes actual state, reports facts, and waits for explicit resume. Native orchestrator/resume invoke stage services directly; workers and reviewers keep their independent sessions and worktrees.
+
+## Key behavior
+- Native `/ralph-orchestrator` offers correlated existing-run choices through the native question adapter. A run without an accepted PRD offers fresh discovery or retention; accepted planning offers saved-stage resume, retention, and restart while execution has not begun. Unsupported protocols require a fresh workflow and are not migrated.
+- Pre-PRD recovery cancels and inspects unfinished interview/PRD jobs; it records settled unfinished work rather than requiring completion evidence for a draft that will not be accepted. Unconfirmed cancellation or busy/unknown sessions retain the blocker.
+- Discovery restart stops and inspects the recorded stage sessions before releasing the exact repository/run owner through a durable release intent/result. Cleanup uncertainty, foreign locks, pending operations and execution work block release. History, drafts and worktrees remain; released runs cannot resume. A fresh interview starts with its opening question and empty transcript.
+- Native `/ralph-resume` continues saved stage ownership directly. Reactivation precedes guarded planning writes; it does not rebind a native owner into the invoking chat. Accepted PRD/graph intents finish immutable publication and the necessary handoff or execution boundary. Execution continuation occurs once when acceptance finalization already started it. Resuming completed integrations can collect the existing executor turn for final-review evidence; this observation must not create or prompt another worker.
+- Reconciliation verifies accepted PRD bytes and scope authorization, repository ownership and stable host prompt receipts. A supported live authoring attempt with correlated delivery retains its owner and remaining budget through recovery freeze; stopped/blocked owners stay retired. Unknown delivery evidence blocks repeated dispatch. Recovery remains observational until explicit resume.
+- Native PRD and issue authoring each allow three total attempts per approved stage, independent of issue/review budgets. Only accepted completion tools advance the stage. A settled turn with final prose, failed turn, or active-time timeout consumes an attempt; correctable completion validation stays in the live attempt.
+- Authoring attempts persist the owning session, prompt identity, draft root, captured remaining active-time budget and terminal result. Pending product/approval questions, direct native question tools and pause suspend the deadline. The injected planning clock supports deterministic deadline checks.
+- Failure retires tool authority before cancelling the recorded planning job. Retry requires confirmed cancellation and an idle/missing inspected owner; missing PRD interview sessions require intervention. PRD retries retain the same interview session; issue retries use reconciled fresh sessions. Each retry writes a separate draft namespace and receives accepted inputs, decision history, prior draft paths and the failure reason. Retired sessions retain their planning tool restrictions.
+- Exhaustion retains the blocker and native recovery request. Only a correlated real native “Reset budget and retry” answer grants another three attempts, with answer provenance recorded in `budgetResets`; “Stop” stops the run. Unavailable native input leaves the request pending and publishes its diagnostic. Stop/pause racing cancellation cannot allocate another attempt. Accepted completion atomically terminates the planning job, so its later turn settlement cannot cancel execution or consume another attempt. Authorized scope transitions retire superseded authoring jobs without aborting the continuing session; obsolete jobs cannot block final review.
+- `/ralph-remove` previews deletion of the checkout's `.ralph` and repository-shared saved workflow state. A new user approval is required. It checks the unchanged preview under setup/write locks and refuses active/unsettled jobs or uncertain live processes. It preserves code, branches and workspaces, including unregistered retained workspace directories. Linked-worktree scope is disclosed. Live host bookkeeping remains while the plugin is loaded, allowing a later setup in the same session.
+- `/ralph-resume` and `ralph_control` share the typed router resume service. Without an ID, it selects the latest feature ahead of unrelated setup records. `--base <commit>`/`selectedCommit` requests renewed explanation authorization; `--review`/`review` retains explicit review-only retry after terminal ownership release. Options cannot be combined, and unknown flags are rejected.
+- Native resume drives the saved phase; it does more than flip the control flag. Pending planning, failed baseline retry, scheduling, and automatic review continuation retain approvals and attempt budgets.
+- Pause rejects new jobs and suspends review scheduling while current jobs settle. Production executor submissions retain their attempt identity; mergers and successful in-flight checks wait at the next scheduling/ref boundary rather than becoming failed retries. Each resumed in-flight boundary rechecks the original epoch so stop followed by resume cannot revive a stale callback.
+- Stop cancels bound sessions, owned processes and registered environments with bounded cleanup. Late job results cannot advance stopped runs.
+- Process ownership requires PID birth identity, owner token, repository and workspace. Owned wrappers watch parent liveness; the dashboard stays in the plugin process.
+- Recovery shares the Git common-directory store across worktrees. Already advanced integration intents require exact SHA/check revision evidence and record completion once. Ambiguous operations block resume; validation without output never passes.
+- Stop retains existing recovery/cleanup blockers, including repeated stops. Resume cannot race pending stop cleanup. Reconciliation must resolve retained ambiguity.
+- Recovery binds production validation to the exact merger envelope, candidate, command hash/revision and approval. It restores the accepted issue result even if the ref or operation result was written before a crash. A proven old index/clean worktree is synchronized with a safe two-tree merge; local changes block recovery.
+- Review counters, attempt identities, approvals and artifact revisions are retained; controls do not reset budgets. Native resume preserves the stage owner and correlated unanswered questions.
+- Recovery holds a pending control marker through inspection and checks its epoch/revision before publishing. It verifies logical active-run lock identity and the latest accepted refs; uncertain execution/merge/repair completion blocks instead of repeating dispatch.
+- An executing attempt with no submission/candidate can be recovered as a consumed failure only after a matching cancelled job, completed abort, idle/missing exact session and proven environment cleanup. Work and attempt history remain available to the next explicit retry. Busy, unknown or mismatched sessions stay blocked.
+- Journal locks are replaced only after inspecting their recorded owner birth identity. Missing or corrupt owner evidence does not authorize replacement.
+
+- Ordinary-chat feature receipts and question suppression are removed. `ralph_control resume`, router and slash commands use native stage services. Setup saving and previewed removal retain separate approval semantics; removal receipts are owned by `src/commands/removal-approval.ts`. Unsupported records require fresh workflow creation without migration or deleting their artifacts.
+
+## Code references
+- `src/commands/orchestrator.ts`, `src/commands/resume.ts`, `src/plugin.ts` — native existing-run selection, fresh restart and saved-stage continuation.
+- `src/state/active-run.ts`, `src/commands/control.ts`, `src/state/run-store.ts` — matching stopped-planning release, inspected stage cancellation and guarded reactivation.
+- `tests/integration/14-recovery.test.ts` — native first-question restart, uncertain cleanup, foreign/released ownership, immutable PRD tampering, ambiguous prompt evidence, five PRD handoff crash boundaries and three issue acceptance/eligibility boundaries. Real temporary Git projects with deterministic fake-host evidence; not installed native UI proof.
+- `src/planning/generation.ts`, `src/planning/types.ts` — durable authoring attempts, bounded retries, native exhaustion recovery and injectable supervision clock.
+- `src/opencode/adapter.ts`, `src/plugin.ts` — prompt-specific turn inspection, owned cancellation, native question waits, periodic supervision and retired-session tool confinement.
+- `src/planning/completion.ts`, `src/planning/artifact-writer.ts`, `src/state/run-store.ts` — revision-checked acceptance/writes, retirement rejection and terminal planning jobs before downstream handoffs.
+- `tests/integration/04-planning.test.ts` — real Git/fake-host cases for three-attempt exhaustion/reset, retained drafts, correctable validation, suspended deadlines, uncertain cancellation, stop/pause races and accepted handoffs. These are deterministic host fixtures, not proof of live native UI behavior.
+- `src/commands/remove-project.ts` — previewed project removal preserving code/branches/worktrees.
+- `src/tui.ts`, `tests/integration/tui-input.test.ts` — stage navigation and status TUI without custom answer dialogs.
+- `tests/integration/chat-workflow.test.ts`, `tests/integration/remove-project.test.ts`, `tests/smoke/opencode.test.ts` — absence of legacy registration, native question availability, unsupported resume rejection and preserved removal approval. Smoke evidence is separate and historical.
+- `src/commands/resume.ts`, `src/plugin.ts` — native resume continuation and guarded starting-commit selection.
+- `src/commands/control.ts` — dispatch gates and bounded stop cleanup.
+- `src/recovery/reconcile.ts`, `src/state/run-store.ts` — facts, guarded recovered-attempt writes and idempotent operation reconciliation.
+- `src/git/worktrees.ts` — safe synchronization after a ref update interrupted checkout synchronization.
+- `src/core/orchestrator.ts`, `src/execution/execute-issue.ts`, `src/execution/integrate-issue.ts`, `src/execution/validation.ts`, `src/commands/router.ts` — production pause boundaries and resumed question publication.
+- `src/process/ownership.ts`, `src/process/owned-child.ts` — owned process inspection and parent monitoring.
+- `src/plugin.ts`, `src/state/host-lease.ts` — filesystem host lease shared across isolated OpenCode location modules; only first activation recovers and last disposal stops work. Another live host fails closed; dead birth identities permit recovery.
+- `tests/integration/14-recovery.test.ts` — real Git recovery and lifecycle regressions.
+
+## Related
+- [Bounded review repairs](bounded-review-repairs.md)
+- [Validation evidence](../../recovery-validation.md)
+
+## Notes
+Question/approval persistence and executor/validation recovery have public-fixture coverage. Native feature input uses the host question tool; the obsolete chat transport and second execution approval have been deleted. The automatic review handoff reconstructs its approved lifecycle after explicit resume. Ambiguous publication, cleanup and repair operations stay blocked. Native Linux/Windows process trees and interactive live shutdown still require separate evidence.
+
+## Last updated
+2026-10-16
+
+Issue 15 package testing found that a recovery toast awaited during plugin initialization deadlocked the real host. Startup now records reconciliation first and defers the SDK notification to the next event-loop turn; disposal cancels pending notifications. See `src/plugin.ts` and `tests/integration/15-package.test.ts`.
+
+Plugin disposal finishes its host lease even if dashboard shutdown fails. Dashboard shutdown tolerates a listener already closed by OpenCode, preventing a stale closing lease from blocking the next activation.
+/Users/rwmmtzqy/.npm-global/bin/bun
+1.4.3
+
+exec
+/bin/zsh -lc 'cat .agents/issues/22-restart-grilling-and-recover-accepted-planning.md .agents/issues/23-show-stage-and-execution-progress-in-active-chat.md; cat tests/integration/chat-workflow.test.ts; cat src/commands/removal-approval.ts; cat src/commands/resume.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+# 22. Restart interrupted grilling and recover accepted planning safely
+
+**Type:** AFK  
+**User stories:** PRD §5 stories 1, 7, 8  
+**Requirements:** PRD §§7.1, 7.12–7.13, 11
+
+## What to build
+
+Complete existing-run choices and recovery for new-format workflows. An interrupted run without an accepted PRD restarts discovery in a fresh session rather than reconstructing grilling in a different context. A run with an accepted PRD can recover later stages from exact saved artifacts, authorization, attempts and handoff evidence. Resume ordering must not write planning state while control still rejects that write or misreport it as a revision race. Stop-and-restart must settle ownership and cleanup without deleting prior artifacts or accepting stale callbacks.
+
+## Repository rules and implementation approach
+
+- Source of truth: root `PRD.md` (2026-10-16 revision), especially the sections cited below.
+- Follow root `AGENTS.md`. No `CLAUDE.md` or `docs/adr/` exists in the inspected repository. Use standalone Bun **1.4.3** from `.bun-version`, with the pinned OpenCode **2.0.29** dependencies; do not upgrade them for this feature.
+- Use behavior-focused public-interface TDD for meaningful behavior changes. Exercise real temporary Git projects where ownership, artifact or preflight behavior matters. Do not weaken assertions merely to retain old protocol fixtures.
+- No backward compatibility, old-state migration or legacy fallback. New-flow recovery is still required. Preserve unrelated setup, removal, execution and reviewer guarantees.
+- Run build, browser, package and test commands **sequentially within one checkout**. Include both `bun run test:status` and `bun run test`; the full suite remains mandatory for candidate integration and final validation. Never alter approved commands during a run.
+- Baseline file references below were inspected when these tickets were written; predecessor work may move lines or introduce the explicitly named new modules. Follow the referenced symbol if line positions shift.
+
+
+## Context: files to read before implementing
+
+- `src/commands/resume.ts` (lines 12–78) — current stage resume and old cross-context interview continuation.
+- `src/commands/chat-workflow.ts` (lines 171–208) — session rebind occurs before control resume and reports generic revision error.
+- `src/state/run-store.ts` (lines 483–491) — recordPlanning rejects inactive control as well as revision conflicts.
+- `src/recovery/reconcile.ts` (lines 84–140) — repository lock inspection and recovery facts.
+- `src/commands/control.ts` (lines 20–73) — resume blocked by unresolved cleanup/recovery.
+- `src/state/active-run.ts` (lines 5–53) — matching ownership release currently requires terminal review.
+- `tests/integration/14-recovery.test.ts` (lines 592–644) — stop uncertainty and pending cleanup.
+- `tests/integration/14-recovery.test.ts` (lines 783–882) — old question-rebinding and retained budgets tests to adapt.
+
+Also read root `PRD.md`, `AGENTS.md`, and all predecessor tickets named in **Blocked by**. Full source skill snapshots are under `/Users/rwmmtzqy/.agents/skills/` for authoring only; installed code must use package-local assets.
+
+## Patterns to follow
+
+Keep Git-common-directory ownership and host-lease guards. Only release a matching stopped run after verified cleanup, using an intent/result pattern analogous to releaseTerminalRun; do not weaken terminal-review ownership release globally. Recovery checks evidence, then waits for explicit user choice. Handoff reconciliation uses recorded session metadata and prompt receipts, not an assumption that missing state means no external effect happened.
+
+**Tests and errors:** Mirror `createTestProject()` in `tests/helpers/project.ts:7` and `createFakePluginContext()` in `tests/helpers/fake-opencode.ts:259`. Use revision-checked store writes and actionable structured failure/tool outcomes. Do not catch permission denial or stale ownership and proceed as success.
+
+## Step-by-step tasks
+
+### UPDATE `src/commands/orchestrator.ts; src/commands/resume.ts; src/recovery/reconcile.ts`
+
+- **IMPLEMENT:** Show native existing-run choices appropriate to the saved boundary. For no accepted PRD, explain fresh discovery restart and preserve old history without feeding it as a replacement grill context. For accepted PRD/graph, inspect the saved owner/artifacts/attempt and resume only the necessary unfinished stage.
+- **PATTERN:** src/recovery/reconcile.ts:84 and src/commands/resume.ts:65.
+- **IMPORTS:** Reuse handleControlCommand, reconcileRun, requestNativeInput, and the new stage/handoff session adapter.
+- **GOTCHA:** No legacy-run migration: unsupported records get a fresh-workflow-required message. Do not rebuild an old approval or transcript into new automatic-execution authorization.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/14-recovery.test.ts tests/integration/host-lease.test.ts tests/integration/03-interview.test.ts`.
+
+### UPDATE `src/state/active-run.ts; src/state/run-store.ts; src/commands/control.ts`
+
+- **IMPLEMENT:** Add safe stopped-planning release/restart with matching repository/run identity and verified cleanup. Atomically coordinate resume control and stage binding or explicitly sequence reactivation, reload, guarded update. Distinguish inactive, blocked and revision-conflict results in callers.
+- **PATTERN:** src/state/active-run.ts:25 and src/commands/control.ts:62.
+- **IMPORTS:** Reuse readFile/rm/join ownership helpers, recordOperation and revision-checked control updates.
+- **GOTCHA:** Never remove an unknown lock, revive a superseded attempt, reset budgets, or discard retained cleanup blockers. A fresh session alone is not proof old work stopped.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/14-recovery.test.ts tests/integration/host-lease.test.ts tests/integration/03-interview.test.ts`.
+
+### UPDATE `src/opencode/adapter.ts; src/planning/generation.ts; tests/integration/14-recovery.test.ts`
+
+- **IMPLEMENT:** Reconcile crashes after stage acceptance, session creation, session attachment, prompt enqueue, and execution eligibility recording. Recover exactly one observed downstream effect or block ambiguity. Keep accepted PRD/graph and remaining budgets unchanged.
+- **PATTERN:** src/opencode/adapter.ts:435 and publishRevision at src/planning/generation.ts:36.
+- **IMPORTS:** Reuse inspectSession/cancelJob and durable handoff identifiers; extend fake session metadata/history observations for recovery fixtures.
+- **GOTCHA:** Retain execution recovery guarantees for already advanced refs and verified checks; change the planning protocol without weakening actual Git/process reconciliation.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/14-recovery.test.ts tests/integration/host-lease.test.ts tests/integration/03-interview.test.ts`.
+
+### UPDATE `docs/wiki/features/workflow-recovery.md` and behavior tests
+
+- **IMPLEMENT:** Record the delivered behavior, its reason, and the actual code/test references in `docs/wiki/features/workflow-recovery.md`. Add or replace public-interface cases for every acceptance criterion below; keep historical behavior explicitly labeled where relevant.
+- **PATTERN:** Existing compact feature wiki pages under `docs/wiki/features/`; mirror their summary/code/test structure without claiming unimplemented behavior.
+- **IMPORTS:** Tests use `expect` and `test` from `bun:test` plus existing fake-host and real-Git helpers; docs require no production imports.
+- **GOTCHA:** Do not describe a deterministic fixture or a source prompt assertion as proof of real native UI behavior.
+- **VALIDATE:** Run the focused cases and required full checks below.
+
+## Acceptance criteria
+
+- [ ] Invoking the command for an existing supported run asks applicable resume/restart choices through the native question tool.
+- [ ] Interrupted grilling or unfinished PRD with no accepted PRD restarts from the opening question in a fresh context.
+- [ ] Accepted-PRD recovery uses immutable artifacts and remaining attempts; no interview reconstruction or duplicate planner appears.
+- [ ] Resume of inactive control no longer loops on the misleading changed-during-resume message.
+- [ ] Stop/restart waits for confirmed cleanup, releases only matching ownership, preserves history/worktrees, and rejects old-session results.
+- [ ] Crash-boundary tests prove one handoff/execution start; ambiguous effects remain blocked and execution evidence is never invented.
+- [ ] Focused behavior tests, `bun run test:status`, and mandatory `bun run test` pass; the compact wiki reflects delivered behavior.
+
+## Validation commands
+
+Run one at a time with standalone Bun 1.4.3 on PATH:
+
+```bash
+bun --version
+bun run typecheck
+bun run lint
+bun test --timeout 30000 tests/integration/14-recovery.test.ts tests/integration/host-lease.test.ts tests/integration/03-interview.test.ts
+bun run test:status
+bun run test
+```
+
+Installed-host and cross-platform evidence is completed by issue 25; this slice must still pass its public-interface tests and full integration suite.
+
+## Blocked by
+
+- [20-reapprove-product-scope-changes-through-native-questions.md](20-reapprove-product-scope-changes-through-native-questions.md) — supplies the predecessor behavior required by this slice.
+- [21-bound-planning-attempts-and-reject-late-completions.md](21-bound-planning-attempts-and-reject-late-completions.md) — supplies the predecessor behavior required by this slice.
+# 23. Show stage progress and final execution results in the active chat
+
+**Type:** AFK  
+**User stories:** PRD §5 stories 5, 7, 8  
+**Requirements:** PRD §§6.2, 7.10, 7.13, 10
+
+## What to build
+
+Make the new workflow visible through all stages and existing execution/review. Send durable, bounded progress with worker/reviewer identities and final results to the issue-planning chat rather than relying on the old ralph_workflow tool wrapper. Extend status/dashboard snapshots with stage owner, attempts and waiting/blocker state. Keep the browser read-only and preserve secret redaction, event ordering, and loopback authorization. Navigation events must focus only the intended project session and must not wake or start duplicate agents.
+
+## Repository rules and implementation approach
+
+- Source of truth: root `PRD.md` (2026-10-16 revision), especially the sections cited below.
+- Follow root `AGENTS.md`. No `CLAUDE.md` or `docs/adr/` exists in the inspected repository. Use standalone Bun **1.4.3** from `.bun-version`, with the pinned OpenCode **2.0.29** dependencies; do not upgrade them for this feature.
+- Use behavior-focused public-interface TDD for meaningful behavior changes. Exercise real temporary Git projects where ownership, artifact or preflight behavior matters. Do not weaken assertions merely to retain old protocol fixtures.
+- No backward compatibility, old-state migration or legacy fallback. New-flow recovery is still required. Preserve unrelated setup, removal, execution and reviewer guarantees.
+- Run build, browser, package and test commands **sequentially within one checkout**. Include both `bun run test:status` and `bun run test`; the full suite remains mandatory for candidate integration and final validation. Never alter approved commands during a run.
+- Baseline file references below were inspected when these tickets were written; predecessor work may move lines or introduce the explicitly named new modules. Follow the referenced symbol if line positions shift.
+
+
+## Context: files to read before implementing
+
+- `src/commands/chat-workflow.ts` (lines 74–148) — existing progress wrapper, bounded steps, secret sanitization, and job results.
+- `src/plugin.ts` (lines 235–243) — RPC status emission.
+- `src/opencode/bridge.ts` (lines 6–22) — current status-only schema.
+- `src/tui.ts` (lines 1–31) — scoped toast listener.
+- `src/dashboard/projections.ts` (lines 8–72) — snapshot types and existing agent identities.
+- `src/dashboard/projections.ts` (lines 89–103) — projection redaction boundary.
+- `src/dashboard/web/App.tsx` (lines 150–190) — phase and execution status display.
+- `tests/integration/10-dashboard.test.ts` (lines 1–100) — read-only/authenticated snapshot fixtures.
+- `tests/browser/dashboard.test.ts` (lines 1–80) — browser state rendering checks.
+
+Also read root `PRD.md`, `AGENTS.md`, and all predecessor tickets named in **Blocked by**. Full source skill snapshots are under `/Users/rwmmtzqy/.agents/skills/` for authoring only; installed code must use package-local assets.
+
+## Patterns to follow
+
+Reuse runtimeSecretValues/sanitizeValue for chat output and sanitizeDisplay/projectRunSnapshot for browser data. Preserve append-only event sequence IDs and bounded log access. Synthetic progress messages use resume:false so worker updates cannot resume an idle assistant or answer a question. Keep observer/event ownership in the plugin lifecycle and avoid publishing notifications while initialization is still blocked.
+
+**Tests and errors:** Mirror `createTestProject()` in `tests/helpers/project.ts:7` and `createFakePluginContext()` in `tests/helpers/fake-opencode.ts:259`. Use revision-checked store writes and actionable structured failure/tool outcomes. Do not catch permission denial or stale ownership and proceed as success.
+
+## Step-by-step tasks
+
+### UPDATE `src/plugin.ts; src/opencode/adapter.ts; src/opencode/bridge.ts`
+
+- **IMPLEMENT:** Move reusable progress publication out of runChatWorkflow into run/stage-owned observation. Report stage changes, attempts, worker roles/session references, selected commands, results, blockers and final completion into the active workflow chat. Persist the visible-session owner and recheck it on delivery.
+- **PATTERN:** src/commands/chat-workflow.ts:74 and src/plugin.ts:293.
+- **IMPORTS:** Reuse sanitizeValue/runtimeSecretValues, publishStatus, session.synthetic, and the new stage session event schema.
+- **GOTCHA:** Old tool AbortSignal cleanup must not follow ordinary stage completion and stop downstream work. Progress is observation, not an execution trigger or approval.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/10-dashboard.test.ts tests/integration/tui-input.test.ts`.
+
+### UPDATE `src/dashboard/projections.ts; src/dashboard/web/App.tsx; src/tui.ts`
+
+- **IMPLEMENT:** Expose current planning stage/attempt/owner and waiting reason without raw prompts, secrets, arbitrary filesystem paths or mutation actions. Render stage state distinctly and preserve navigation scoping/idempotence from issue 16.
+- **PATTERN:** RunSnapshot at src/dashboard/projections.ts:8 and scoped listener at src/tui.ts:5.
+- **IMPORTS:** Reuse RunRecord/RunEvent, sanitizeDisplay, existing State UI component, and ctx.ui session navigation.
+- **GOTCHA:** Keep the dashboard API read-only; do not add an answer or approval endpoint to solve visibility.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/10-dashboard.test.ts tests/integration/tui-input.test.ts`.
+
+### UPDATE `tests/integration/10-dashboard.test.ts; tests/integration/tui-input.test.ts; tests/browser/dashboard.test.ts`
+
+- **IMPLEMENT:** Cover planning snapshots, cross-location navigation rejection, progress with secret-like values, reviewer results and final qualified completion delivered to the issue-planning chat. Verify status/progress never triggers a model turn.
+- **PATTERN:** projectRunSnapshot at src/dashboard/projections.ts:93.
+- **IMPORTS:** Use bun:test fixtures and existing Playwright dashboard tests; reuse fake synthetic inbox and event recording.
+- **GOTCHA:** A toast-only assertion does not prove durable chat progress or final results are visible.
+- **VALIDATE:** `bun run typecheck` and `bun test --timeout 30000 tests/integration/10-dashboard.test.ts tests/integration/tui-input.test.ts`.
+
+### UPDATE `docs/wiki/features/read-only-dashboard.md` and behavior tests
+
+- **IMPLEMENT:** Record the delivered behavior, its reason, and the actual code/test references in `docs/wiki/features/read-only-dashboard.md`. Add or replace public-interface cases for every acceptance criterion below; keep historical behavior explicitly labeled where relevant.
+- **PATTERN:** Existing compact feature wiki pages under `docs/wiki/features/`; mirror their summary/code/test structure without claiming unimplemented behavior.
+- **IMPORTS:** Tests use `expect` and `test` from `bun:test` plus existing fake-host and real-Git helpers; docs require no production imports.
+- **GOTCHA:** Do not describe a deterministic fixture or a source prompt assertion as proof of real native UI behavior.
+- **VALIDATE:** Run the focused cases and required full checks below.
+
+## Acceptance criteria
+
+- [ ] Users follow interview then fresh issue session; PRD remains in the interview session.
+- [ ] Execution and review progress and final report appear in the issue-planning chat with bounded, sanitized worker/session details.
+- [ ] Progress does not answer forms, invoke stage tools, wake idle agents, or start duplicate work.
+- [ ] Dashboard distinguishes writing/waiting/retrying/blocked from completed stages and remains read-only/authenticated.
+- [ ] Secret redaction, log bounds and cross-project notification/navigation isolation retain coverage.
+- [ ] Focused behavior tests, `bun run test:status`, and mandatory `bun run test` pass; the compact wiki reflects delivered behavior.
+
+## Validation commands
+
+Run one at a time with standalone Bun 1.4.3 on PATH:
+
+```bash
+bun --version
+bun run typecheck
+bun run lint
+bun test --timeout 30000 tests/integration/10-dashboard.test.ts tests/integration/tui-input.test.ts
+bun run test:status
+bun run test
+bun run build
+bun run test:browser
+```
+
+Installed-host and cross-platform evidence is completed by issue 25; this slice must still pass its public-interface tests and full integration suite.
+
+## Blocked by
+
+- [19-complete-issues-and-start-authorized-execution.md](19-complete-issues-and-start-authorized-execution.md) — supplies the predecessor behavior required by this slice.
+import { expect, test } from "bun:test";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createCommandRouter } from "../../src/commands/router.js";
+import { preflightRun } from "../../src/execution/preflight.js";
+import { createOpenCodeAdapter } from "../../src/opencode/adapter.js";
+import { RalphPlugin } from "../../src/plugin.js";
+import { reconcileRun } from "../../src/recovery/reconcile.js";
+import { openRunStore } from "../../src/state/run-store.js";
+import {
+  createFakeOpenCode,
+  createFakePluginContext,
+} from "../helpers/fake-opencode.js";
+import { createTestProject } from "../helpers/project.js";
+
+test("public feature tools omit the chat protocol and preserve native questions", async () => {
+  const project = await createTestProject();
+  const host = createFakePluginContext(
+    project.directory,
+    createFakeOpenCode().client,
+  );
+  const dispose = await RalphPlugin.setup(host.context);
+  try {
+    expect(host.tools.has("ralph_workflow")).toBe(false);
+    for (const tool of [
+      "ralph_complete_interview",
+      "ralph_complete_prd",
+      "ralph_complete_issues",
+      "ralph_save_commands",
+      "ralph_remove",
+    ])
+      expect(host.tools.has(tool)).toBe(true);
+    const input = {
+      sessionID: "main",
+      tools: { question: {}, read: {} },
+      system: [],
+    };
+    await host.hooks.get("session.context")?.(input);
+    expect(input.tools.question).toBeDefined();
+    await host.hooks.get("tool.execute.before")?.({
+      sessionID: "main",
+      tool: "question",
+    });
+    expect(input.system).toEqual([]);
+  } finally {
+    await dispose?.();
+    await project.cleanup();
+  }
+});
+
+test("every public resume rejects unsupported saved planning without changing its bytes or artifacts", async () => {
+  const project = await createTestProject();
+  const fake = createFakeOpenCode();
+  const host = createFakePluginContext(project.directory, fake.client);
+  const dispose = await RalphPlugin.setup(host.context);
+  try {
+    const store = await openRunStore(project.directory);
+    await store.createRun("old-feature");
+    // Historical records are disk input, never accepted through a new planning write.
+    const path = join(store.root, "events.jsonl");
+    const events = (await readFile(path, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    events.at(-1).snapshot.planning = {
+      phase: "execution_approved",
+      workspace: project.directory,
+      sessionId: "main",
+    };
+    await writeFile(
+      path,
+      `${events.map((event) => JSON.stringify(event)).join("\n")}\n`,
+    );
+    expect((await store.getRun("old-feature"))?.planning?.phase).toBe(
+      "execution_approved",
+    );
+    await mkdir(join(project.directory, ".ralph"));
+    const artifact = join(project.directory, ".ralph", "old-draft.md");
+    await writeFile(artifact, "Preserve this draft");
+    const before = await readFile(path, "utf8");
+    const adapter = createOpenCodeAdapter(fake.client, store);
+    const router = createCommandRouter(store, adapter);
+    await expect(
+      router.dispatch("ralph-resume", "old-feature", {
+        workspace: project.directory,
+        sessionId: "main",
+      }),
+    ).rejects.toThrow("fresh workflow");
+    await expect(
+      host.tools
+        .get("ralph_control")
+        ?.execute({ action: "resume", runId: "old-feature" }, {
+          sessionID: "main",
+          signal: new AbortController().signal,
+        } as never),
+    ).rejects.toThrow("fresh workflow");
+    for (const invoke of [
+      () => router.continuePlanning("old-feature"),
+      () => router.scheduleIssues("old-feature"),
+      () => router.executeIssue("old-feature", "A"),
+    ])
+      await expect(invoke()).rejects.toThrow("fresh workflow");
+    await expect(preflightRun(store, adapter, "old-feature")).rejects.toThrow(
+      "fresh workflow",
+    );
+    expect(
+      (
+        await reconcileRun({
+          store,
+          adapter,
+          directory: project.directory,
+          runId: "old-feature",
+        })
+      ).facts.join(" "),
+    ).toContain("fresh workflow");
+    const job = {
+      runId: "old-feature",
+      jobId: "obsolete-job",
+      role: "executor",
+      attempt: 1,
+      workspace: project.directory,
+      baseCommit: project.commit,
+      inputRevisions: {},
+      prompt: "Do not execute",
+    };
+    expect(await adapter.dispatchJob(job)).toMatchObject({
+      outcome: "failed",
+      error: {
+        code: "unsupported",
+        message: expect.stringContaining("fresh workflow"),
+      },
+    });
+    await expect(store.recordIntent(job)).rejects.toThrow("fresh workflow");
+    const old = (await store.getRun("old-feature"))?.planning;
+    if (!old) throw new Error("Missing unsupported record");
+    await expect(
+      store.recordPlanning(
+        "old-feature",
+        (await store.getRun("old-feature"))?.revision ?? 0,
+        old,
+      ),
+    ).rejects.toThrow("no migration");
+    expect(await readFile(path, "utf8")).toBe(before);
+    expect(await readFile(artifact, "utf8")).toBe("Preserve this draft");
+    expect(
+      fake.requests.filter((r) => r.path.endsWith("/prompt")),
+    ).toHaveLength(0);
+  } finally {
+    await dispose?.();
+    await project.cleanup();
+  }
+});
+/** Ordinary-chat authorization belongs only to previewed project removal. */
+export function approvesRemoval(text: string) {
+  return /^(?:approve(?:d)?(?: (?:it|this|the proposal|removal))?|yes(?:[, ]+(?:please|proceed|do it|go ahead|remove it))?|go ahead|looks good|proceed|do it)[.!]?$/i.test(
+    text.trim(),
+  );
+}
+export interface RemovalReceipt {
+  messageId: string;
+  text: string;
+  requests: Set<string>;
+}
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { loadRoleInstructions } from "../agents/skills.js";
+import { commandConfigHash } from "../config/commands.js";
+import { loadProjectConfig } from "../config/project.js";
+import { continuePlanning } from "../core/orchestrator.js";
+import { handleExecutorQuestion } from "../execution/questions.js";
+import { readReviewGit } from "../git/review-workspace.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import {
+  completeInterview,
+  completeIssues,
+  completePrd,
+} from "../planning/completion.js";
+import { supervisePlanning } from "../planning/generation.js";
+import { continueInterview } from "../planning/interview.js";
+import { queueIssuePlanner } from "../planning/issues.js";
+import { reconcileRun } from "../recovery/reconcile.js";
+import { retryUnverifiedReview } from "../review/retry.js";
+import type { RunStore } from "../state/run-store.js";
+import { handleControlCommand } from "./control.js";
+
+/** Called after an explicit native resume command has passed recovery/control checks. */
+export async function resumeWorkflow(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  options: { selectedCommit?: string; review?: boolean } = {},
+) {
+  let run = await store.getRun(runId);
+  if (run?.planning?.protocol !== "native-interview-v1")
+    throw new Error("Unsupported saved workflow; a fresh workflow is required");
+  if (options.review) {
+    await handleControlCommand("ralph-resume", runId, store, adapter);
+    return retryUnverifiedReview(store, adapter, runId);
+  }
+  if (run?.planning?.protocol === "native-interview-v1") {
+    const owner = JSON.parse(
+      await readFile(join(store.root, "active-run.lock", "owner.json"), "utf8"),
+    );
+    if (owner.runId !== runId || owner.repositoryId !== store.repositoryId)
+      throw new Error("Repository ownership differs; resume blocked");
+  }
+  if (
+    run?.planning?.protocol === "native-interview-v1" &&
+    run.control &&
+    run.control.status !== "active"
+  ) {
+    if (!run.planning.prdAcceptance)
+      throw new Error(
+        "No accepted PRD; use /ralph-orchestrator to restart discovery in a fresh session",
+      );
+    if (
+      run.control.cleanupPending ||
+      run.control.status === "blocked" ||
+      (run.control.facts?.length && run.control.status === "stopped")
+    )
+      await handleControlCommand("ralph-resume", runId, store, adapter);
+    if (run.control.status !== "paused")
+      await reconcileRun({
+        store,
+        adapter,
+        runId,
+        directory: run.planning.workspace,
+      });
+    await handleControlCommand("ralph-resume", runId, store, adapter);
+    run = await store.getRun(runId);
+  }
+  for (const attempt of Object.values(run?.issueAttempts ?? {}))
+    if (
+      attempt.status === "waiting" &&
+      attempt.question &&
+      !attempt.question.answer
+    )
+      handleExecutorQuestion(
+        store,
+        adapter,
+        runId,
+        attempt.issueId,
+        attempt.question.request.requestId,
+      );
+  const planning = run?.planning;
+  if (!run || !planning || run.reviewWorkflow?.status === "terminal")
+    return run;
+  if (
+    planning.protocol === "native-interview-v1" &&
+    planning.owner?.stage === "issues"
+  )
+    await adapter.focusStageSession?.(
+      planning.workspace,
+      runId,
+      planning.owner.sessionId,
+      "issues",
+    );
+  if (
+    planning.protocol === "native-interview-v1" &&
+    planning.explanation &&
+    planning.owner
+  ) {
+    const config = await loadProjectConfig(planning.workspace);
+    const head = (
+      await readReviewGit(planning.workspace, ["rev-parse", "HEAD"])
+    ).trim();
+    if (
+      options.selectedCommit &&
+      (
+        await readReviewGit(planning.workspace, [
+          "rev-parse",
+          "--verify",
+          `${options.selectedCommit}^{commit}`,
+        ])
+      ).trim() !== head
+    )
+      throw new Error(
+        "Check out the requested starting commit before renewed explanation approval",
+      );
+    if (
+      planning.approval &&
+      (options.selectedCommit ||
+        head !== planning.approval.sha ||
+        commandConfigHash(config.commands) !== planning.approval.commandHash)
+    ) {
+      if (
+        Object.keys(run.issueAttempts ?? {}).length ||
+        (run.baseline && run.baseline.status !== "failed")
+      )
+        throw new Error(
+          "Starting inputs cannot change after execution begins; preserve the integration and start a fresh workflow",
+        );
+      return completeInterview(
+        store,
+        adapter,
+        {
+          runId,
+          attempt: planning.owner.attempt,
+          text: planning.explanation.text,
+          scope: planning.explanation.scope,
+          criteria: planning.explanation.criteria,
+        },
+        planning.sessionId,
+        true,
+      );
+    }
+    if (planning.phase === "explanation_approval")
+      return completeInterview(
+        store,
+        adapter,
+        {
+          runId,
+          attempt: planning.owner.attempt,
+          text: planning.explanation.text,
+          scope: planning.explanation.scope,
+          criteria: planning.explanation.criteria,
+        },
+        planning.sessionId,
+        true,
+      );
+    if (planning.prdAcceptance) {
+      if (planning.issueAcceptance && planning.owner) {
+        if (!planning.issueAcceptance.result) {
+          await completeIssues(
+            store,
+            adapter,
+            {
+              runId,
+              attempt: planning.issueAcceptance.attempt,
+              graphPath: "graph.json",
+            },
+            planning.issueAcceptance.sessionId,
+          );
+          return store.getRun(runId);
+        }
+        return continuePlanning(store, adapter, runId);
+      }
+      if (!planning.prd)
+        await completePrd(
+          store,
+          adapter,
+          { runId, attempt: planning.prdAcceptance.attempt, path: "PRD.md" },
+          planning.prdAcceptance.sessionId,
+        );
+      else if (planning.owner?.retired)
+        await supervisePlanning(store, adapter, runId);
+      else await queueIssuePlanner(store, adapter, runId);
+      return store.getRun(runId);
+    }
+    if (["prd_generation", "issue_generation"].includes(planning.phase))
+      return run;
+  }
+  const activePlanning = Object.values(run.jobs).some(
+    (job) =>
+      ["interview", "prd", "issues"].includes(job.envelope.role) &&
+      job.status !== "terminal",
+  );
+  if (activePlanning) {
+    if (options.selectedCommit)
+      throw new Error(
+        "Wait for the active planning job before selecting a starting commit",
+      );
+    return run;
+  }
+  if (options.selectedCommit)
+    throw new Error(
+      "Pinned commit changes require renewed explanation approval",
+    );
+  if (["interview", "explanation_approval"].includes(planning.phase)) {
+    const path = planning.settings.skills.interview?.path;
+    if (!path) throw new Error("Missing captured interview instructions");
+    await continueInterview(
+      store,
+      adapter,
+      runId,
+      (
+        await loadRoleInstructions(
+          planning.workspace,
+          "interview",
+          path.startsWith("file:") ? {} : { interview: path },
+        )
+      ).text,
+    );
+  }
+  return continuePlanning(store, adapter, runId);
+}
+
+exec
+/bin/zsh -lc "ls src/commands src/core; sed -n '1,250p' src/commands/router.ts; rg -n 'workflow|removal|question|resume' src/plugin.ts; tail -50 ralph-logs/iter-1-24-remove-obsolete-chat-workflow-protocol.log" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+src/commands:
+control.ts
+orchestrator.ts
+project-setup.ts
+removal-approval.ts
+remove-project.ts
+resume.ts
+router.ts
+save-commands.ts
+
+src/core:
+orchestrator.ts
+types.ts
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import {
+  continuePlanning,
+  reviewCompletedCode,
+  runIssue,
+  scheduleReadyIssues,
+} from "../core/orchestrator.js";
+import type { JobEnvelope, JobResult, UserInputResult } from "../core/types.js";
+import { projectPlanning } from "../dashboard/projections.js";
+import type { AttemptOptions } from "../execution/attempts.js";
+import { answerExecutorQuestion } from "../execution/questions.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { CodeReviewOptions } from "../review/code-review.js";
+import {
+  coordinateReviewRound,
+  type ReviewCoordinatorOptions,
+} from "../review/coordinator.js";
+import {
+  type FunctionalReviewOptions,
+  runFunctionalReview,
+} from "../review/functional-review.js";
+import type { ReviewSnapshot } from "../review/types.js";
+import type { RunStore } from "../state/run-store.js";
+import { assertDispatchAllowed, handleControlCommand } from "./control.js";
+import { startNativeFeature } from "./orchestrator.js";
+import {
+  type ProjectSetupOptions,
+  projectStatus,
+  setupProject,
+} from "./project-setup.js";
+import { resumeWorkflow } from "./resume.js";
+export function createCommandRouter(
+  store: RunStore,
+  adapter?: OpenCodeAdapter,
+  dashboardUrl?: string,
+  workspace?: string,
+) {
+  return {
+    projectStatus,
+    async continuePlanning(runId: string) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      return continuePlanning(store, adapter, runId);
+    },
+    async answerExecutorQuestion(
+      runId: string,
+      issueId: string,
+      response: UserInputResult,
+    ) {
+      return answerExecutorQuestion(store, runId, issueId, response);
+    },
+    async scheduleIssues(runId: string, options: AttemptOptions = {}) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      await assertDispatchAllowed(store, runId);
+      return scheduleReadyIssues(store, adapter, runId, options);
+    },
+    async executeIssue(
+      runId: string,
+      issueId: string,
+      options: AttemptOptions = {},
+    ) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      await assertDispatchAllowed(store, runId);
+      return runIssue(store, adapter, runId, issueId, options);
+    },
+    async setupProject(options: ProjectSetupOptions) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      return setupProject({ ...options, store, adapter });
+    },
+    async reviewFeature(
+      options: Omit<ReviewCoordinatorOptions, "store" | "adapter">,
+    ) {
+      await assertDispatchAllowed(store, options.runId);
+      return coordinateReviewRound({
+        ...options,
+        store,
+        ...(adapter ? { adapter } : {}),
+      });
+    },
+    async reviewFunctional(
+      snapshot: ReviewSnapshot,
+      options: Omit<FunctionalReviewOptions, "store" | "adapter">,
+    ) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      await assertDispatchAllowed(store, snapshot.runId);
+      return runFunctionalReview(snapshot, { ...options, store, adapter });
+    },
+    async reviewCode(
+      snapshot: ReviewSnapshot,
+      options: Omit<CodeReviewOptions, "store" | "adapter">,
+    ) {
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      await assertDispatchAllowed(store, snapshot.runId);
+      return reviewCompletedCode(snapshot, { ...options, store, adapter });
+    },
+    async runJob(job: JobEnvelope): Promise<JobResult> {
+      if (!adapter)
+        return {
+          ...job,
+          outcome: "failed",
+          evidence: [],
+          error: {
+            code: "unsupported",
+            message: "No OpenCode adapter supplied",
+          },
+        };
+      await store.createRun(job.runId);
+      await assertDispatchAllowed(store, job.runId);
+      return adapter.dispatchJob(job);
+    },
+    async status(runId?: string): Promise<string> {
+      const projectSetup = workspace
+        ? await projectStatus(workspace)
+        : undefined;
+      const run = runId
+        ? await store.getRun(runId)
+        : (await store.listRuns()).at(-1);
+      const stage = run && projectPlanning(run);
+      const issues = run?.execution?.issues ?? [];
+      const issueSummary = {
+        total: issues.length,
+        pending: 0,
+        ready: 0,
+        running: 0,
+        integration_queued: 0,
+        integrated: 0,
+        blocked: 0,
+        failed: 0,
+      };
+      for (const issue of issues) issueSummary[issue.status]++;
+      return run
+        ? JSON.stringify(
+            {
+              ...(dashboardUrl ? { dashboardUrl } : {}),
+              ...(projectSetup ? { projectSetup } : {}),
+              runId: run.runId,
+              revision: run.revision,
+              phase: run.phase,
+              ...(stage ? { stage } : {}),
+              control: run.control ?? null,
+              lastResult: run.lastResult ?? null,
+              ...(run.review ? { review: run.review } : {}),
+              ...(run.reviewWorkflow
+                ? { reviewWorkflow: run.reviewWorkflow }
+                : {}),
+              ...(run.planning ? { planning: run.planning } : {}),
+              ...(run.baseline
+                ? {
+                    baseline: run.baseline,
+                    validationSkips: run.validationSkips ?? [],
+                  }
+                : {}),
+              issueAttempts: run.issueAttempts ?? {},
+              issueSummary,
+              ...(run.execution ? { execution: run.execution } : {}),
+              errors: run.errors,
+            },
+            null,
+            2,
+          )
+        : dashboardUrl
+          ? JSON.stringify({
+              dashboardUrl,
+              ...(projectSetup ? { projectSetup } : {}),
+              message: "No Ralph run found.",
+            })
+          : projectSetup
+            ? JSON.stringify({ projectSetup, message: "No Ralph run found." })
+            : "No Ralph run found.";
+    },
+    async resume(
+      runId?: string,
+      context?: ProjectSetupOptions,
+      options: { selectedCommit?: string; review?: boolean } = {},
+    ) {
+      const runs = runId?.trim() ? [] : await store.listRuns();
+      const id =
+        runId?.trim() ||
+        runs.filter((run) => run.planning).at(-1)?.runId ||
+        runs.at(-1)?.runId;
+      if (!id) throw new Error("No Ralph run found");
+      const run = await store.getRun(id);
+      if (!run?.planning) {
+        if (options.review || options.selectedCommit)
+          throw new Error(
+            "Resume options require a supported feature workflow",
+          );
+        return handleControlCommand("ralph-resume", id, store, adapter);
+      }
+      if (run.planning.protocol !== "native-interview-v1")
+        throw new Error(
+          "Unsupported saved workflow; a fresh workflow is required",
+        );
+      if (!adapter) throw new Error("No OpenCode adapter supplied");
+      if (!run.planning.prdAcceptance) {
+        if (options.review || options.selectedCommit)
+          throw new Error(
+            "An accepted PRD is required; restart discovery in a fresh session",
+          );
+        if (!context)
+          throw new Error(
+            "Discovery restart requires the main session and workspace",
+          );
+        if (
+          Object.values(run.operations).some(
+            (op) => op.kind === "run.release" && op.status !== "failed",
+          )
+        )
+          throw new Error(
+            "Run ownership was released; a fresh workflow is required",
+          );
+        const owner = JSON.parse(
+          await readFile(
+            join(store.root, "active-run.lock/owner.json"),
+            "utf8",
+          ),
+        );
+        if (owner.runId !== id || owner.repositoryId !== store.repositoryId)
+          throw new Error("Repository ownership differs; resume blocked");
+        return JSON.stringify(
+          await startNativeFeature({ ...context, store, adapter }),
+        );
+      }
+      await resumeWorkflow(store, adapter, id, options);
+      return this.status(id);
+    },
+    async dispatch(command: string, args = "", context?: ProjectSetupOptions) {
+      if (command === "ralph-orchestrator") {
+        if (!context)
+          throw new Error(
+            "Feature planning requires the main session and workspace",
+          );
+        if (!adapter) throw new Error("No OpenCode adapter supplied");
+        return JSON.stringify(
+          await startNativeFeature({
+            ...context,
+            feature: args,
+            store,
+            adapter,
+          }),
+          null,
+          2,
+        );
+      }
+      if (command === "ralph-commands") {
+        if (!context)
+          throw new Error(
+            "Project setup requires the main session and workspace",
+          );
+        return JSON.stringify(await this.setupProject(context), null, 2);
+11:} from "./commands/removal-approval.js";
+50:} from "./planning/questions.js";
+204:    const removalPlans = new Map<string, string>();
+310:            "ralph-resume",
+354:                      resume: false,
+359:                if (name === "ralph-resume") {
+368:                    text = `Ralph resume blocked: ${String(cause)}`;
+374:                    description: "Ralph resume result",
+375:                    resume: false,
+396:                    resume: false,
+440:              "Ask the owning stage product question natively; revised explanations require separate scope approval.",
+547:              "Preview removal of this project's Ralph configuration and saved workflow state. Only remove after the user approves the displayed preview. Keeps code, branches, worktrees and the global plugin.",
+556:                removalPlans.set(context.sessionID, plan.planId);
+562:                removalPlans.get(context.sessionID) !== input.planId ||
+567:                  "Show a removal preview and wait for a new user approval in this chat.",
+575:              removalPlans.delete(context.sessionID);
+595:              "Pause, resume or stop a durable Ralph run. Use slash commands for explicit user intent.",
+597:              action: z.enum(["pause", "resume", "stop"]),
+604:              if (action === "resume") {
+610:                  content: await router.resume(
+621:                throw new Error("Resume options require action=resume");
+637:          const plan = removalPlans.get(input.sessionID);
+655:              "question",
+691:          if (input.tool !== "question") return;
+710:              input.tool === "question" &&
+722:            if (input.tool === "question" && !pendingNativeQuestion)
+740:                "question",
+(pass) public review reuses the approved executor, merger and candidate checks for dedicated repairs [3493.55ms]
+(pass) production repair disputes require frozen reviewer evidence: behavior.test.ts:1 [1351.34ms]
+
+codex
+Concurrency, resource-isolation, and retry checks pass. The suite is finishing the reviewer and project-setup cases with no failures so far.
+ succeeded in 272796ms:
+exec
+/bin/zsh -lc 'tail -8 /tmp/task24-final-full.log' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+1 tests skipped:
+(skip) real agent-browser submits committed fixture form and retains screenshot
+
+ 293 pass
+ 1 skip
+ 0 fail
+ 2018 expect() calls
+Ran 294 tests across 22 files. [272.91s]
+
+codex
+The full integration suite passed: 293 passed, one gated browser test skipped, and no failures. I’m building the package now to remove stale compiled transport files.
+exec
+/bin/zsh -lc 'bun run build' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 2190ms:
+$ bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts
+vite v7.1.12 building for production...
+transforming...
+✓ 30 modules transformed.
+rendering chunks...
+computing gzip size...
+../public/index.html        0.34 kB │ gzip:  0.24 kB
+../public/assets/app.css    1.21 kB │ gzip:  0.63 kB
+../public/assets/app.js   203.82 kB │ gzip: 63.87 kB
+✓ built in 325ms
+
+exec
+/bin/zsh -lc "rg --files dist | rg '(chat-workflow|chat-input)' ; rg -n 'ralph_workflow|waiting_for_reply|runChatWorkflow|ChatInputRequired' dist --glob '*.js'; git status --short --untracked-files=no" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+codex
+Removed the legacy transport, feature chat receipts, question suppression, and second execution approval. Public controls use native stages; unsupported runs cannot execute or migrate. Setup and removal safeguards remain intact.
+
+README and [compact wiki](/Users/rwmmtzqy/Documents/opencode-ralph-plugin/docs/wiki/features/workflow-recovery.md) updated.
+
+Validation passed: typecheck, lint, build, 47 focused tests, 15 status tests, and full integration—293 passed, one gated browser test skipped. Installed-host and platform validation remain with issue 25.
+tokens used
+305,340
+Removed the legacy transport, feature chat receipts, question suppression, and second execution approval. Public controls use native stages; unsupported runs cannot execute or migrate. Setup and removal safeguards remain intact.
+
+README and [compact wiki](/Users/rwmmtzqy/Documents/opencode-ralph-plugin/docs/wiki/features/workflow-recovery.md) updated.
+
+Validation passed: typecheck, lint, build, 47 focused tests, 15 status tests, and full integration—293 passed, one gated browser test skipped. Installed-host and platform validation remain with issue 25.
+
+codex
+Already completed in the prior iteration. The legacy transport is absent, public controls use native stages, unsupported runs are rejected, and setup/removal safeguards and documentation are preserved.
+
+Prior validation passed, including focused, status, and full integration tests. No files changed this iteration.
+tokens used
+37,743
+Already completed in the prior iteration. The legacy transport is absent, public controls use native stages, unsupported runs are rejected, and setup/removal safeguards and documentation are preserved.
+
+Prior validation passed, including focused, status, and full integration tests. No files changed this iteration.

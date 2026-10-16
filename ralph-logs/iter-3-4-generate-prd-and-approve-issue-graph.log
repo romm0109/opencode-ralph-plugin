@@ -1,0 +1,973 @@
+[codex] FAILED (exit 0) /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/4-generate-prd-and-approve-issue-graph.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cd1-28d8-76b3-a1a3-bbcb92809c6c
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 4 of 15 — 4-generate-prd-and-approve-issue-graph.md
+=== END METADATA ===
+
+TASK:
+# 4. Generate the PRD and approve a valid issue graph
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-3  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Continue from an approved explanation to PRD generation and an automatic new-session issue-planning job. Write local vertical-slice issues and graph.json, validate the graph, and present the PRD and graph together for execution approval. Carry explicit source artifacts into the new session and preserve revision identity. No executor starts in this slice.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 173–179): automatic PRD handoff, fresh issue session, graph validation and approval.
+- `PRD.md` (lines 129–152): artifact locations and revision identity.
+- `PRD.md` (lines 343–349): minimum durable records.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 3: Interview the user and approve the feature explanation](3-interview-and-approve-feature-explanation.md): predecessor contracts and the code delivered by that slice.
+- `src/planning/prd.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/planning/issues.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/planning/graph.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `skills/create-prd/SKILL.md`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `skills/to-issues/SKILL.md`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Use feature-scoped artifacts under .ralph/features/<id>/, not this implementation backlog's .agents/issues/. Distinguish schema validation from user approval. Proposed source file references in a greenfield project must not be described as existing patterns.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Write the PRD and launch a fresh issue session
+
+**Files:** `src/planning/prd.ts`, `src/planning/issues.ts`, `skills/create-prd/SKILL.md`, `skills/to-issues/SKILL.md`
+
+- **IMPLEMENT:** Dispatch the PRD role from the approved explanation, save the PRD revision, then automatically create a separate issue-planner session with explicit PRD and repository references. Bundle the required PRD structure and vertical-slice issue template with project overrides. Do not add an intermediate PRD-only approval.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import loadRoleInstructions and OpenCodeAdapter; export generatePrd and generateIssues from their respective modules.
+- **GOTCHA:** Agents may author draft content, but the orchestrator validates and atomically publishes artifact revisions. Keep paths within the feature directory.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/04-planning.test.ts`; add the tests below as this slice develops.
+
+### 2. Validate and approve executable issue metadata
+
+**Files:** `src/planning/graph.ts`, `src/planning/issues.ts`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** Define IssueSpec with id, title, artifactPath, dependencies, acceptance criteria, and testable behaviors; define IssueGraph with schemaVersion and PRD revision. Reject duplicate IDs, unknown dependencies, cycles, invalid file references and malformed results. Present numbered slices and dependencies, process revisions, and record execution approval bound to both PRD and graph hashes.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Export validateIssueGraph and topologicalOrder from graph.ts; import RunStore and domain records from src/core/types.ts.
+- **GOTCHA:** Requirements cannot change behind an approved hash. Approval establishes execution intent but issue 5 still owns preflight.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/04-planning.test.ts`; add the tests below as this slice develops.
+
+### 3. Verify the complete planning handoff
+
+**Files:** `tests/integration/04-planning.test.ts`
+
+- **IMPLEMENT:** Test that issue planning has a different session ID, receives the exact PRD revision, and produces dependency-ordered local files. Exercise cycle/missing/duplicate rejection and user revisions. Assert no execution job is dispatched before approval and no old approval authorizes revised artifacts.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import createFakeOpenCode, createTestProject, and public planning handlers.
+- **GOTCHA:** Use a small diamond DAG fixture and keep its expected graph behavior, not generated prose, under test.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/04-planning.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [ ] Approved explanation automatically produces a PRD and a new issue-planning session.
+- [ ] Issues have acceptance criteria, relevant context, tests to cover, and explicit dependencies.
+- [ ] Graph validation rejects cycles and dangling references before approval can succeed.
+- [ ] Execution approval covers the current PRD and graph together.
+- [ ] Generated feature issues remain local; no external issue tracker operations occur.
+- [ ] This slice's behavioral regression tests pass: `bun test tests/integration/04-planning.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [ ] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/04-planning.test.ts
+
+```
+
+**Demonstration:** Approve an explanation and follow it to a PRD plus A→B/C→D graph; revise one dependency, approve the new graph, and inspect the stored revisions.
+
+## Blocked by
+
+- [3-interview-and-approve-feature-explanation.md](3-interview-and-approve-feature-explanation.md) — interview the user and approve the feature explanation supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+### Implementation evidence — 2026-10-15
+
+Implemented the public command handoff from approved explanation to PRD generation,
+a separate issue-planning session with explicit PRD path/hash/revision and repository
+context, graph validation, and one combined execution-approval gate. Bundled role
+contracts compose with project overrides. Revision directories stay local under
+`.ralph/features/<run-id>/`; publication intent precedes atomic bundle rename. The
+canonical state selects current revisions and retains old artifact/event evidence.
+Graph hashes include issue content. Changed requirements, stale requests, fabricated
+assistant approvals, invalid graphs, modified files and interrupted/late jobs cannot
+establish execution approval. No executor, tracker integration or preflight was added.
+
+Red/green evidence: the first public-command diamond test initially failed because
+planning stopped at `explanation_approved`; it passes after the automatic handoff.
+A second regression initially showed a carried approval surviving changed issue
+content; canonical hash/revision invalidation makes it pass. Additional validation,
+revision, provenance, publication and interruption cases were added incrementally.
+The predecessor test now expects the new PRD handoff, retaining its interview assertions.
+Documentation/skill prose changes are non-behavior exceptions to TDD.
+
+Validation with pinned Bun 1.4.3:
+- `bun run typecheck` — passed after final code changes.
+- `bun test tests/integration/04-planning.test.ts` — 13 passed, 0 failed.
+- Combined issue 3/4 regression run — 21 passed before adding the final timeout case.
+- `bun test --timeout 30000 tests/integration` — 112 passed, 1 browser-dependent skip,
+  0 failed (before final publication-intent hardening; final planning tests passed afterward).
+- Changed TypeScript/test files pass Biome. `bun run lint` remains blocked only by
+  pre-existing formatting in `tests/browser/dashboard.test.ts:38`; this unrelated file
+  was left untouched as required by this ticket's scope.
+
+Demonstrated through router + SDK adapter fixture: approve explanation; generate
+PRD and A→B/C→D local graph; request C→B; preserve the original graph, reject its stale
+approval, publish revision 2 and approve current PRD/graph together. Published files,
+source revisions, distinct sessions, dependency order and absence of executor jobs
+are asserted. No live human/model smoke, native Linux/Windows validation, publication,
+external messages or branch merging was performed. Production approval still returns
+`unsupported` until the existing adapter gains verified human provenance; fixtures do
+not bypass that production boundary. Wiki updated with artifact and approval contracts.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing implementation and run the planning checks to see whether this ticket still needs changes.
+exec
+/bin/zsh -lc "pwd; rg --files -g AGENTS.md -g package.json -g '*04-planning*' -g '*4-generate*' -g 'README.md' -g '.bun-version' -g 'bun.lock*'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+.bun-version
+ralph-logs/iter-2-4-generate-prd-and-approve-issue-graph.log
+ralph-logs/iter-1-4-generate-prd-and-approve-issue-graph.log
+package.json
+README.md
+bun.lock
+tests/integration/04-planning.test.ts
+
+exec
+/bin/zsh -lc "git status --short; cat package.json; cat .bun-version; rg --files src/planning skills/create-prd skills/to-issues .agents/issues docs/wiki; sed -n '1,220p' src/planning/graph.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+1.4.3
+skills/to-issues/SKILL.md
+docs/wiki/open-questions.md
+docs/wiki/index.md
+.agents/issues/2-discover-approve-and-verify-project-commands.md
+.agents/issues/6-execute-and-integrate-one-issue-with-tdd.md
+.agents/issues/11-review-completed-feature-code.md
+.agents/issues/3-interview-and-approve-feature-explanation.md
+.agents/issues/1-install-plugin-and-run-opencode-session.md
+.agents/issues/7-retry-failed-work-and-skip-hung-checks.md
+.agents/issues/4-generate-prd-and-approve-issue-graph.md
+.agents/issues/12-verify-acceptance-with-browser-and-http.md
+.agents/issues/9-resolve-executor-questions-in-opencode.md
+.agents/issues/13-repair-findings-within-three-review-rounds.md
+.agents/issues/8-execute-dependency-ready-issues-concurrently.md
+.agents/issues/10-observe-execution-in-read-only-dashboard.md
+.agents/issues/5-prepare-feature-branch-and-validate-baseline.md
+.agents/issues/15-verify-packaged-workflow-across-platforms.md
+.agents/issues/14-pause-stop-and-recover-interrupted-workflows.md
+skills/create-prd/SKILL.md
+docs/wiki/features/functional-review.md
+docs/wiki/features/execution-baseline.md
+docs/wiki/features/independent-code-review.md
+docs/wiki/features/executor-questions.md
+docs/wiki/features/single-issue-integration.md
+docs/wiki/features/read-only-dashboard.md
+docs/wiki/features/ralph-task-loop.md
+docs/wiki/features/plugin-session-results.md
+docs/wiki/features/bounded-review-repairs.md
+docs/wiki/features/concurrent-execution.md
+docs/wiki/features/project-commands.md
+docs/wiki/features/feature-planning.md
+docs/wiki/features/feature-interview.md
+docs/wiki/features/package-distribution.md
+docs/wiki/features/workflow-recovery.md
+src/planning/issues.ts
+src/planning/generation.ts
+src/planning/interview.ts
+src/planning/approvals.ts
+src/planning/graph.ts
+src/planning/types.ts
+src/planning/prd.ts
+src/planning/artifacts.ts
+import { z } from "zod";
+
+const strings = z.array(z.string().trim().min(1)).min(1);
+export const artifactRevision = z
+  .object({
+    revision: z.number().int().positive(),
+    hash: z.string().regex(/^[a-f0-9]{64}$/),
+    artifactPath: z.string().min(1),
+  })
+  .strict();
+const issue = z
+  .object({
+    id: z.string().regex(/^[A-Za-z0-9_-]+$/),
+    title: z.string().trim().min(1),
+    artifactPath: z.string().regex(/^issues\/[A-Za-z0-9_-]+\.md$/),
+    dependencies: z.array(z.string().min(1)),
+    acceptanceCriteria: strings,
+    testableBehaviors: strings,
+  })
+  .strict();
+const graph = z
+  .object({
+    schemaVersion: z.literal(1),
+    prdRevision: artifactRevision,
+    issues: z.array(issue).min(1),
+  })
+  .strict();
+export type IssueSpec = z.infer<typeof issue>;
+export type IssueGraph = z.infer<typeof graph>;
+export function topologicalOrder(value: IssueGraph): string[] {
+  const issues = new Map(value.issues.map((item) => [item.id, item]));
+  if (issues.size !== value.issues.length)
+    throw new Error("Duplicate issue IDs");
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const order: string[] = [];
+  function visit(id: string) {
+    if (visiting.has(id)) throw new Error("Issue graph contains a cycle");
+    if (visited.has(id)) return;
+    const item = issues.get(id);
+    if (!item) throw new Error(`Unknown dependency ${id}`);
+    visiting.add(id);
+    for (const dependency of item.dependencies) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+    order.push(id);
+  }
+  for (const item of value.issues) visit(item.id);
+  return order;
+}
+export function validateIssueGraph(
+  raw: unknown,
+  files: Record<string, string>,
+  prd: z.infer<typeof artifactRevision>,
+): IssueGraph {
+  const value = graph.parse(raw);
+  if (
+    JSON.stringify(value.prdRevision) !==
+    JSON.stringify(artifactRevision.parse(prd))
+  )
+    throw new Error("Issue graph references a different PRD revision");
+  const paths = new Set<string>();
+  for (const item of value.issues) {
+    if (paths.has(item.artifactPath))
+      throw new Error("Duplicate issue artifact path");
+    paths.add(item.artifactPath);
+    const text = files[item.artifactPath];
+    if (!text?.trim())
+      throw new Error(`Missing issue file ${item.artifactPath}`);
+    for (const heading of [
+      "Context",
+      "Implementation",
+      "Tests",
+      "Acceptance criteria",
+      "Dependencies",
+    ])
+      if (!text.toLowerCase().includes(`## ${heading.toLowerCase()}`))
+        throw new Error(`Issue ${item.id} missing ${heading}`);
+  }
+  if (Object.keys(files).some((path) => !paths.has(path)))
+    throw new Error("Invalid issue file reference");
+  topologicalOrder(value);
+  return value;
+}
+
+exec
+/bin/zsh -lc "sed -n '1,210p' src/planning/prd.ts; sed -n '1,230p' src/planning/issues.ts; rg -n 'test\\(|it\\(|unsupported|planning|approval' tests/integration/04-planning.test.ts src/core/orchestrator.ts; cat skills/create-prd/SKILL.md skills/to-issues/SKILL.md; sed -n '88,97p;129,152p;173,179p;343,349p' PRD.md; cat .agents/issues/README.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ exited 1 in 0ms:
+import { z } from "zod";
+import { loadRoleInstructions } from "../agents/skills.js";
+import { loadProjectConfig } from "../config/project.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { RunStore } from "../state/run-store.js";
+import { artifactHash, explanationHash } from "./artifacts.js";
+import {
+  dispatchGeneration,
+  planningFailure,
+  publishRevision,
+  savePlanning,
+} from "./generation.js";
+import { generateIssues } from "./issues.js";
+
+export async function generatePrd(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+) {
+  const run = await store.getRun(runId);
+  const state = run?.planning;
+  if (
+    !state?.explanation ||
+    !state.approval ||
+    state.approval.hash !== explanationHash(state.explanation) ||
+    state.approval.revision !== state.explanation.revision
+  )
+    throw new Error("An approved explanation is required");
+  try {
+    const config = await loadProjectConfig(state.workspace);
+    const skill = await loadRoleInstructions(
+      state.workspace,
+      "prd",
+      config.skillPaths,
+    );
+    const generated = await dispatchGeneration(
+      store,
+      adapter,
+      runId,
+      "prd",
+      `${skill.text}\nRepository: ${state.workspace}\nApproved explanation: ${JSON.stringify(state.explanation)}\nTranscript: ${JSON.stringify(state.transcript)}`,
+      { prd: { path: skill.path, hash: skill.hash } },
+    );
+    if (!generated) return store.getRun(runId);
+    const { text } = z
+      .object({ text: z.string().trim().min(1) })
+      .strict()
+      .parse(JSON.parse(generated.result.text ?? ""));
+    for (const heading of [
+      "Problem",
+      "User stories",
+      "Requirements",
+      "Acceptance criteria",
+      "Non-goals",
+    ])
+      if (!text.toLowerCase().includes(`## ${heading.toLowerCase()}`))
+        throw new Error(`PRD missing ${heading}`);
+    const revision = (generated.state.prd?.revision ?? 0) + 1;
+    const publication = await publishRevision(
+      store,
+      generated.run.revision,
+      generated.state,
+      runId,
+      `prd-${generated.state.generation?.revision}`,
+      { "PRD.md": text },
+    );
+    generated.state.prd = {
+      revision,
+      hash: artifactHash(text),
+      artifactPath: `${publication.directory}/PRD.md`,
+    };
+    delete generated.state.executionApproval;
+    await savePlanning(store, runId, publication.revision, generated.state);
+  } catch (cause) {
+    await planningFailure(store, runId, cause);
+    return store.getRun(runId);
+  }
+  return generateIssues(store, adapter, runId);
+}
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { z } from "zod";
+import { loadRoleInstructions } from "../agents/skills.js";
+import { loadProjectConfig } from "../config/project.js";
+import type { UserInputResult } from "../core/types.js";
+import { readReviewGit } from "../git/review-workspace.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { RunStore } from "../state/run-store.js";
+import { recordApproval } from "./approvals.js";
+import { artifactHash, issueBundleHash } from "./artifacts.js";
+import {
+  dispatchGeneration,
+  planningFailure,
+  publishRevision,
+  savePlanning,
+} from "./generation.js";
+import { topologicalOrder, validateIssueGraph } from "./graph.js";
+
+export async function generateIssues(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+) {
+  const run = await store.getRun(runId);
+  const state = run?.planning;
+  if (!state?.prd) throw new Error("A PRD revision is required");
+  try {
+    const config = await loadProjectConfig(state.workspace);
+    const skill = await loadRoleInstructions(
+      state.workspace,
+      "issues",
+      config.skillPaths,
+    );
+    const text = await readFile(
+      join(state.workspace, state.prd.artifactPath),
+      "utf8",
+    );
+    if (artifactHash(text) !== state.prd.hash)
+      throw new Error("PRD artifact changed");
+    const generated = await dispatchGeneration(
+      store,
+      adapter,
+      runId,
+      "issues",
+      `${skill.text}\nRepository: ${state.workspace}\nPRD revision: ${JSON.stringify(state.prd)}\nPRD content:\n${text}\nExplanation: ${JSON.stringify(state.explanation)}\nRevision feedback: ${JSON.stringify(state.transcript)}`,
+      { issues: { path: skill.path, hash: skill.hash } },
+    );
+    if (!generated) return store.getRun(runId);
+    const output = z
+      .object({ graph: z.unknown(), files: z.record(z.string(), z.string()) })
+      .strict()
+      .parse(JSON.parse(generated.result.text ?? ""));
+    const value = validateIssueGraph(output.graph, output.files, state.prd);
+    const order = topologicalOrder(value);
+    const files = Object.fromEntries(
+      order.map((id) => {
+        const issue = value.issues.find((item) => item.id === id);
+        if (!issue) throw new Error("Missing issue");
+        return [issue.artifactPath, output.files[issue.artifactPath] as string];
+      }),
+    );
+    const publication = await publishRevision(
+      store,
+      generated.run.revision,
+      generated.state,
+      runId,
+      `graph-${generated.state.generation?.revision}`,
+      { ...files, "graph.json": JSON.stringify(value, null, 2) },
+    );
+    generated.state.graph = {
+      revision: (generated.state.graph?.revision ?? 0) + 1,
+      hash: issueBundleHash(value, files),
+      artifactPath: `${publication.directory}/graph.json`,
+      value,
+      files,
+      order,
+    };
+    generated.state.phase = "execution_approval";
+    delete generated.state.executionApproval;
+    await savePlanning(store, runId, publication.revision, generated.state);
+  } catch (cause) {
+    await planningFailure(store, runId, cause);
+  }
+  return store.getRun(runId);
+}
+
+export async function handlePlanningResponse(
+  store: RunStore,
+  runId: string,
+  response: UserInputResult,
+) {
+  const run = await store.getRun(runId);
+  const state = run?.planning;
+  const pending = state?.pending;
+  if (
+    !run ||
+    state?.phase !== "execution_approval" ||
+    !state.prd ||
+    !state.graph ||
+    !pending ||
+    !response.ok ||
+    response.source !== "user" ||
+    !response.messageId ||
+    !response.text.trim() ||
+    response.requestId !== pending.requestId ||
+    response.sessionId !== pending.sessionId ||
+    response.revision !== pending.revision ||
+    state.transcript.some((entry) => entry.messageId === response.messageId)
+  )
+    return false;
+  try {
+    const text = await readFile(
+      join(state.workspace, state.prd.artifactPath),
+      "utf8",
+    );
+    const value = JSON.parse(
+      await readFile(join(state.workspace, state.graph.artifactPath), "utf8"),
+    );
+    const files: Record<string, string> = {};
+    for (const path of Object.keys(state.graph.files))
+      files[path] = await readFile(
+        join(state.workspace, dirname(state.graph.artifactPath), path),
+        "utf8",
+      );
+    validateIssueGraph(value, files, state.prd);
+    if (
+      artifactHash(text) !== state.prd.hash ||
+      issueBundleHash(value, files) !== state.graph.hash
+    )
+      throw new Error(
+        "Published artifacts changed; regenerate and approve a new revision",
+      );
+  } catch (cause) {
+    await planningFailure(store, runId, cause);
+    return false;
+  }
+  const next = structuredClone(state);
+  delete next.pending;
+  delete next.error;
+  next.transcript.push({
+    source: "user",
+    text: response.text,
+    messageId: response.messageId,
+    requestId: response.requestId,
+    revision: response.revision,
+  });
+  if (response.text.trim() === `approve ${state.graph.revision}`) {
+    // Keep pending identity while the shared approval validator records provenance.
+    next.pending = pending;
+    if (!recordApproval(next, response)) return false;
+    delete next.pending;
+  } else {
+    next.phase = "explanation_approved";
+    delete next.executionApproval;
+  }
+  return store.recordPlanning(runId, run.revision, next);
+}
+export async function requestPlanningApproval(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  selectedCommit?: string,
+) {
+  const run = await store.getRun(runId);
+  const state = run?.planning;
+  if (
+    !run ||
+    state?.phase !== "execution_approval" ||
+    !state.prd ||
+    !state.graph ||
+    (state.scopeChange &&
+      (state.publication?.status !== "completed" ||
+        state.graph.revision <= state.scopeChange.previousGraph.revision))
+  )
+    return false;
+  if (!state.pending) {
+    try {
+      state.selectedCommit = (
+        await readReviewGit(state.workspace, [
+          "rev-parse",
+          "--verify",
+          `${selectedCommit ?? state.selectedCommit ?? "HEAD"}^{commit}`,
+        ])
+      ).trim();
+    } catch (cause) {
+      await planningFailure(
+        store,
+        runId,
+        new Error(
+          "Select a committed starting point; this repository may be unborn",
+          { cause },
+        ),
+      );
+      return false;
+    }
+    const text = await readFile(
+      join(state.workspace, state.prd.artifactPath),
+      "utf8",
+    );
+    state.pending = {
+      runId,
+      workspace: state.workspace,
+      sessionId: state.sessionId,
+      requestId: randomUUID(),
+      revision: state.graph.revision,
+      question: `${state.scopeChange ? `Scope revision affects: ${state.scopeChange.affectedIssueIds.join(", ")}\nAlready integrated evidence retained pending approval: ${state.scopeChange.integratedIssueIds.join(", ") || "none"}\n` : ""}Starting commit: ${state.selectedCommit}\n${text}\nPRD: ${state.prd.artifactPath} (${state.prd.hash})\nGraph: ${state.graph.artifactPath} (${state.graph.hash})\n${state.graph.order
+        .map((id, index) => {
+          const item = state.graph?.value.issues.find(
+            (issue) => issue.id === id,
+          );
+          return `${index + 1}. ${id}: ${item?.title}; depends on ${item?.dependencies.join(", ") || "none"}`;
+        })
+        .join(
+          "\n",
+        )}\nApprove both artifacts for execution by replying approve ${state.graph.revision}, or reply with revisions.`,
+    };
+    await savePlanning(store, runId, run.revision, state);
+  }
+  const published = await adapter.publishStatus(
+    state.sessionId,
+    state.workspace,
+    state.pending.question,
+  );
+  const response = published.ok
+    ? await adapter.requestUserInput(state.pending)
+    : {
+        ok: false as const,
+        error: published.error ?? {
+tests/integration/04-planning.test.ts:47:          args: ["-e", "process.exit(0)"],
+tests/integration/04-planning.test.ts:86:      const prd = run?.planning?.prd;
+tests/integration/04-planning.test.ts:121:test("approved explanation automatically hands exact PRD to a fresh issue session and approves the local diamond together", async () => {
+tests/integration/04-planning.test.ts:137:    expect(run.planning.phase).toBe("execution_approved");
+tests/integration/04-planning.test.ts:142:    expect(issues?.envelope.prompt).toContain(run.planning.prd.hash);
+tests/integration/04-planning.test.ts:143:    expect(issues?.envelope.inputRevisions.prd).toBe(run.planning.prd.revision);
+tests/integration/04-planning.test.ts:144:    expect(run.planning.graph.order).toEqual(["A", "B", "C", "D"]);
+tests/integration/04-planning.test.ts:146:    for (const id of run.planning.graph.order) {
+tests/integration/04-planning.test.ts:151:            dirname(run.planning.graph.artifactPath),
+tests/integration/04-planning.test.ts:158:    expect(run.planning.executionApproval.prdHash).toBe(run.planning.prd.hash);
+tests/integration/04-planning.test.ts:159:    expect(run.planning.executionApproval.graphHash).toBe(
+tests/integration/04-planning.test.ts:160:      run.planning.graph.hash,
+tests/integration/04-planning.test.ts:169:        join(project.directory, run.planning.graph.artifactPath),
+tests/integration/04-planning.test.ts:178:test("changing approved PRD or issue content invalidates carried execution approval", async () => {
+tests/integration/04-planning.test.ts:195:    if (!run?.planning?.graph) throw new Error("Missing graph");
+tests/integration/04-planning.test.ts:196:    const changed = structuredClone(run.planning);
+tests/integration/04-planning.test.ts:201:    expect(current?.planning?.executionApproval).toBeUndefined();
+tests/integration/04-planning.test.ts:202:    expect(current?.planning?.phase).toBe("execution_approval");
+tests/integration/04-planning.test.ts:216:  test(`invalid ${invalid} graph never reaches execution approval`, async () => {
+tests/integration/04-planning.test.ts:251:      expect(run.planning.error.code).toBe("missing-output");
+tests/integration/04-planning.test.ts:252:      expect(run.planning.executionApproval).toBeUndefined();
+tests/integration/04-planning.test.ts:253:      expect(run.planning.graph).toBeUndefined();
+tests/integration/04-planning.test.ts:266:test("dependency revision publishes preserved revisions and ignores an old approval", async () => {
+tests/integration/04-planning.test.ts:276:    let approvals = 0;
+tests/integration/04-planning.test.ts:278:      const state = (await store.getRun(request.runId))?.planning;
+tests/integration/04-planning.test.ts:279:      if (state?.phase === "execution_approval") {
+tests/integration/04-planning.test.ts:281:        approvals++;
+tests/integration/04-planning.test.ts:282:        if (approvals === 1) {
+tests/integration/04-planning.test.ts:322:    expect(run.planning.phase).toBe("execution_approved");
+tests/integration/04-planning.test.ts:323:    expect(run.planning.graph.revision).toBe(2);
+tests/integration/04-planning.test.ts:324:    expect(run.planning.prd.revision).toBe(2);
+tests/integration/04-planning.test.ts:325:    expect(run.planning.executionApproval.revision).toBe(2);
+tests/integration/04-planning.test.ts:327:      (event) => event.snapshot.planning,
+tests/integration/04-planning.test.ts:333:    expect(run.planning.graph.hash).not.toBe(original.hash);
+tests/integration/04-planning.test.ts:337:    expect(run.planning.graph.order).toEqual(["A", "B", "C", "D"]);
+tests/integration/04-planning.test.ts:343:test("changed published issue file cannot authorize execution", async () => {
+tests/integration/04-planning.test.ts:371:    expect(run.planning.phase).toBe("execution_approval");
+tests/integration/04-planning.test.ts:372:    expect(run.planning.executionApproval).toBeUndefined();
+tests/integration/04-planning.test.ts:373:    expect(run.planning.error.code).toBe("missing-output");
+tests/integration/04-planning.test.ts:379:test("assistant responses do not approve a validated graph", async () => {
+tests/integration/04-planning.test.ts:398:    expect(run.planning.phase).toBe("execution_approval");
+tests/integration/04-planning.test.ts:399:    expect(run.planning.executionApproval).toBeUndefined();
+tests/integration/04-planning.test.ts:410:test("interrupted issue planning discards late output without publishing a graph", async () => {
+tests/integration/04-planning.test.ts:451:    expect(run.planning.graph).toBeUndefined();
+tests/integration/04-planning.test.ts:452:    expect(run.planning.executionApproval).toBeUndefined();
+tests/integration/04-planning.test.ts:459:test("issue timeout interrupts the run and late output cannot publish or approve", async () => {
+tests/integration/04-planning.test.ts:485:    expect(result.planning.phase).toBe("issue_generation");
+tests/integration/04-planning.test.ts:486:    expect(result.planning.error.code).toBe("cancelled");
+tests/integration/04-planning.test.ts:490:    expect((await store.getRun(result.runId))?.planning?.graph).toBeUndefined();
+tests/integration/04-planning.test.ts:492:      (await store.getRun(result.runId))?.planning?.executionApproval,
+src/core/orchestrator.ts:25:} from "../planning/interview.js";
+src/core/orchestrator.ts:29:import { requestPlanningApproval } from "../planning/issues.js";
+src/core/orchestrator.ts:30:import { generatePrd } from "../planning/prd.js";
+src/core/orchestrator.ts:33:export { generateIssues, handlePlanningResponse } from "../planning/issues.js";
+src/core/orchestrator.ts:34:export { generatePrd } from "../planning/prd.js";
+src/core/orchestrator.ts:43:    if (!run?.planning || (run.control && run.control.status !== "active"))
+src/core/orchestrator.ts:45:    if (run.planning.phase === "explanation_approved")
+src/core/orchestrator.ts:47:    if (run?.planning?.phase !== "execution_approval" || run.planning.error)
+src/core/orchestrator.ts:51:    if ((await store.getRun(runId))?.planning?.phase === "execution_approved") {
+src/core/orchestrator.ts:53:      const prepared = current?.planning?.scopeChange
+# Create a feature PRD
+Use the explicitly supplied approved explanation and transcript. Explore repository facts with observation tools. Return JSON only: {"text":"<Markdown PRD>"}.
+Include ## Problem, ## User stories (numbered), ## Requirements, ## Acceptance criteria, and ## Non-goals. Use concrete, testable behaviors and simplified English. Preserve scope and constraints. Honor project instructions supplied after this contract. Never invent existing files in greenfield projects. Do not write files or execute work; the orchestrator publishes the draft. This is not an approval step.
+# Plan local vertical slices
+Use the exact PRD revision and explicit repository references in the prompt; no conversation inheritance is available. Explore relevant repository files using observation tools. Create thin complete vertical slices with explicit dependencies; keep issues local. Do not use external trackers or dispatch executors.
+Return JSON only: {"graph":{"schemaVersion":1,"prdRevision":{"revision":1,"hash":"<supplied hash>","artifactPath":"<supplied path>"},"issues":[{"id":"A","title":"Slice title","artifactPath":"issues/A.md","dependencies":[],"acceptanceCriteria":["Observable result"],"testableBehaviors":["Behavior test"]}]},"files":{"issues/A.md":"<Markdown>"}}.
+Each Markdown issue must have ## Context (relevant files, verified patterns, purpose; identify greenfield honestly), ## Implementation (guidance), ## Tests (behaviors to cover), ## Acceptance criteria, and ## Dependencies. Paths must be issues/<safe-name>.md. The orchestrator validates and publishes drafts; do not write artifacts yourself. Honor supplied project instructions while preserving this output contract.
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+### 6.4 Local artifacts
+
+Proposed layout; these paths are implementation defaults rather than user-prescribed names:
+
+```text
+.ralph/
+  commands.json                  # Approved project lifecycle/check configuration
+  config.json                    # Models, concurrency, timeouts, skill overrides
+  features/<feature-id>/
+    PRD.md
+    issues/<issue-id>-<title>.md
+    graph.json                   # Machine-readable dependencies and issue references
+  runs/<run-id>/                  # Local runtime state, events, logs, reports
+```
+
+Keep configuration and approved requirements suitable for version control. Ignore runtime logs, transient state, process metadata, and credentials. Store canonical run state in a location shared by the repository's linked worktrees; do not create independent schedulers from copies of tracked files. Use the repository's Git common directory to identify its lock and canonical runtime root.
+
+The bundled `to-issues` workflow is adapted to the per-feature issue directory. This intentionally differs from its standalone `.agents/issues/` default, keeping separate feature graphs unambiguous.
+
+### 6.5 Durable job contracts
+
+Each dispatched job records role, run ID, issue ID when relevant, attempt, session, workspace, input artifact revisions, and starting commit. Results reference produced commits, logs, evidence, findings, or questions.
+
+Persist intent before externally visible Git/process operations, then persist their observed result. Recovery must detect already-completed operations and avoid duplicate integrations. Late results from cancelled or superseded attempts cannot advance workflow state.
+### 7.3 PRD and issue planning
+
+Write a PRD from the agreed interview. Immediately create a new OpenCode session and instruct its agent to apply the bundled or selected `to-issues` workflow to that PRD. Pass explicit artifact references and context; do not depend on implicit conversation inheritance.
+
+The planner explores relevant code and creates thin, complete vertical slices. Each issue contains purpose, relevant files and patterns, implementation guidance, behavior tests to cover, acceptance criteria, and dependencies. Greenfield projects must be identified honestly; do not invent existing file references or patterns.
+
+Present the PRD and issue graph together for execution approval. Allow revisions before approval. Reject cycles, missing dependencies, duplicate IDs, and invalid issue references before execution. A changed PRD or graph requires renewed execution approval.
+### Minimum internal records
+
+- **Run:** approved artifact revisions, configuration revision, branch/commit, phase, repository identity, skip list, review round, outcome.
+- **Issue:** stable ID, artifact reference, dependencies, status, attempt, branch/worktree, session, submission and integration commit.
+- **Check result:** configured check ID, candidate commit, exit status or timeout, timestamps, log reference.
+- **Finding:** reviewer, reviewed commit, severity, criterion, evidence, repair task, disposition.
+- **Approval:** phase, artifact revision, user response, timestamp. Stale approvals cannot authorize changed artifacts.
+cat: .agents/issues/README.md: No such file or directory
+
+exec
+/bin/zsh -lc 'bun test tests/integration/04-planning.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun --version; bun run typecheck' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 87ms:
+$ biome check src tests scripts
+Checked 98 files in 104ms. No fixes applied.
+
+ succeeded in 1610ms:
+1.4.3
+$ tsc --noEmit
+
+ succeeded in 4651ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/04-planning.test.ts:
+(pass) approved explanation automatically hands exact PRD to a fresh issue session and approves the local diamond together [535.08ms]
+(pass) changing approved PRD or issue content invalidates carried execution approval [481.91ms]
+(pass) invalid cycle graph never reaches execution approval [407.22ms]
+(pass) invalid unknown graph never reaches execution approval [330.86ms]
+(pass) invalid duplicate graph never reaches execution approval [288.54ms]
+(pass) invalid missing-file graph never reaches execution approval [293.32ms]
+(pass) invalid escape graph never reaches execution approval [289.15ms]
+(pass) invalid wrong-prd graph never reaches execution approval [291.85ms]
+(pass) dependency revision publishes preserved revisions and ignores an old approval [436.44ms]
+(pass) changed published issue file cannot authorize execution [300.45ms]
+(pass) assistant responses do not approve a validated graph [308.02ms]
+(pass) interrupted issue planning discards late output without publishing a graph [287.68ms]
+(pass) issue timeout interrupts the run and late output cannot publish or approve [429.62ms]
+
+ 13 pass
+ 0 fail
+ 70 expect() calls
+Ran 13 tests across 1 file. [4.75s]
+
+codex
+Already implemented; no changes needed.
+
+Verified with Bun 1.4.3:
+
+- Planning regression tests: 13 passed.
+- Type checking: passed.
+- Lint: passed.
+
+Tests cover the fresh planning session, diamond graph, dependency revisions, stale approvals, and invalid graph rejection. Live model and cross-platform checks were not run.
+tokens used
+17,539
+Already implemented; no changes needed.
+
+Verified with Bun 1.4.3:
+
+- Planning regression tests: 13 passed.
+- Type checking: passed.
+- Lint: passed.
+
+Tests cover the fresh planning session, diamond graph, dependency revisions, stale approvals, and invalid graph rejection. Live model and cross-platform checks were not run.
+
+[claude] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/4-generate-prd-and-approve-issue-graph.md
+Task 4 was already finished in an earlier iteration, so I made no changes this time. I re-ran the validation commands:
+
+- **`bun run typecheck`:** passed.
+- **`bun test tests/integration/04-planning.test.ts`:** 13 passed, 0 failed.
+- **`bun run lint`:** passed (98 files checked). The earlier evidence said lint was blocked by a formatting problem in `tests/browser/dashboard.test.ts`; that file now passes too.
+
+The functions the task asked for are in place: `generatePrd` (`src/planning/prd.ts:15`), `generateIssues` (`src/planning/issues.ts:21`), and `validateIssueGraph` and `topologicalOrder` (`src/planning/graph.ts:51` and `:30`). The tests cover each part of the task:
+- an approved explanation flows into a separate issue-planning session on the A→B/C→D diamond graph
+- changed PRD or issue content cancels an earlier approval
+- cycle, missing-dependency and duplicate-ID graphs are rejected
+- revising a dependency keeps the old revision and ignores its old approval
+- an approval message written by the assistant doesn't count
+- output that arrives after an interruption or timeout is thrown away
+
+The limits recorded in the task file still apply. Nothing has been tested with a live person or model, or on Linux or Windows. Outside the test fixtures, approval still returns `unsupported` until the OpenCode adapter can verify that a real person gave it.

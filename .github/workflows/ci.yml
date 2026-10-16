@@ -1,0 +1,34 @@
+name: Compatibility
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  plugin:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run test
+      - run: bun run build
+      - run: bunx --no-install playwright install --with-deps chromium
+      - run: bun run test:browser
+      - run: bun run test:smoke
+        env:
+          OPENCODE_SMOKE: '1'
+      - run: bun test tests/e2e/full-workflow.test.ts
+      - run: bun run test:package
+        env:
+          PACKAGE_EVIDENCE_PATH: package-evidence.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-evidence-${{ matrix.os }}
+          path: package-evidence.json
+          if-no-files-found: warn

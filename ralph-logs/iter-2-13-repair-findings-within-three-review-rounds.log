@@ -1,0 +1,993 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/13-repair-findings-within-three-review-rounds.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13ccd-7a2a-7dc1-9a24-ed8ee41600f2
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 2 of 3
+File      : 13 of 15 — 13-repair-findings-within-three-review-rounds.md
+=== END METADATA ===
+
+TASK:
+# 13. Repair review findings within three review rounds
+
+**Type:** AFK  
+**Status:** Implemented; local validation and live/platform limitations recorded below  
+**User stories:** US-5, US-6, US-7, US-8  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Join both reviewers into a bounded review-and-repair workflow. Run them against one stable commit, consolidate blocking findings into dedicated TDD repair tasks, and reuse the executor/merger/check pipeline. Allow at most three total review rounds with evidence-based re-review of disputed findings. Produce a final OpenCode and dashboard report and leave the feature branch ready without merging or publishing.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 227–255): dual review, dedicated repairs, three rounds, dispute handling and reports.
+- `PRD.md` (lines 257–259): dashboard review visibility.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 10: Observe execution in the read-only browser dashboard](10-observe-execution-in-read-only-dashboard.md): predecessor contracts and the code delivered by that slice.
+- [Issue 11: Review the completed feature’s code](11-review-completed-feature-code.md): predecessor contracts and the code delivered by that slice.
+- [Issue 12: Verify acceptance criteria through browser and HTTP tests](12-verify-acceptance-with-browser-and-http.md): predecessor contracts and the code delivered by that slice.
+- `src/review/coordinator.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/review/repairs.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/reporting/completion.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/dashboard/projections.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Maintain separate counters for review round, repair issue attempt, and functional infrastructure attempt. Findings are facts tied to a commit; fixes are new issue-like tasks with their own worktrees. Terminal outcomes distinguish missing evidence from confirmed unresolved defects.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Coordinate both reviewers on one frozen commit
+
+**Files:** `src/review/coordinator.ts`, `src/review/types.ts`, `src/review/functional-results.ts`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** Consolidate issue 11/12 boundary types and dispatch both roles with the same ReviewSnapshot. Wait for both results before changing the integration branch. Record round 1 initially, and only increment for a new complete review after repairs. Preserve failed/unverified reviewer results without claiming global success.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import runCodeReview, runFunctionalReview, createReviewSnapshot and RunStore; export coordinateReviewRound.
+- **GOTCHA:** If one reviewer is unavailable, retain the other's findings. Unverified completion is valid only with no unresolved confirmed blockers; failures cannot be hidden by missing evidence.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/13-review-loop.test.ts`; add the tests below as this slice develops.
+
+### 2. Create bounded TDD repairs and handle disputes
+
+**Files:** `src/review/repairs.ts`, `src/review/coordinator.ts`
+
+- **IMPLEMENT:** Deduplicate equivalent findings while retaining both sources. Generate repair IssueSpecs with finding IDs, relevant original issue context, test behaviors, criteria and dependencies. Use the existing three-attempt execute/integrate flow and allocate fresh worktrees. Relay executor disputes to the originating reviewer for evidence-based withdrawal or retention; permit one clarification exchange per finding per round before retaining unresolved disposition. After repairs rerun both reviewers, with no fourth round.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import executeIssue, integrateIssue, AttemptPolicy and scheduler interfaces; export createRepairTasks and resolveFindingDispute.
+- **GOTCHA:** Repairs do not rewrite the original approved feature graph or silently expand scope. Expected TDD red failures do not consume attempts. Round three unresolved findings stop automatic repairs.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/13-review-loop.test.ts`; add the tests below as this slice develops.
+
+### 3. Report accurate final state in chat and dashboard
+
+**Files:** `src/reporting/completion.ts`, `src/dashboard/projections.ts`, `src/dashboard/web/App.tsx`
+
+- **IMPLEMENT:** Produce branch/SHA, issue and repair counts, attempt usage, evidence, findings, skipped checks, unavailable review and retained resources. Render review rounds and findings in the existing dashboard. Mark full verification only if no skipped checks, no unavailable applicable criteria and no unresolved blockers remain. Release the active-run lock only for a terminal outcome.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Export buildCompletionReport; import read-only projection contracts and persisted run records.
+- **GOTCHA:** Never push, merge the target branch or create a pull request. Preserve feature branch and logs even for unverified results.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/13-review-loop.test.ts`; add the tests below as this slice develops.
+
+### 4. Prove all review termination paths
+
+**Files:** `tests/integration/13-review-loop.test.ts`, `tests/browser/review-report.test.ts`
+
+- **IMPLEMENT:** Test clean first round, fix then pass, findings remaining after round three, repair exhaustion, duplicate findings, disputed finding withdrawn/retained, unavailable functional review, both skipped checks and otherwise passing reviewers, and browser report consistency.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Use fake reviewers/clock and real Git repair fixtures; import coordinator and completion report public functions.
+- **GOTCHA:** Ensure no nested counter resets allow unbounded review or repair.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/13-review-loop.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] Both reviewers inspect the same commit in each round and repairs wait for both results.
+- [x] Repair tasks use TDD, new worktrees, three execution attempts and normal candidate checks.
+- [x] At most three total review rounds run; unresolved final findings stop automatic work.
+- [x] Disputes have bounded evidence-based disposition and do not create a hidden extra round.
+- [x] Final report and dashboard accurately distinguish verified, incomplete-validation, unverified and unresolved outcomes.
+- [x] Target branch and remotes remain unchanged.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/13-review-loop.test.ts`.
+- [x] Type checking and lint pass; no unsupported platform is silently excluded.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/13-review-loop.test.ts
+bun run test:browser -- tests/browser/review-report.test.ts
+```
+
+**Demonstration:** Plant one UI defect and one code defect, produce two repair tasks, pass the second review, and inspect the report. Repeat with a persistent defect to show termination after round three.
+
+## Blocked by
+
+- [10-observe-execution-in-read-only-dashboard.md](10-observe-execution-in-read-only-dashboard.md) — observe execution in the read-only browser dashboard supplies the prerequisite behavior/contracts.
+- [11-review-completed-feature-code.md](11-review-completed-feature-code.md) — review the completed feature’s code supplies the prerequisite behavior/contracts.
+- [12-verify-acceptance-with-browser-and-http.md](12-verify-acceptance-with-browser-and-http.md) — verify acceptance criteria through browser and http tests supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+### Implementation evidence — 2026-10-14
+
+Implemented the bounded coordinator, dedicated repair/dispute interfaces, persisted
+rounds and attempt intents, final reporting, public router boundary and dashboard
+visibility. See [validation evidence](../../docs/review-loop-validation.md) and
+[project wiki](../../docs/wiki/features/bounded-review-repairs.md) for red/green
+results, demonstrated scenarios and actual command outcomes.
+
+### Follow-up implementation evidence — 2026-10-15
+
+Approved review runs now default to the existing executor/merger/check pipeline;
+injected repair support is optional. Dedicated repair specs remain outside the
+approved feature graph. The public router regression executes real TDD repairs,
+normal candidate checks and a second review, with separate original/repair budgets.
+Executor disputes reach one read-only clarification in the originating reviewer
+role with the frozen review and counterexample context. Terminal reporting releases
+only the matching active-run lock. Reports aggregate attempts and distinguish
+retained worktrees/logs from successful worktrees already cleaned up.
+
+See the updated [validation evidence](../../docs/review-loop-validation.md) for
+command outcomes and limitations. Hosts still supply functional environment,
+surface and tool options to the dual-review public boundary; the scheduler's
+automatic handoff currently starts code review. Live-provider and native
+Linux/Windows checks remain unrun. No publication or target-branch merge occurred.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check whether this slice is already complete and verify its recorded validation before making any changes.
+
+exec
+/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*review-loop*' -g '*review-report*' -g '*13-repair*' -g 'README.md' -g 'PRD.md' -g 'coordinator.ts' -g 'repairs.ts' -g 'completion.ts' -g 'projections.ts'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+src/review/coordinator.ts
+src/review/repairs.ts
+src/dashboard/projections.ts
+src/reporting/completion.ts
+ralph-logs/iter-1-13-repair-findings-within-three-review-rounds.log
+package.json
+README.md
+docs/review-loop-validation.md
+tests/browser/review-report.test.ts
+tests/integration/13-review-loop.test.ts
+PRD.md
+
+exec
+/bin/zsh -lc 'git status --short' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+
+exec
+/bin/zsh -lc "rg --files -g AGENTS.md -g '*bounded-review*' -g '*13*' docs .agents; cat package.json; cat .bun-version; cat docs/review-loop-validation.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+.agents/issues/13-repair-findings-within-three-review-rounds.md
+docs/wiki/features/bounded-review-repairs.md
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+1.4.3
+# Review loop validation (2026-10-14)
+
+Public behavior: `createCommandRouter(...).reviewFeature(options)` runs both review
+roles on one frozen SHA, persists round/repair/dispute history, and reports a terminal
+outcome in status, an adapter toast and the dashboard. No target merge, push or PR
+creation is performed by the coordinator.
+
+TDD evidence: the first clean-round test failed because the coordinator module did
+not exist, then passed after its implementation. The persistent-defect test failed
+with only one round, then passed with exactly three rounds and two fresh repair
+worktrees. An intermediate skipped-check regression failed as `verified`, then
+passed as `incomplete-validation` after retaining checks on each repair attempt.
+The infrastructure-budget regression failed with two functional invocations after
+three infrastructure failures, then passed with one invocation. Formatting, package
+exports and wiki updates are non-behavior changes and have no separate red test.
+
+Demonstration: the two planted code/UI defects test starts a real feature branch,
+creates two dedicated repairs, writes regression tests in fresh worktrees, observes
+real Bun red and green results, validates each candidate and fast-forwards only the
+feature branch via an injected merger fixture. Both reviewers pass round two. Each
+repair uses one attempt; expected red failures do not consume attempts. The target
+ref and remotes remain unchanged. The persistent-defect test performs two repairs
+and stops with unresolved findings at round three; no fourth review or third repair
+cycle is dispatched.
+
+The dedicated integration suite also covers repair exhaustion, deduplication,
+withdrawn/retained/evidence-less disputes, unavailable functional review, passing
+reviewers with skipped or incomplete validation, stale output, terminal lock release,
+independent SDK adapter sessions and an exhausted feature-wide infrastructure budget.
+Chromium checks compare all four outcome labels and branch/SHA against persisted
+status and projections without browser mutation controls.
+
+Follow-up (2026-10-15): predecessors now provide the executor, merger, scheduler
+and active-run lock. Approved `reviewFeature` runs default to a production repair
+pipeline that reuses executor slots, parsed TDD submissions, the serial integration
+queue and approved candidate checks. Repairs stay outside the original graph.
+A public router regression failed unresolved without injection, then passed with
+real Git/Bun red/green execution, independent merger sessions and round-two review.
+It also proves an original issue can consume two attempts while its repair uses one.
+
+Production executor disputes now carry correlated finding IDs and counterexample
+evidence. A failing public router regression became green after wiring one read-only
+clarification in the originating role with frozen requirements and original review
+context. Missing/invalid clarification evidence retains the finding; disputes do not
+allocate an extra review round. The adapter creates a fresh session per dispatch;
+this does not claim continuation of the originating OpenCode session.
+
+Additional red/green regressions reject nonexistent withdrawal evidence and repair IDs
+that collide with approved issues, stop denied repairs without phantom retries, and
+prove terminal owner-checked lock release, one
+attempt count per issue, and accurate retained resources. Successful native repair
+worktrees are removed by normal cleanup; reviewer worktrees, failed work and logs
+remain listed. Functional service cleanup does not imply deleting its worktree.
+
+Limitations: hosts still supply approved functional environment/surface/tool options
+to `reviewFeature`. The scheduler's automatic handoff currently starts only code
+review. The planted UI demonstration tests a rendered-label module, not live browser
+repair by an agent. Dashboard checks use real Chromium with deterministic reviewer
+fixtures; live-provider, Linux and Windows checks remain unrun. No package was
+published, external message sent, remote changed or target branch merged.
+
+Initial command results on pinned Bun 1.4.3 (2026-10-14):
+- `bun run typecheck`: passed.
+- `bun run lint`: passed (40 source/test/script files).
+- `bun test tests/integration`: 53 passed, one explicitly gated real
+  agent-browser check skipped, zero failures (54 total).
+- `bun run test:browser -- tests/browser/review-report.test.ts tests/browser/dashboard.test.ts`:
+  five Chromium tests passed, including four review-report outcomes.
+- `bun test tests/integration/13-review-loop.test.ts`: all 12 tests passed
+  (98 assertions).
+- `bun run build`: passed, including declaration output and dashboard assets.
+
+Follow-up command results on pinned Bun 1.4.3 (2026-10-15):
+- `bun run typecheck`: passed.
+- `bun run lint`: passed (97 source/test/script files).
+- `bun test tests/integration/13-review-loop.test.ts`: 18 passed, zero failures
+  (157 assertions).
+- `bun run test:browser -- tests/browser/review-report.test.ts`: all four Chromium
+  report outcomes passed.
+- Final stable-source `bun test --timeout 30000 tests/integration`: 177 passed,
+  one explicitly gated live agent-browser test skipped, zero failures (178 tests,
+  1,109 assertions). An earlier concurrent development run loaded pre-fix modules
+  and failed three new regressions; the stable-source rerun above passed all three.
+
+exec
+/bin/zsh -lc "sed -n '1,240p' src/review/coordinator.ts; sed -n '1,200p' src/review/repairs.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { assertDispatchAllowed, waitForDispatch } from "../commands/control.js";
+import { attemptPolicy } from "../execution/attempts.js";
+import {
+  createOwnedWorktree,
+  readReviewGit,
+  resolveReviewCommit,
+} from "../git/review-workspace.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import {
+  buildCompletionReport,
+  type ReviewWorkflow,
+} from "../reporting/completion.js";
+import { releaseTerminalRun } from "../state/active-run.js";
+import type { RunStore } from "../state/run-store.js";
+import { runCodeReview } from "./code-review.js";
+import type { FunctionalReviewResult } from "./functional-results.js";
+import {
+  type FunctionalReviewOptions,
+  runFunctionalReview,
+} from "./functional-review.js";
+import {
+  createRepairPipeline,
+  createRepairTasks,
+  type RepairPipeline,
+  resolveFindingDispute,
+} from "./repairs.js";
+import { createReviewSnapshot } from "./snapshot.js";
+import type { ReviewResult, ReviewSnapshot, SnapshotOptions } from "./types.js";
+
+export interface ReviewCoordinatorOptions
+  extends Omit<SnapshotOptions, "round"> {
+  adapter?: OpenCodeAdapter;
+  /** Captured by the coordinator; stop/restart invalidates live callbacks. */
+  controlEpoch?: number;
+  parentSessionId?: string;
+  functionalOptions?: Omit<
+    FunctionalReviewOptions,
+    "store" | "adapter" | "directory" | "parentSessionId"
+  >;
+  reviewers?: {
+    code(snapshot: ReviewSnapshot): Promise<ReviewResult>;
+    functional(snapshot: ReviewSnapshot): Promise<FunctionalReviewResult>;
+  };
+  repairs?: RepairPipeline;
+  /** Supplied by the lifecycle owner; called only after durable terminal reporting. */
+  releaseActiveRun?: () => Promise<void>;
+}
+async function save(
+  store: RunStore,
+  runId: string,
+  workflow: ReviewWorkflow,
+  epoch?: number,
+) {
+  const run = await store.getRun(runId);
+  if (
+    !run ||
+    (epoch !== undefined && (run.control?.epoch ?? 0) !== epoch) ||
+    !(await store.recordReviewWorkflow(runId, run.revision, workflow))
+  )
+    throw new Error("Stale review workflow completion ignored");
+}
+function missing(
+  snapshot: ReviewSnapshot,
+  role: ReviewResult["role"],
+  cause: unknown,
+): ReviewResult {
+  return {
+    role,
+    reviewedCommit: snapshot.commit,
+    round: snapshot.round,
+    outcome: "unverified",
+    findings: [],
+    evidenceRefs: [],
+    error: {
+      code: "unsupported",
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause: String(cause),
+    },
+  };
+}
+const activeCoordinators = new Set<string>();
+export async function coordinateReviewRound(options: ReviewCoordinatorOptions) {
+  const key = `${options.store.repositoryId}:${options.runId}`;
+  if (activeCoordinators.has(key))
+    throw new Error("Review workflow already active");
+  activeCoordinators.add(key);
+  try {
+    return await coordinate(options);
+  } finally {
+    activeCoordinators.delete(key);
+  }
+}
+async function coordinate(options: ReviewCoordinatorOptions) {
+  await assertDispatchAllowed(options.store, options.runId);
+  const prior = await options.store.getRun(options.runId);
+  options = { ...options, controlEpoch: prior?.control?.epoch ?? 0 };
+  if (!options.repairs && options.adapter && prior?.planning?.executionApproval)
+    options.repairs = createRepairPipeline(
+      options.store,
+      options.adapter,
+      options.runId,
+    );
+  if (
+    prior?.reviewWorkflow?.status === "terminal" &&
+    prior.reviewWorkflow.report
+  )
+    return prior.reviewWorkflow.report;
+  if (prior?.reviewWorkflow && prior.control?.source !== "human")
+    throw new Error(
+      "Existing workflow requires explicit recovery before resume",
+    );
+  if (
+    prior?.reviewWorkflow?.rounds.some((r) =>
+      r.repairs.some((t) =>
+        t.attempts.some((a) => ["intent", "integrating"].includes(a.status)),
+      ),
+    )
+  )
+    throw new Error("Interrupted repair requires reconciliation before resume");
+  const branch = (
+    await readReviewGit(options.directory, ["symbolic-ref", "--short", "HEAD"])
+  ).trim();
+  const snapshot =
+    prior?.reviewWorkflow?.rounds.at(-1)?.snapshot ??
+    (await createReviewSnapshot({ ...options, round: 1 }));
+  const initial = await options.store.getRun(options.runId);
+  if (!initial?.review) throw new Error("Missing frozen review");
+  const workflow: ReviewWorkflow = structuredClone(
+    prior?.reviewWorkflow ?? {
+      ownerId: randomUUID(),
+      branch,
+      commit: snapshot.commit,
+      status: "running",
+      rounds: [
+        {
+          snapshot,
+          repairs: [],
+          disputes: [],
+          validation: initial.review.inputs.execution,
+        },
+      ],
+    },
+  );
+  // Scheduling keeps verification provisional until review. Qualify the frozen
+  // validation from commit-bound checks without treating a pending-review flag
+  // as a permanent omission. Missing/failed/skipped checks remain incomplete.
+  const validation = workflow.rounds.at(-1)?.validation;
+  if (
+    initial.planning?.executionApproval &&
+    validation?.verification === "incomplete" &&
+    validation.reviewPending === true &&
+    validation.issues.length > 0 &&
+    validation.issues.every((issue) => issue.status === "integrated") &&
+    validation.integrationQueue.length === 0 &&
+    !initial.validationSkips?.length &&
+    validation.checks.length > 0 &&
+    validation.checks.every(
+      (check) =>
+        check.status === "passed" && check.candidateCommit === snapshot.commit,
+    )
+  ) {
+    validation.verification = "passed";
+    validation.reviewPending = false;
+  }
+  await save(options.store, options.runId, workflow, options.controlEpoch);
+  const common = () => {
+    if (!options.adapter || !options.parentSessionId)
+      throw new Error("No coordinated OpenCode adapter/session supplied");
+    return {
+      store: options.store,
+      adapter: options.adapter,
+      directory: options.directory,
+      parentSessionId: options.parentSessionId,
+    };
+  };
+  for (let number = workflow.rounds.length; number <= 3; number++) {
+    await waitForDispatch(options.store, options.runId);
+    const round = workflow.rounds.at(-1);
+    if (!round) throw new Error("Missing round");
+    const frozen = round.snapshot;
+    const infrastructureUsed = workflow.rounds
+      .slice(0, -1)
+      .flatMap((r) => r.functional?.attempts ?? [])
+      .filter(
+        (a) =>
+          a.blocker?.code === "unsupported" ||
+          a.blocker?.code === "sdk-error" ||
+          a.blocker?.code === "missing-output" ||
+          a.blocker?.code === "permission-denied",
+      ).length;
+    const infrastructureRemaining = Math.max(0, 3 - infrastructureUsed);
+    const results = await Promise.allSettled([
+      Promise.resolve().then(() =>
+        round.code
+          ? round.code
+          : options.reviewers
+            ? options.reviewers.code(frozen)
+            : runCodeReview(frozen, common()),
+      ),
+      Promise.resolve().then(() => {
+        if (round.functional) return round.functional;
+        if (!infrastructureRemaining)
+          return {
+            ...missing(
+              frozen,
+              "functional-review",
+              "Functional infrastructure budget exhausted after three attempts",
+            ),
+            role: "functional-review" as const,
+            criteria: [],
+            evidence: [],
+            attempts: [],
+          };
+        if (options.reviewers) return options.reviewers.functional(frozen);
+        if (!options.functionalOptions)
+          throw new Error("No approved functional environment supplied");
+        return runFunctionalReview(frozen, {
+          ...common(),
+          ...options.functionalOptions,
+          infrastructureAttemptLimit: infrastructureRemaining,
+        });
+      }),
+    ]);
+    const persisted = await options.store.getRun(options.runId);
+    const c = results[0];
+    const f = results[1];
+    round.code =
+      c.status === "fulfilled"
+        ? c.value
+        : (persisted?.review?.result ??
+          missing(frozen, "code-review", c.reason));
+    round.functional =
+      f.status === "fulfilled"
+        ? f.value
+        : (persisted?.review?.functionalResult ?? {
+            ...missing(frozen, "functional-review", f.reason),
+            role: "functional-review",
+            criteria: [],
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { z } from "zod";
+import { correlatedResult } from "../agents/results.js";
+import type { ExecutionEvidence, Failure } from "../core/types.js";
+import { dispatchAttempt } from "../execution/attempts.js";
+import { executeIssue } from "../execution/execute-issue.js";
+import { integrateIssue } from "../execution/integrate-issue.js";
+import {
+  createReviewWorkspace,
+  verifyFindingEvidence,
+  verifyReviewWorkspace,
+} from "../git/review-workspace.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { RunStore } from "../state/run-store.js";
+import type { ReviewFinding, ReviewSnapshot } from "./types.js";
+
+/** Dedicated repair specification; it never rewrites the approved feature graph. */
+export interface IssueSpec {
+  id: string;
+  findingIds: string[];
+  sources: ReviewFinding[];
+  originalIssues: ExecutionEvidence["issues"];
+  originalContext: { prd: string; graph: string };
+  testBehaviors: string[];
+  acceptanceCriteria: string[];
+  dependencies: string[];
+  tdd: true;
+}
+export interface RepairAttempt {
+  attempt: number;
+  workspace: string;
+  baseCommit: string;
+  candidateCommit?: string;
+  checks?: ExecutionEvidence["checks"];
+  status: "intent" | "integrating" | "failed" | "integrated" | "disputed";
+  evidenceRefs: string[];
+  error?: Failure;
+}
+export interface RepairTask extends IssueSpec {
+  attempts: RepairAttempt[];
+  status: "pending" | "integrated" | "unresolved" | "withdrawn";
+}
+export interface FindingDispute {
+  finding: ReviewFinding;
+  executorEvidence: string[];
+  disposition: "withdrawn" | "retained";
+  reviewerEvidence: string[];
+  justification: string;
+}
+export interface RepairPipeline {
+  /** The production executor records intent and allocates its own owned branch. */
+  ownsWorkspaces?: boolean;
+  /** Executes one complete TDD attempt, including expected red failures internally. */
+  executeIssue(
+    task: IssueSpec,
+    context: {
+      snapshot: ReviewSnapshot;
+      workspace: string;
+      attempt: number;
+      baseCommit: string;
+    },
+  ): Promise<
+    | { outcome: "candidate"; commit: string; evidenceRefs: string[] }
+    | { outcome: "failed"; error: Failure; evidenceRefs: string[] }
+    | { outcome: "disputed"; findingIds: string[]; evidenceRefs: string[] }
+  >;
+  /** Must use the normal isolated merger and approved candidate checks. */
+  integrateIssue(
+    task: IssueSpec,
+    candidate: string,
+    context: { workspace: string; attempt: number; baseCommit: string },
+  ): Promise<
+    | {
+        outcome: "integrated";
+        commit: string;
+        checks: ExecutionEvidence["checks"];
+        evidenceRefs: string[];
+      }
+    | { outcome: "failed"; error: Failure; evidenceRefs: string[] }
+  >;
+  clarifyFinding?(
+    finding: ReviewFinding,
+    evidence: string[],
+    snapshot: ReviewSnapshot,
+  ): Promise<{
+    disposition: "withdrawn" | "retained";
+    evidenceRefs: string[];
+    justification: string;
+  }>;
+}
+export function createRepairTasks(
+  snapshot: ReviewSnapshot,
+  findings: ReviewFinding[],
+  originalIssues: ExecutionEvidence["issues"],
+  originalContext: { prd: string; graph: string } = { prd: "", graph: "" },
+): RepairTask[] {
+  const groups = new Map<string, ReviewFinding[]>();
+  for (const finding of findings) {
+    if (
+      !finding.blocking ||
+      finding.disposition !== "open" ||
+      ["style", "refactor"].includes(finding.category)
+    )
+      continue;
+    if (finding.reviewedCommit !== snapshot.commit)
+      throw new Error("Finding is not tied to the frozen commit");
+    // Conservative equivalence: same criterion and proposed behavior change, never prose similarity alone.
+    const key = JSON.stringify([
+      finding.criterion.trim().toLowerCase(),
+      finding.suggestedRepair.trim().toLowerCase(),
+    ]);
+    const group = groups.get(key) ?? [];
+    group.push(structuredClone(finding));
+    groups.set(key, group);
+  }
+  const usedIds = new Set(originalIssues.map((issue) => issue.id));
+  let sequence = 0;
+  const nextId = () => {
+    let id: string;
+    do {
+      id = `repair-${snapshot.round}-${++sequence}`;
+    } while (usedIds.has(id));
+    usedIds.add(id);
+    return id;
+  };
+  return [...groups.values()].map((sources) => ({
+    id: nextId(),
+    findingIds: sources.map((f) => `${f.reviewerRole}:${f.id}`),
+    sources,
+    originalIssues: structuredClone(originalIssues),
+    originalContext: structuredClone(originalContext),
+    testBehaviors: [...new Set(sources.map((f) => f.criterion))],
+    acceptanceCriteria: [...new Set(sources.map((f) => f.suggestedRepair))],
+    dependencies: [],
+    tdd: true,
+    attempts: [],
+    status: "pending",
+  }));
+}
+export async function resolveFindingDispute(
+  finding: ReviewFinding,
+  executorEvidence: string[],
+  snapshot: ReviewSnapshot,
+  clarify?: RepairPipeline["clarifyFinding"],
+): Promise<FindingDispute> {
+  const retained: FindingDispute = {
+    finding,
+    executorEvidence,
+    disposition: "retained",
+    reviewerEvidence: [],
+    justification: "No evidence-based reviewer withdrawal",
+  };
+  if (!executorEvidence.length || !clarify) return retained;
+  try {
+    const response = await clarify(finding, executorEvidence, snapshot);
+    if (
+      !["withdrawn", "retained"].includes(response.disposition) ||
+      !response.justification.trim() ||
+      !response.evidenceRefs.length ||
+      response.evidenceRefs.some((e) => !e.trim())
+    )
+      return retained;
+    return {
+      finding,
+      executorEvidence,
+      disposition: response.disposition,
+      reviewerEvidence: response.evidenceRefs,
+      justification: response.justification,
+    };
+  } catch {
+    return retained;
+  }
+}
+
+const findingDispute = z
+  .object({
+    kind: z.literal("finding_dispute"),
+    findingIds: z.array(z.string().trim().min(1)).min(1),
+    evidenceRefs: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict();
+export function parseFindingDispute(raw: unknown, task: IssueSpec) {
+  if (
+    !raw ||
+    typeof raw !== "object" ||
+    !("kind" in raw) ||
+    raw.kind !== "finding_dispute"
+  )
+    return undefined;
+  const value = findingDispute.parse(raw);
+  if (value.findingIds.some((id) => !task.findingIds.includes(id)))
+    throw new Error("Dispute references an unrelated finding");
+  return { findingIds: value.findingIds, evidenceRefs: value.evidenceRefs };
+}
+
+/** Reuse normal executor slots, TDD submission validation, merger queue and checks. */
+export function createRepairPipeline(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+
+exec
+/bin/zsh -lc 'bun test tests/integration/13-review-loop.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun --version && bun run typecheck && bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun run test:browser -- tests/browser/review-report.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 2275ms:
+1.4.3
+$ tsc --noEmit
+$ biome check src tests scripts
+Checked 98 files in 81ms. No fixes applied.
+
+ succeeded in 4307ms:
+$ bun run scripts/browser-tests.ts tests/browser/review-report.test.ts
+$ vite build
+vite v7.1.12 building for production...
+transforming...
+✓ 30 modules transformed.
+rendering chunks...
+computing gzip size...
+../public/index.html        0.34 kB │ gzip:  0.24 kB
+../public/assets/app.css    1.21 kB │ gzip:  0.63 kB
+../public/assets/app.js   203.29 kB │ gzip: 63.77 kB
+✓ built in 391ms
+
+Running 4 tests using 1 worker
+
+(node:72867) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72867) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/review-report.test.ts:11:3 › browser report matches persisted verified report and chat status (802ms)
+  ✓  2 tests/browser/review-report.test.ts:11:3 › browser report matches persisted unverified report and chat status (522ms)
+  ✓  3 tests/browser/review-report.test.ts:11:3 › browser report matches persisted unresolved report and chat status (564ms)
+  ✓  4 tests/browser/review-report.test.ts:11:3 › browser report matches persisted incomplete-validation report and chat status (494ms)
+
+  4 passed (3.4s)
+
+ succeeded in 17199ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/13-review-loop.test.ts:
+(pass) clean dual review freezes one commit and persists terminal verified evidence [484.90ms]
+(pass) repairs wait for both reviewers, use fresh worktrees and stop after third complete round [1534.98ms]
+(pass) unavailable functional review cannot hide confirmed code blockers; skipped checks qualify passing reviews [1031.15ms]
+(pass) duplicate findings preserve both sources and exhausted repairs get exactly three attempts [461.06ms]
+(pass) evidence-based disputes are withdrawn or retained in one exchange without an extra round [972.19ms]
+(pass) two planted code/UI defects pass review two and preserve intermediate skips: false [900.70ms]
+(pass) two planted code/UI defects pass review two and preserve intermediate skips: true [880.35ms]
+(pass) default dual reviewers use independent adapter sessions on the same SHA [481.92ms]
+(pass) functional infrastructure exhaustion is three attempts in one round and only terminal reporting releases the lock [428.82ms]
+(pass) stale reviewer output cannot finalize or release the active run [211.25ms]
+(pass) execution missing its required validation attestation cannot become verified [230.33ms]
+(pass) repairs cannot reset an exhausted functional infrastructure budget [522.69ms]
+(pass) public review reuses the approved executor, merger and candidate checks for dedicated repairs [4432.64ms]
+(pass) production repair disputes require frozen reviewer evidence: behavior.test.ts:1 [1430.09ms]
+(pass) production repair disputes require frozen reviewer evidence: absent.test.ts:999 [1379.16ms]
+(pass) production repair disputes require frozen reviewer evidence: permission-denied [1373.11ms]
+(pass) terminal review releases only its own active-run lock after persisting the report [447.87ms]
+(pass) generated repairs cannot alias an original approved issue ID [0.16ms]
+
+ 18 pass
+ 0 fail
+ 157 expect() calls
+Ran 18 tests across 1 file. [17.30s]
+
+exec
+/bin/zsh -lc 'git status --short' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+
+codex
+This task is already implemented; no source changes were needed.
+
+Verified on Bun 1.4.3:
+
+- Typecheck and lint passed.
+- Review-loop integration tests: 18 passed.
+- Chromium report tests: 4 passed.
+
+Live-provider and native Linux/Windows checks remain unrun, as documented.
+tokens used
+24,442
+This task is already implemented; no source changes were needed.
+
+Verified on Bun 1.4.3:
+
+- Typecheck and lint passed.
+- Review-loop integration tests: 18 passed.
+- Chromium report tests: 4 passed.
+
+Live-provider and native Linux/Windows checks remain unrun, as documented.

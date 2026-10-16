@@ -1,0 +1,676 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/7-retry-failed-work-and-skip-hung-checks.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cd3-1b25-7a81-88bd-f45a3942ce0c
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 7 of 15 — 7-retry-failed-work-and-skip-hung-checks.md
+=== END METADATA ===
+
+TASK:
+# 7. Retry failed work and skip hung validation checks
+
+**Type:** AFK  
+**Status:** Implemented; repository-wide lint retains the unrelated predecessor formatting blocker  
+**User stories:** US-6  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Extend single-issue execution with autonomous repairs and bounded agent retries. Initial execution plus two repairs share one three-attempt issue budget, including stuck executor attempts and submission-level setup failures. Apply the existing run-local skip policy to every candidate validation and expose omissions in status. Preserve exhausted work for intervention without creating an automatic fourth attempt.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 211–225): three attempts, agent timeout, run-local skips, setup exceptions.
+- `PRD.md` (lines 244–255): honest outcome reporting.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 6: Execute and integrate one issue using TDD](6-execute-and-integrate-one-issue-with-tdd.md): predecessor contracts and the code delivered by that slice.
+- `src/execution/attempts.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/execution/execute-issue.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/execution/validation.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Use an injected clock and typed failure causes. Persist attempt allocation before dispatch and cancel the old job before retry; accept results only for the active attempt. Keep validation omission state orthogonal to integration success.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Enforce the issue attempt ledger
+
+**Files:** `src/execution/attempts.ts`, `src/execution/execute-issue.ts`, `src/execution/integrate-issue.ts`
+
+- **IMPLEMENT:** Define beginAttempt, failAttempt, and exhaustIssue with initial attempt 1 and maximum 3. Feed failed check logs, merge feedback, and previous work references back to the executor. Include executor/merger agent timeouts and task setup failures in the current issue attempt; avoid double charging when multiple events describe the same failure. Stop owned agent activity and reconcile workspace before retry.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import RunStore, OpenCodeAdapter, IntegrationResult and Submission; export AttemptPolicy and attempt transition helpers.
+- **GOTCHA:** Permission prompts and requirement questions are waiting states, not silent authorization or fabricated code failures. A duplicate timeout/result event cannot allocate another attempt.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/07-retries.test.ts`; add the tests below as this slice develops.
+
+### 2. Extend check skip behavior across attempts
+
+**Files:** `src/execution/validation.ts`, `src/process/runner.ts`, `src/core/orchestrator.ts`
+
+- **IMPLEMENT:** Reuse baseline skip records by stable check ID across issues and later reviews. Kill timed-out owned command trees and continue remaining checks. Distinguish timeout, cancellation, permission denial, spawn errors, setup failures, and completed nonzero exits. All checks skipped permits continued execution with incomplete-validation status; never edit approved commands.json.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import CommandResult and ValidationSummary from predecessor modules.
+- **GOTCHA:** Only actual validation timeouts cause skipping. Do not label commands killed by /ralph-stop as timed-out checks. Cleanup is never skipped by this policy.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/07-retries.test.ts`; add the tests below as this slice develops.
+
+### 3. Prove bounded retries and honest status
+
+**Files:** `tests/integration/07-retries.test.ts`
+
+- **IMPLEMENT:** Test success on attempt 3, exhaustion at 3, duplicate failures, late results, timed-out agent, check timeout propagated into next attempt, all checks skipped, and next-run retry of previously skipped checks. Use a fake clock rather than waiting for real thirty-minute limits.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import fake agent and project fixtures; add a reusable controllable clock in tests/helpers/clock.ts.
+- **GOTCHA:** Parallel independent-work behavior is added by issue 8; record blocked/exhausted issue states now rather than aborting the whole run.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/07-retries.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] A failing issue dispatches at most three execution attempts automatically.
+- [x] Failure context contains actual check logs or agent/merge failure evidence.
+- [x] Hung checks are skipped only for the active run; ordinary failures still trigger repairs.
+- [x] A stuck agent consumes one attempt and its late response cannot advance the run.
+- [x] The final issue status includes missing validation even if every remaining check was skipped.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/07-retries.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded. — Type checking and touched-file lint pass; full lint retains the existing `tests/browser/dashboard.test.ts:38` formatting error.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/07-retries.test.ts
+
+```
+
+**Demonstration:** Drive a fake executor through two failed submissions and a successful third; then drive three failures and confirm no fourth job. Run a timed-out check fixture and verify unchanged configuration.
+
+## Blocked by
+
+- [6-execute-and-integrate-one-issue-with-tdd.md](6-execute-and-integrate-one-issue-with-tdd.md) — execute and integrate one issue using tdd supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+
+## Completion evidence (2026-10-15)
+
+The command router now exposes `executeIssue(runId, issueId)` for bounded execution and integration through the existing fake OpenCode HTTP adapter and real Git worktrees. Initial execution and two repairs share one issue ledger, reserved before submission setup. Executor/merger deadline failures, setup failures and failed validation consume that budget. History preserves correlated results, logs, conflict feedback and saved work references. Retry cancels owned activity and reconciles retained branch/HEAD/dirty facts. Exhausted issues remain inspectable and repeated/concurrent calls cannot create an automatic fourth job. Permission denial and cancellation wait without fabricated repairs.
+
+Candidate validation reuses baseline run-local skips across repairs and subsequent validation. Only actual validation timeouts with confirmed tree cleanup add skips. All-skipped validation integrates with `passed_with_omissions`, disclosed with issue attempts in status. New runs retry the original checks; configuration stays byte-for-byte unchanged. Setup timeout, spawn error, setup failure, nonzero exit, denial and cancellation remain distinct; cleanup is never skipped. Live process ownership is persisted during command execution so stop can kill a running check without labelling it timed out. `agentTimeoutMs` is visible in project configuration/run settings/attempt status with a thirty-minute default; tests inject a controllable clock.
+
+TDD red/green evidence: the initial command-boundary repair test failed on the missing router method, then passed with two failed candidate checks and successful integration on attempt 3. Subsequent observed failures exposed setup before reservation, denied validation exhausting the budget, injected clocks not controlling commands, missing retry cancellation/reconciliation, and stop unable to kill a live check and then reporting it as completed. Each was corrected with its behavioral regression green. A final duplicate-failure regression exposed whole-run phase being set failed by an exhausted issue job; issue job settlement now keeps the run active for independent work and final review. Spawn/setup status tests also failed on ambiguous completed/null-exit outcomes before explicit statuses were added. Demonstrations cover success on attempt 3, exhaustion without a fourth dispatch, duplicate results, executor/merger deadlines and late output, skip reuse on repair and future validation, all-skipped qualification, fresh-run checks, setup timeouts and stop cancellation.
+
+Wiki updated: `docs/wiki/features/single-issue-integration.md`; predecessor fixture extracted to `tests/helpers/single-issue.ts` without changing its behavior. No publication, external messages or user-target merge occurred. Native Linux/Windows and credentialed live OpenCode smoke were not run; tests exercise the existing portable command ownership paths on macOS. Automatic dependency scheduling and requirement-question routing remain downstream work.
+
+Final validation (Bun 1.4.3, macOS):
+- `bun run typecheck`: passed.
+- `bun test tests/integration/07-retries.test.ts`: 17 passed, 0 failed; 156 assertions.
+- `bun test --timeout 30000 tests/integration`: 156 passed, 1 opt-in browser test skipped, 0 failed; 843 assertions. Final fresh process loaded the completed changes.
+- `bunx biome check` on all 16 touched source/test files: passed.
+- `bun run lint`: blocked solely by the pre-existing formatting error in `tests/browser/dashboard.test.ts:38`, left unchanged under the unrelated-file constraint.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing implementation and rerun the acceptance checks to confirm whether this task is already complete.
+exec
+/bin/zsh -lc "pwd; rg --files -g AGENTS.md -g '*07-retries*' -g package.json -g '*7-retry*' -g '*attempts*' -g '*validation*' -g '*execute-issue*' -g '*integrate-issue*'" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+src/execution/attempts.ts
+src/execution/execute-issue.ts
+src/execution/integrate-issue.ts
+src/execution/validation.ts
+ralph-logs/iter-2-7-retry-failed-work-and-skip-hung-checks.log
+ralph-logs/iter-1-7-retry-failed-work-and-skip-hung-checks.log
+package.json
+docs/package-validation.md
+docs/functional-review-validation.md
+docs/recovery-validation.md
+docs/review-loop-validation.md
+tests/integration/07-retries.test.ts
+
+exec
+/bin/zsh -lc "rg -n 'test\\(|it\\(|timeout|skip|attempt|exhaust' tests/integration/07-retries.test.ts src/execution/execute-issue.ts src/execution/validation.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+src/execution/validation.ts:24:    status: "passed" | "failed" | "skipped";
+src/execution/validation.ts:29:  skippedCheckIds: string[];
+src/execution/validation.ts:46:    skippedCheckIds: [...(initial?.validationSkips ?? [])],
+src/execution/validation.ts:48:  const environment = createApprovedEnvironment(context, { skipChecks: true });
+src/execution/validation.ts:69:      !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(job.baseCommit) ||
+src/execution/validation.ts:80:      if (summary.skippedCheckIds.includes(command.id)) {
+src/execution/validation.ts:83:          status: "skipped",
+src/execution/validation.ts:84:          reason: "Earlier timeout in this feature run",
+src/execution/validation.ts:97:        summary.skippedCheckIds.push(command.id);
+src/execution/validation.ts:100:          status: "skipped",
+src/execution/validation.ts:114:            throw new Error("Stale timeout completion");
+src/execution/validation.ts:120:              summary.skippedCheckIds,
+src/execution/validation.ts:149:    summary.status = summary.checks.some((c) => c.status === "skipped")
+src/execution/execute-issue.ts:42:} from "./attempts.js";
+src/execution/execute-issue.ts:49:  attempt: number;
+src/execution/execute-issue.ts:58:    | "exhausted"
+src/execution/execute-issue.ts:89:/** Approval and control identity remain fixed throughout one attempt. */
+src/execution/execute-issue.ts:93:  attempt: IssueAttempt,
+src/execution/execute-issue.ts:106:    (currentRepair(initial, attempt.issueId) &&
+src/execution/execute-issue.ts:110:        !currentRepair(current, attempt.issueId))) ||
+src/execution/execute-issue.ts:111:    current.issueAttempts?.[attempt.issueId]?.job.jobId !== attempt.job.jobId ||
+src/execution/execute-issue.ts:112:    current.issueAttempts?.[attempt.issueId]?.operationId !==
+src/execution/execute-issue.ts:113:      attempt.operationId
+src/execution/execute-issue.ts:120:  attempt: IssueAttempt,
+src/execution/execute-issue.ts:124:    assertCurrentAttempt(initial, current, attempt);
+src/execution/execute-issue.ts:126:      await store.recordIssueAttempt(initial.runId, current.revision, attempt)
+src/execution/execute-issue.ts:161:  const number = resuming ? previous.attempt : beginAttempt(previous);
+src/execution/execute-issue.ts:165:  const reserved = repair?.attempts.at(-1);
+src/execution/execute-issue.ts:166:  if (repair && (reserved?.attempt !== number || reserved.status !== "intent"))
+src/execution/execute-issue.ts:168:      "Repair attempt must be reserved by the review coordinator",
+src/execution/execute-issue.ts:183:    attempt: number,
+src/execution/execute-issue.ts:199:    prompt: "Reserved issue attempt",
+src/execution/execute-issue.ts:201:  let attempt: IssueAttempt = {
+src/execution/execute-issue.ts:203:    attempt: number,
+src/execution/execute-issue.ts:216:    attempt = { ...structuredClone(previous), status: "executing" };
+src/execution/execute-issue.ts:217:    if (!attempt.question?.answer)
+src/execution/execute-issue.ts:219:    attempt.questions = [...(attempt.questions ?? []), attempt.question];
+src/execution/execute-issue.ts:220:    job = { ...attempt.job, jobId: `continuation-${randomUUID()}` };
+src/execution/execute-issue.ts:227:    job.prompt += `\nClarification context: ${JSON.stringify(attempt.question)}\nCurrent approved PRD: ${JSON.stringify(planning.prd)}\nCurrent approved issue: ${JSON.stringify(issue)}\n${context?.text}`;
+src/execution/execute-issue.ts:228:    attempt.job = job;
+src/execution/execute-issue.ts:229:    delete attempt.question;
+src/execution/execute-issue.ts:230:    delete attempt.executionResult;
+src/execution/execute-issue.ts:232:  if (!(await store.recordIssueAttempt(runId, initial.revision, attempt)))
+src/execution/execute-issue.ts:238:        attempt.reconciledWork = await reconcileAttempt(
+src/execution/execute-issue.ts:244:        attempt.error = { code: "cancelled", message: String(cause) };
+src/execution/execute-issue.ts:284:      job.prompt = `${skill.text}\nSkill: ${JSON.stringify({ path: skill.path, hash: skill.hash })}\nPRD revision: ${JSON.stringify(planning.prd)}\nPRD:\n${prd}\nIssue: ${JSON.stringify(issue)}\n${context?.text}\nRepair context: ${JSON.stringify({ previous: repairContext(previous), reconciledWork: attempt.reconciledWork })}\nCommands: ${JSON.stringify(config.commands)}\nIdentity: ${JSON.stringify({ issueId, attempt: number, baseCommit: base.commit })}`;
+src/execution/execute-issue.ts:285:      await saveIssueAttempt(store, initial, attempt);
+src/execution/execute-issue.ts:306:      { skipChecks: true },
+src/execution/execute-issue.ts:308:    attempt.environment = { lifecycle: environment.results };
+src/execution/execute-issue.ts:309:    attempt.environment.lease = await prepareEnvironment(environment, job);
+src/execution/execute-issue.ts:311:    await saveIssueAttempt(store, initial, attempt);
+src/execution/execute-issue.ts:314:      attempt.remainingAgentMs ?? attempt.agentTimeoutMs ?? 1800000;
+src/execution/execute-issue.ts:323:    assertCurrentAttempt(initial, await store.getRun(runId), attempt);
+src/execution/execute-issue.ts:324:    attempt.remainingAgentMs = Math.max(
+src/execution/execute-issue.ts:328:    attempt.executionResult = result;
+src/execution/execute-issue.ts:330:      attempt.error = result.error ?? {
+src/execution/execute-issue.ts:339:      throw new Error(attempt.error.message);
+src/execution/execute-issue.ts:345:      attempt.findingDispute = dispute;
+src/execution/execute-issue.ts:346:      attempt.status = "waiting";
+src/execution/execute-issue.ts:347:      await saveIssueAttempt(store, initial, attempt);
+src/execution/execute-issue.ts:348:      return attempt;
+src/execution/execute-issue.ts:353:      attempt.question = createExecutorQuestion(initial, attempt, question);
+src/execution/execute-issue.ts:354:      attempt.status = "waiting";
+src/execution/execute-issue.ts:355:      await saveIssueAttempt(store, initial, attempt);
+src/execution/execute-issue.ts:356:      return attempt;
+src/execution/execute-issue.ts:384:    attempt.submission = submission;
+src/execution/execute-issue.ts:385:    attempt.status = "submitted";
+src/execution/execute-issue.ts:386:    await saveIssueAttempt(store, initial, attempt);
+src/execution/execute-issue.ts:392:      attempt.error ??= {
+src/execution/execute-issue.ts:400:    attempt.error ??= {
+src/execution/execute-issue.ts:405:    if (attempt.status !== "integrated") failAttempt(attempt);
+src/execution/execute-issue.ts:406:    await saveIssueAttempt(store, initial, attempt).catch(() => {});
+src/execution/execute-issue.ts:413:        attempt.cleanupErrors ??= [];
+src/execution/execute-issue.ts:414:        attempt.cleanupErrors.push(
+src/execution/execute-issue.ts:418:      await saveIssueAttempt(store, initial, attempt).catch(() => {});
+src/execution/execute-issue.ts:421:  return attempt;
+tests/integration/07-retries.test.ts:11:test("two failed candidates repair with real logs and integrate attempt three", async () => {
+tests/integration/07-retries.test.ts:20:      } else f.setMode(job.attempt < 3 ? "validation" : "success");
+tests/integration/07-retries.test.ts:26:    expect(result.attempt).toBe(3);
+tests/integration/07-retries.test.ts:31:    expect(status.issueAttempts.A.attempt).toBe(3);
+tests/integration/07-retries.test.ts:37:test("three executor setup failures exhaust once, concurrent and repeated calls cannot dispatch a fourth", async () => {
+tests/integration/07-retries.test.ts:51:    expect(result.status).toBe("exhausted");
+tests/integration/07-retries.test.ts:52:    expect(result.attempt).toBe(3);
+tests/integration/07-retries.test.ts:56:    expect((await router.executeIssue(f.runId, "A")).attempt).toBe(3);
+tests/integration/07-retries.test.ts:63:test("submission setup failures before dispatch consume the same three attempt budget", async () => {
+tests/integration/07-retries.test.ts:69:    expect(result.status).toBe("exhausted");
+tests/integration/07-retries.test.ts:70:    expect(result.attempt).toBe(3);
+tests/integration/07-retries.test.ts:77:test("stuck executor is cancelled before repair and late output cannot advance active attempt", async () => {
+tests/integration/07-retries.test.ts:96:      if (job.role === "executor" && job.attempt === 1) {
+tests/integration/07-retries.test.ts:122:    expect(result.attempt).toBe(2);
+tests/integration/07-retries.test.ts:123:    expect(result.history?.[0]?.error?.code).toBe("agent-timeout");
+tests/integration/07-retries.test.ts:135:test("denied executor permission waits without fabricating a repair", async () => {
+tests/integration/07-retries.test.ts:144:    expect(result.attempt).toBe(1);
+tests/integration/07-retries.test.ts:153:test("denied validation permission waits and never becomes a timeout skip or repair", async () => {
+tests/integration/07-retries.test.ts:165:    expect(result.attempt).toBe(1);
+tests/integration/07-retries.test.ts:182:    timeoutMs: 5000,
+tests/integration/07-retries.test.ts:187:test("all hung checks are omitted with incomplete status, immutable config and fresh-run retry", async () => {
+tests/integration/07-retries.test.ts:205:      const attempt = (await f.store.getRun(f.runId))?.issueAttempts?.A;
+tests/integration/07-retries.test.ts:207:        !!attempt?.candidate &&
+tests/integration/07-retries.test.ts:209:          join(attempt.candidate.job.workspace, "hung-ready"),
+tests/integration/07-retries.test.ts:224:    expect(result.attempt).toBe(1);
+tests/integration/07-retries.test.ts:226:    expect(result.validation?.checks[0]?.status).toBe("skipped");
+tests/integration/07-retries.test.ts:283:test("a dispatch exception cancels a still-owned session and reconciles saved workspace before retry", async () => {
+tests/integration/07-retries.test.ts:297:      if (job.role === "executor" && job.attempt === 1) {
+tests/integration/07-retries.test.ts:316:    expect(result.attempt).toBe(2);
+tests/integration/07-retries.test.ts:325:  test(`three stuck ${role} jobs exhaust the shared budget without a fourth`, async () => {
+tests/integration/07-retries.test.ts:350:      for (let attempt = 1; attempt <= 3; attempt++) {
+tests/integration/07-retries.test.ts:354:            (j) => j.envelope.role === role && j.envelope.attempt === attempt,
+tests/integration/07-retries.test.ts:357:            stuck === attempt &&
+tests/integration/07-retries.test.ts:360:              attempt * (role === "merger" ? 2 : 1)
+tests/integration/07-retries.test.ts:366:      expect(result.status).toBe("exhausted");
+tests/integration/07-retries.test.ts:367:      expect(result.attempt).toBe(3);
+tests/integration/07-retries.test.ts:369:      expect(result.error?.code).toBe("agent-timeout");
+tests/integration/07-retries.test.ts:374:        "exhausted",
+tests/integration/07-retries.test.ts:383:test("timed-out check is skipped on repair while ordinary failed checks return logs and run again", async () => {
+tests/integration/07-retries.test.ts:394:        job.role === "merger" && job.attempt === 1 ? "validation" : "success",
+tests/integration/07-retries.test.ts:404:      const attempt = (await f.store.getRun(f.runId))?.issueAttempts?.A;
+tests/integration/07-retries.test.ts:406:        !!attempt?.candidate &&
+tests/integration/07-retries.test.ts:408:          join(attempt.candidate.job.workspace, "hung-ready"),
+tests/integration/07-retries.test.ts:415:    expect(result.attempt).toBe(2);
+tests/integration/07-retries.test.ts:419:    ).toEqual(["skipped", "failed"]);
+tests/integration/07-retries.test.ts:421:      "skipped",
+tests/integration/07-retries.test.ts:432:test("setup timeouts consume attempts and are never validation skips", async () => {
+tests/integration/07-retries.test.ts:446:    for (let attempt = 1; attempt <= 3; attempt++) {
+tests/integration/07-retries.test.ts:450:          stored?.attempt === attempt &&
+tests/integration/07-retries.test.ts:457:    expect(result.status).toBe("exhausted");
+tests/integration/07-retries.test.ts:458:    expect(result.attempt).toBe(3);
+tests/integration/07-retries.test.ts:468:test("stop kills an active check without labelling it a timeout or scheduling repairs", async () => {
+tests/integration/07-retries.test.ts:485:    expect(result.attempt).toBe(1);
+tests/integration/07-retries.test.ts:497:  test(`${kind} remains a typed failure and never disables an approved check`, async () => {
+tests/integration/07-retries.test.ts:515:      expect(result.status).toBe("exhausted");
+tests/integration/07-retries.test.ts:524:test("issue agents default to a visible thirty-minute deadline", async () => {
+tests/integration/07-retries.test.ts:542:test("duplicate agent failure results do not charge additional attempts", async () => {
+tests/integration/07-retries.test.ts:557:    expect(result.status).toBe("exhausted");
+
+exec
+/bin/zsh -lc 'git status --short; cat package.json; cat src/execution/attempts.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+import type { JobEnvelope, JobResult } from "../core/types.js";
+import { gitOutput, inspectWorktree } from "../git/worktrees.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import { terminateOwnedProcess } from "../process/ownership.js";
+import type { RunStore } from "../state/run-store.js";
+import type { IssueAttempt } from "./execute-issue.js";
+
+export interface AttemptPolicy {
+  maxAttempts: 3;
+}
+export const attemptPolicy: Readonly<AttemptPolicy> = Object.freeze({
+  maxAttempts: 3,
+});
+export function beginAttempt(previous?: IssueAttempt): number {
+  const number = (previous?.attempt ?? 0) + 1;
+  if (number > attemptPolicy.maxAttempts)
+    throw new Error("Issue attempt budget exhausted");
+  return number;
+}
+export function exhaustIssue(attempt: IssueAttempt) {
+  attempt.status = "exhausted";
+}
+export function failAttempt(attempt: IssueAttempt) {
+  if (["permission-denied", "cancelled"].includes(attempt.error?.code ?? "")) {
+    attempt.status = "waiting";
+    return;
+  }
+  if (attempt.attempt >= attemptPolicy.maxAttempts) exhaustIssue(attempt);
+  else attempt.status = "failed";
+}
+export function repairContext(previous?: IssueAttempt) {
+  if (!previous) return undefined;
+  const { history: _history, ...evidence } = previous;
+  return evidence;
+}
+
+export interface Clock {
+  now?(): number;
+  schedule(ms: number, callback: () => void): () => void;
+}
+export const systemClock: Clock = {
+  schedule(ms, callback) {
+    const timer = setTimeout(callback, ms);
+    return () => clearTimeout(timer);
+  },
+};
+export interface AttemptOptions {
+  clock?: Clock;
+}
+/** Cancellation is acknowledged before the caller can allocate a repair. */
+export async function dispatchAttempt(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  job: JobEnvelope,
+  timeoutMs: number,
+  options: AttemptOptions,
+): Promise<JobResult> {
+  const clock = options.clock ?? systemClock;
+  const timeout = Symbol("deadline");
+  let dispose = () => {};
+  const deadline = new Promise<typeof timeout>((resolve) => {
+    dispose = clock.schedule(timeoutMs, () => resolve(timeout));
+  });
+  try {
+    const result = await Promise.race([adapter.dispatchJob(job), deadline]);
+    if (result !== timeout) return result;
+    const entry = (await store.getRun(job.runId))?.jobs[job.jobId];
+    const cancelled = entry
+      ? await adapter.cancelJob(entry.envelope)
+      : { ok: false };
+    return {
+      ...(entry?.envelope ?? job),
+      outcome: "failed",
+      evidence: [`${job.role} deadline ${timeoutMs}ms exceeded`],
+      error: {
+        code: cancelled.ok ? "agent-timeout" : "cancelled",
+        message: cancelled.ok
+          ? `${job.role} deadline exceeded (${timeoutMs}ms); owned job cancelled`
+          : "Agent deadline exceeded; cancellation was not confirmed. Intervention required",
+      },
+    };
+  } catch (cause) {
+    const entry = (await store.getRun(job.runId))?.jobs[job.jobId];
+    if (entry && entry.status !== "terminal") {
+      const cancelled = await adapter.cancelJob(entry.envelope);
+      if (!cancelled.ok)
+        return {
+          ...entry.envelope,
+          outcome: "cancelled",
+          evidence: [],
+          error: {
+            code: "cancelled",
+            message:
+              "Dispatch failed and owned agent cancellation was not confirmed",
+            cause: String(cause),
+          },
+        };
+    }
+    throw cause;
+  } finally {
+    dispose();
+  }
+}
+
+/** Retain failed work; verify its ownership and describe current saved facts. */
+export async function reconcileAttempt(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  previous: IssueAttempt,
+) {
+  const run = await store.getRun(previous.job.runId);
+  if (!run) throw new Error("Missing retry run");
+  for (const entry of Object.values(run.jobs).filter(
+    (entry) =>
+      entry.envelope.issueId === previous.issueId &&
+      entry.envelope.attempt === previous.attempt &&
+      entry.status !== "terminal",
+  )) {
+    const cancelled = await adapter.cancelJob(entry.envelope);
+    if (!cancelled.ok)
+      throw new Error("Owned agent cancellation was not confirmed");
+  }
+  const work: {
+    workspace: string;
+    commit: string;
+    branch: string;
+    changes: string;
+  }[] = [];
+  for (const operation of Object.values(run.operations).filter(
+    (op) =>
+      op.job.issueId === previous.issueId &&
+      op.job.attempt === previous.attempt,
+  )) {
+    if (
+      operation.ownedProcess &&
+      !(await terminateOwnedProcess(operation.ownedProcess))
+    )
+      throw new Error("Owned command cleanup was not confirmed");
+    if (
+      !["issue.workspace", "candidate.workspace"].includes(operation.kind) ||
+      operation.status !== "completed"
+    )
+      continue;
+    if (
+      run.operations[`${operation.operationId}-cleanup`]?.status === "completed"
+    )
+      continue;
+    const found = await inspectWorktree(operation.job.workspace);
+    if (
+      found.repositoryId !== store.repositoryId ||
+      found.branch !== operation.ref
+    )
+      throw new Error("Retained retry workspace identity changed");
+    work.push({
+      workspace: found.workspace,
+      commit: found.commit,
+      branch: found.branch,
+      changes: await gitOutput(found.workspace, [
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+      ]),
+    });
+  }
+  return work;
+}
+
+exec
+/bin/zsh -lc 'bun run typecheck; bun test tests/integration/07-retries.test.ts; bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 26698ms:
+$ tsc --noEmit
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/07-retries.test.ts:
+(pass) two failed candidates repair with real logs and integrate attempt three [4715.80ms]
+(pass) three executor setup failures exhaust once, concurrent and repeated calls cannot dispatch a fourth [551.07ms]
+(pass) submission setup failures before dispatch consume the same three attempt budget [151.81ms]
+(pass) stuck executor is cancelled before repair and late output cannot advance active attempt [1249.91ms]
+(pass) denied executor permission waits without fabricating a repair [266.37ms]
+(pass) denied validation permission waits and never becomes a timeout skip or repair [540.51ms]
+(pass) all hung checks are omitted with incomplete status, immutable config and fresh-run retry [1889.02ms]
+(pass) a dispatch exception cancels a still-owned session and reconciles saved workspace before retry [1206.14ms]
+(pass) three stuck executor jobs exhaust the shared budget without a fourth [882.54ms]
+(pass) three stuck merger jobs exhaust the shared budget without a fourth [2335.71ms]
+(pass) timed-out check is skipped on repair while ordinary failed checks return logs and run again [2118.50ms]
+(pass) setup timeouts consume attempts and are never validation skips [991.69ms]
+(pass) stop kills an active check without labelling it a timeout or scheduling repairs [761.63ms]
+(pass) spawn_error remains a typed failure and never disables an approved check [3280.15ms]
+(pass) setup_failed remains a typed failure and never disables an approved check [2499.41ms]
+(pass) issue agents default to a visible thirty-minute deadline [872.92ms]
+(pass) duplicate agent failure results do not charge additional attempts [664.80ms]
+
+ 17 pass
+ 0 fail
+ 150 expect() calls
+Ran 17 tests across 1 file. [25.06s]
+$ biome check src tests scripts
+Checked 98 files in 100ms. No fixes applied.
+
+codex
+This task is already implemented. No changes were needed.
+
+Verified with Bun 1.4.3:
+
+- Type checking passed.
+- All 17 retry regression tests passed.
+- Repository-wide lint passed; the previously documented formatting blocker is no longer present.
+tokens used
+23,135
+This task is already implemented. No changes were needed.
+
+Verified with Bun 1.4.3:
+
+- Type checking passed.
+- All 17 retry regression tests passed.
+- Repository-wide lint passed; the previously documented formatting blocker is no longer present.

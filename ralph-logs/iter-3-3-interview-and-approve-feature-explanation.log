@@ -1,0 +1,1357 @@
+[codex] /Users/rwmmtzqy/Documents/opencode-ralph-plugin/.agents/issues/3-interview-and-approve-feature-explanation.md
+OpenAI Codex v0.159.3
+--------
+workdir: /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a13cd0-b7f7-7210-99bd-bc7307be0b3c
+--------
+user
+=== RALPH LOOP CONTEXT ===
+You are an agent running inside a Ralph Loop — an automated multi-iteration pipeline where
+a set of task files (.md) is executed sequentially, in order, across one or more iterations.
+
+How the loop works:
+  - Each .md file represents one bounded task. Files are processed one at a time, in order.
+  - By the time you receive a task, all earlier files in this iteration have already run
+    and their changes are live in the codebase. This is expected — not a conflict or error.
+  - Files that come after yours in this iteration have not yet run. Do not solve their
+    problems, but do not break them either.
+  - The loop may run for multiple iterations. A prior iteration may have made partial or
+    complete progress on this same task. Check before redoing work.
+
+Your approach:
+  - Focus exclusively on the task described in the TASK section below.
+  - If the task is already done, confirm it briefly and stop — do not redo work.
+  - Leave the codebase in a clean, working state after your changes.
+  - Do not modify files unrelated to your task.
+=== END RALPH LOOP CONTEXT ===
+
+=== CURRENT TASK METADATA ===
+Iteration : 3 of 3
+File      : 3 of 15 — 3-interview-and-approve-feature-explanation.md
+=== END METADATA ===
+
+TASK:
+# 3. Interview the user and approve the feature explanation
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-2  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Implement /ralph-orchestrator through the explanation-approval checkpoint. Require verified project setup, run the interview in OpenCode, persist questions and answers, and present a simplified technical explanation of the agreed feature. Bundle the interview instructions and support explicit project overrides and per-role model selection. Approval completes this slice without starting implementation.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 167–171): interview, repository exploration, recommendations, and explanation approval.
+- `PRD.md` (lines 297–299): bundled instructions, overrides, and model defaults.
+- `PRD.md` (lines 107–115): phase progression.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 2: Discover, approve, and verify project commands](2-discover-approve-and-verify-project-commands.md): predecessor contracts and the code delivered by that slice.
+- `src/commands/orchestrator.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/planning/interview.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/config/project.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/agents/skills.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `skills/grill-me/SKILL.md`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Route human input through OpenCodeAdapter.requestUserInput and bind approvals to artifact revisions. A model-generated 'approved' statement is not a user response. Use short sentences and active voice for explanations without calculating or claiming formal ASD-STE100 compliance.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Load reproducible role instructions and configuration
+
+**Files:** `src/config/project.ts`, `src/agents/skills.ts`, `skills/grill-me/SKILL.md`
+
+- **IMPLEMENT:** Define project settings for role model overrides, concurrency and timeout defaults, and explicit skill paths. Bundle interview guidance that explores code before asking discoverable questions and recommends an answer for each preference question. Capture chosen model and skill hashes with the run; resolve skill paths predictably relative to the project.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Export loadProjectConfig from project.ts and loadRoleInstructions from skills.ts; import ApprovedCommandConfig and OpenCodeAdapter from predecessor modules.
+- **GOTCHA:** Use redistributable or original equivalent instructions; do not ship personal absolute skill paths or missing referenced resources.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/03-interview.test.ts`; add the tests below as this slice develops.
+
+### 2. Run the interview and revision-bound explanation gate
+
+**Files:** `src/commands/orchestrator.ts`, `src/planning/interview.ts`, `src/core/orchestrator.ts`, `src/commands/router.ts`
+
+- **IMPLEMENT:** Reject start if setup verification is missing/stale for the chosen config or platform. Create the planning run and repository lock, collect feature input, dispatch the interview role, and persist transcript/artifacts. Present the simplified explanation and approve or revise it. Define explicit interview and explanation_approval transitions; register /ralph-orchestrator.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import loadRoleInstructions, loadProjectConfig, RunStore and OpenCodeAdapter; export startInterview and handleInterviewResponse from interview.ts.
+- **GOTCHA:** Acquire one active-run lock using the common repository identity, including planning phases. No PRD job may launch from text claiming approval.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/03-interview.test.ts`; add the tests below as this slice develops.
+
+### 3. Test conversational state rather than prose wording
+
+**Files:** `tests/integration/03-interview.test.ts`
+
+- **IMPLEMENT:** Verify missing setup is rejected, two starts cannot acquire the same repository, an actual user approval advances the recorded revision, rejection returns to revision, and late responses do not approve a changed explanation. Verify project skill and model overrides without depending on exact generated wording.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import test helpers from issue 1 and the public command handler.
+- **GOTCHA:** Only issue 4 starts PRD generation; this slice ends at an approved explanation.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/03-interview.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [x] /ralph-orchestrator cannot start before setup verification.
+- [x] Questions and approval appear in the main OpenCode session and are persisted.
+- [x] Explanation artifacts contain agreed scope and criteria and do not claim measured STE compliance.
+- [x] Changed explanation content invalidates its prior approval.
+- [x] Explicit skill/model overrides are captured per run and missing overrides produce actionable errors.
+- [x] This slice's behavioral regression tests pass: `bun test tests/integration/03-interview.test.ts`.
+- [x] Type checking and lint pass; no unsupported platform is silently excluded.
+- [x] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/03-interview.test.ts
+
+```
+
+**Demonstration:** Start a feature, answer one recommended question, reject and revise the explanation, then approve the new revision; inspect /ralph-status.
+
+## Blocked by
+
+- [2-discover-approve-and-verify-project-commands.md](2-discover-approve-and-verify-project-commands.md) — discover, approve, and verify project commands supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+
+### Iteration 1 implementation evidence — 2026-10-15
+
+Implemented the public `/ralph-orchestrator` route and plugin registration, verified-setup
+and canonical repository-lock guards, main-session human input, read-only interview jobs,
+persisted transcript/recommended questions, scope/criteria explanation artifacts, and
+revision/hash-bound human approval. Approval ends at `planning.phase=explanation_approved`;
+no PRD or executor job starts. Changed content automatically invalidates old approval.
+Original bundled interview guidance and `.ralph/project.json` support reproducible skill
+hashes, relative project replacements, per-role model selection, concurrency defaults and
+agent timeouts. The adapter reads the pinned SDK's main-session model; missing selection
+or instructions produce actionable errors before acquiring a run lock.
+
+TDD red/green evidence: the initial setup-guard test failed with `Unknown Ralph command`;
+it passed after routing the guard. The conversational demonstration then failed on the
+placeholder response and passed after implementing the workflow. Separate regressions
+failed when carried-forward approval survived a content change, when the configured agent
+timeout was ignored, and when measured STE compliance prose became an artifact. Each
+passed after its corresponding implementation. Documentation updates have no behavioral
+test requirement. Subsequent guard tests exercise the same public boundary without prose
+wording assertions.
+
+Final local checks on macOS arm64, Bun 1.4.3:
+- `bun run typecheck`: passed.
+- `bun test tests/integration/03-interview.test.ts`: 9 passed, 0 failed, 46 assertions.
+- `bunx biome check` on all 13 changed/new TypeScript files: passed without warnings.
+- `bun run lint`: failed only on existing formatting in untouched
+  `tests/browser/dashboard.test.ts:38`. This task forbids unrelated edits.
+- Broader `bun test --timeout 30000 tests/integration`: 98 passed, 1 gated browser probe
+  skipped, 0 failed, at the seven-test interview stage. The final two added regressions
+  and subsequent interview guard refinements were validated by the final nine-test suite
+  and typecheck; the broad suite was not rerun.
+
+Demonstration through public dispatch and the fake SDK adapter: verified command setup;
+start a reset feature; answer the recommended token-expiry question; reject revision 1;
+approve revision 2 with a correlated human message; inspect `/ralph-status` and journaled
+transcript/approval. The final explanation is approved without PRD generation. Additional
+fixtures verify linked-worktree contention, stale approvals, changed command/platform
+verification, explicit model/skill selection, fabricated assistant approval and late output
+after timeout.
+
+**Production blocker remains:** issue 2's pinned adapter returns unsupported for verified
+human-input provenance. This slice preserves that boundary and records the pending request
+and typed error; it does not replace human responses with model or synthetic messages.
+No live human interview/approval smoke or native Linux/Windows check was run. Planning locks
+are retained at this checkpoint and on interruption; downstream lifecycle/recovery must
+reconcile them and drive continuation. Full repository lint is also still blocked as above.
+
+Wiki created: `docs/wiki/features/feature-interview.md`; index, relevant open questions,
+and README updated. No publication, external message, commit or branch merge performed.
+
+### Iteration 2 verification — 2026-10-15
+
+Existing implementation confirmed; no source changes needed. On macOS with pinned
+Bun 1.4.3, `bun run typecheck` and full `bun run lint` both pass. The previous lint
+blocker is resolved in the current repository. `bun test
+tests/integration/03-interview.test.ts` passes all 9 tests with 47 assertions.
+The public demonstration covers a recommended question, rejection, revision and
+correlated human approval. Later slices now continue into PRD generation after
+approval; their handoff is preserved. The interview checkpoint itself still binds
+approval to the explanation revision. This update records verification only, so
+no new behavioral test or red/green cycle is required. No live OpenCode interview
+or native Linux/Windows check was run during this iteration; passing fixtures do
+not establish live human-input provenance support.
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+I’ll check the existing interview workflow and run this slice’s acceptance checks. If it is complete, I’ll leave the code unchanged.
+exec
+/bin/zsh -lc "pwd; rg --files -g AGENTS.md -g '*03-interview*' -g '*3-interview*' -g 'README.md' -g 'PRD.md' -g 'package.json' -g '.bun-version' -g 'src/planning/interview.ts' -g 'src/commands/orchestrator.ts' -g 'src/config/project.ts' -g 'src/agents/skills.ts' -g 'skills/grill-me/SKILL.md'; git status --short" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+/Users/rwmmtzqy/Documents/opencode-ralph-plugin
+src/commands/orchestrator.ts
+src/agents/skills.ts
+src/planning/interview.ts
+src/config/project.ts
+.bun-version
+skills/grill-me/SKILL.md
+ralph-logs/iter-1-3-interview-and-approve-feature-explanation.log
+ralph-logs/iter-2-3-interview-and-approve-feature-explanation.log
+package.json
+README.md
+tests/integration/03-interview.test.ts
+PRD.md
+?? .agents/
+?? .bun-version
+?? .github/
+?? .gitignore
+?? PRD.md
+?? README.md
+?? biome.json
+?? bun.lock
+?? docs/
+?? package.json
+?? playwright.config.ts
+?? ralph-logs/
+?? ralph-loop.sh
+?? scripts/
+?? server.js
+?? skills/
+?? src/
+?? tests/
+?? tsconfig.build.json
+?? tsconfig.json
+?? tui.js
+?? vite.config.ts
+
+exec
+/bin/zsh -lc "rg --files docs .agents | head -60; cat package.json .bun-version; sed -n '88,115p' PRD.md; sed -n '167,171p' PRD.md; sed -n '297,299p' PRD.md; cat src/commands/orchestrator.ts src/config/project.ts src/agents/skills.ts skills/grill-me/SKILL.md" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+docs/package-validation.md
+docs/package-evidence-macos.json
+docs/functional-review-validation.md
+docs/recovery-validation.md
+docs/opencode-compatibility.md
+docs/wiki/open-questions.md
+docs/wiki/index.md
+.agents/issues/2-discover-approve-and-verify-project-commands.md
+.agents/issues/6-execute-and-integrate-one-issue-with-tdd.md
+.agents/issues/11-review-completed-feature-code.md
+.agents/issues/3-interview-and-approve-feature-explanation.md
+.agents/issues/1-install-plugin-and-run-opencode-session.md
+.agents/issues/7-retry-failed-work-and-skip-hung-checks.md
+.agents/issues/4-generate-prd-and-approve-issue-graph.md
+.agents/issues/12-verify-acceptance-with-browser-and-http.md
+.agents/issues/9-resolve-executor-questions-in-opencode.md
+.agents/issues/13-repair-findings-within-three-review-rounds.md
+.agents/issues/8-execute-dependency-ready-issues-concurrently.md
+.agents/issues/10-observe-execution-in-read-only-dashboard.md
+.agents/issues/5-prepare-feature-branch-and-validate-baseline.md
+.agents/issues/15-verify-packaged-workflow-across-platforms.md
+.agents/issues/14-pause-stop-and-recover-interrupted-workflows.md
+docs/troubleshooting.md
+docs/review-loop-validation.md
+docs/wiki/features/bounded-review-repairs.md
+docs/wiki/features/project-commands.md
+docs/wiki/features/feature-planning.md
+docs/wiki/features/concurrent-execution.md
+docs/wiki/features/feature-interview.md
+docs/wiki/features/workflow-recovery.md
+docs/wiki/features/package-distribution.md
+docs/wiki/features/functional-review.md
+docs/wiki/features/execution-baseline.md
+docs/wiki/features/independent-code-review.md
+docs/wiki/features/executor-questions.md
+docs/wiki/features/single-issue-integration.md
+docs/wiki/features/read-only-dashboard.md
+docs/wiki/features/ralph-task-loop.md
+docs/wiki/features/plugin-session-results.md
+{
+  "name": "opencode-ralph-plugin",
+  "version": "0.2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./adapter": {
+      "types": "./dist/opencode/adapter.d.ts",
+      "import": "./dist/opencode/adapter.js"
+    },
+    "./store": {
+      "types": "./dist/state/run-store.d.ts",
+      "import": "./dist/state/run-store.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/router.d.ts",
+      "import": "./dist/commands/router.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js"
+    },
+    "./review": {
+      "types": "./dist/review/code-review.d.ts",
+      "import": "./dist/review/code-review.js"
+    },
+    "./review/snapshot": {
+      "types": "./dist/review/snapshot.d.ts",
+      "import": "./dist/review/snapshot.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "import": "./dist/review/types.js"
+    },
+    "./review/functional": {
+      "types": "./dist/review/functional-review.d.ts",
+      "import": "./dist/review/functional-review.js"
+    },
+    "./review/functional-results": {
+      "types": "./dist/review/functional-results.d.ts",
+      "import": "./dist/review/functional-results.js"
+    },
+    "./review/coordinator": {
+      "types": "./dist/review/coordinator.d.ts",
+      "import": "./dist/review/coordinator.js"
+    },
+    "./review/repairs": {
+      "types": "./dist/review/repairs.d.ts",
+      "import": "./dist/review/repairs.js"
+    },
+    "./reporting/completion": {
+      "types": "./dist/reporting/completion.d.ts",
+      "import": "./dist/reporting/completion.js"
+    },
+    "./process": {
+      "types": "./dist/process/ownership.d.ts",
+      "import": "./dist/process/ownership.js"
+    },
+    "./server": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./server.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/opencode-compatibility.md",
+    "docs/troubleshooting.md",
+    "docs/package-validation.md",
+    "skills",
+    "server.js",
+    "tui.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "build": "bun run scripts/clean-build.ts && tsc -p tsconfig.build.json && vite build && bun run scripts/copy-dashboard.ts",
+    "test": "bun test --timeout 30000 tests/integration",
+    "test:browser": "bun run scripts/browser-tests.ts",
+    "test:smoke": "bun test tests/smoke",
+    "build:dashboard": "vite build",
+    "pack:local": "bun run build && bun pm pack",
+    "test:package": "bun run scripts/package-smoke.ts",
+    "test:e2e": "bun test tests/e2e"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.29",
+    "@opencode/plugin": "2.0.29",
+    "@opencode/schema": "2.0.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opencode/cli": "2.0.29",
+    "@playwright/test": "1.56.1",
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "trustedDependencies": [
+    "@opencode/cli"
+  ]
+}
+1.4.3
+## 5. User Stories
+
+1. **As a developer, I want project checks discovered once, so that every issue uses consistent validation.** For example, Ralph proposes dependency installation, type checking, tests, and local app startup before saving an approved JSON file.
+2. **As a feature owner, I want an interview before implementation, so that ambiguous requirements become explicit.** For example, a password-reset feature specifies token expiry and user-visible error behavior before PRD approval.
+3. **As a developer, I want to approve the PRD and issue graph together, so that I can verify scope and execution order before code changes begin.**
+4. **As a developer, I want independent issues to execute concurrently, so that parallel work reduces completion time.** If C depends on A and B, A and B can run together, but C waits until both are integrated and checked.
+5. **As a maintainer, I want TDD and isolated merge validation, so that each accepted issue has meaningful behavior tests and does not break the integrated feature.**
+6. **As a developer, I want bounded autonomous retries, so that routine failures do not require immediate supervision.** A stuck executor retries within three total attempts; a hung validation command is skipped for that feature run and disclosed.
+7. **As a feature owner, I want independent code and functional review, so that a passing test command is not the only evidence of correctness.** The functional reviewer records results against PRD acceptance criteria.
+8. **As a developer, I want a dashboard and recoverable state, so that I can understand progress and resume after interruption.** Reopening OpenCode shows reconciled run status and waits for my resume instruction.
+
+## 6. Core Architecture & Patterns
+
+### 6.1 OpenCode integration
+
+The product runs as an OpenCode plugin. Slash commands enter the workflow. Agent jobs use separate OpenCode sessions where specified. Model selection defaults to the model used when the run starts; role overrides are captured with the run. Existing OpenCode permissions remain in force.
+
+The plugin owns the orchestration runtime and dashboard server. It does not launch an independent long-lived orchestration service. On graceful OpenCode shutdown it stops scheduling and terminates owned processes. After an unexpected exit, recovery checks reconcile any surviving processes and worktrees before continuation.
+
+### 6.2 Deterministic orchestration
+
+Use an explicit persistent state machine, not a long prompt that asks an agent to remember and enforce the whole flow. Agent messages and completion events are inputs to the state machine; they are not sufficient evidence that a merge or check passed.
+
+Major feature states:
+
+`interview → explanation approval → PRD → issue planning → execution approval → preflight/baseline → execution → final review → terminal result`
+
+Waiting, paused, interrupted, and blocked conditions are persisted separately from successful phase completion. Terminal results distinguish verified completion, completion with missing validation, incomplete functional review, unresolved review findings, and stopped execution.
+### 7.2 Feature interview and explanation
+
+`/ralph-orchestrator` starts an interview about the user's feature. The interviewer explores the codebase for discoverable facts, asks about unresolved product decisions, and recommends an answer for each question. It resolves requirements, scope, acceptance criteria, and relevant constraints before proposing implementation work.
+
+At the end, explain the agreed feature with short sentences, active voice, consistent terms, and necessary technical vocabulary. “80% ASD-STE100” means practical simplified technical English, not measured compliance. The user approves this explanation before PRD creation.
+Configuration covers command lifecycle, platform variants, working directories, timeouts, resource allocation, concurrency, role models, and skill overrides. Bundle grill-me, create-prd, to-issues, and TDD instructions and their necessary referenced resources, subject to redistribution rights. Allow explicit project replacements and record selected versions or content hashes with each run.
+
+One role may use the same model as another while still operating in an independent session. Cross-platform command definitions must preserve executable arguments and avoid accidental shell interpolation. When a shell is needed, its platform-specific choice is part of the approved configuration.
+import { continuePlanning } from "../core/orchestrator.js";
+import {
+  type InterviewOptions,
+  startInterview,
+} from "../planning/interview.js";
+export async function orchestrateFeature(options: InterviewOptions) {
+  const run = await startInterview(options);
+  if (!run) return run;
+  return continuePlanning(options.store, options.adapter, run.runId);
+}
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { z } from "zod";
+import { type ApprovedCommandConfig, parseCommandConfig } from "./commands.js";
+
+const model = z
+  .object({ providerID: z.string().min(1), modelID: z.string().min(1) })
+  .strict();
+const schema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+    models: z.record(z.string(), model).default({}),
+    skillPaths: z.record(z.string(), z.string().min(1)).default({}),
+    concurrency: z.number().int().positive().default(2),
+    agentTimeoutMs: z.number().int().positive().default(1800000),
+    timeoutMs: z.number().int().positive().default(300000),
+  })
+  .strict();
+export type ProjectConfig = z.infer<typeof schema> & {
+  commands: ApprovedCommandConfig;
+};
+export async function loadProjectConfig(
+  workspace: string,
+): Promise<ProjectConfig> {
+  let raw = "{}";
+  try {
+    raw = await readFile(join(workspace, ".ralph/project.json"), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  try {
+    return {
+      ...schema.parse(JSON.parse(raw)),
+      commands: parseCommandConfig(
+        JSON.parse(
+          await readFile(join(workspace, ".ralph/commands.json"), "utf8"),
+        ),
+      ),
+    };
+  } catch (cause) {
+    throw new Error(
+      "Invalid Ralph project configuration. Check .ralph/project.json and commands.json",
+      { cause },
+    );
+  }
+}
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+export async function loadRoleInstructions(
+  workspace: string,
+  role: "interview" | "prd" | "issues" | "executor" | "merger",
+  overrides: Record<string, string> = {},
+) {
+  const bundled = new URL(
+    `../../skills/${{ interview: "grill-me", prd: "create-prd", issues: "to-issues", executor: "tdd", merger: "merge" }[role]}/SKILL.md`,
+    import.meta.url,
+  );
+  const path = overrides[role] ? resolve(workspace, overrides[role]) : bundled;
+  let text: string;
+  try {
+    text = await readFile(path, "utf8");
+    if (!text.trim()) throw new Error("Empty instructions");
+    if (role !== "interview" && overrides[role])
+      text = `${await readFile(bundled, "utf8")}\nProject instructions:\n${text}`;
+  } catch (cause) {
+    throw new Error(
+      `Cannot load ${role} instructions at ${path}. Fix .ralph/project.json skillPaths.${role}.`,
+      { cause },
+    );
+  }
+  return {
+    path: String(path),
+    hash: createHash("sha256").update(text).digest("hex"),
+    text,
+  };
+}
+# Feature interview
+These original instructions are bundled with Ralph.
+Explore the repository with read-only tools before asking questions. Read existing code,
+project documentation, and tests. Infer discoverable facts from that evidence.
+Ask one unresolved product preference at a time. Recommend a concrete answer and explain
+its tradeoff briefly. Resolve scope, acceptance criteria, constraints, and failure behavior.
+Use the persisted feature input and transcript. A model statement cannot approve a feature.
+When decisions are resolved, explain the agreed feature in short sentences. Use active voice,
+consistent terms, and only necessary technical words. Include agreed scope and observable
+acceptance criteria. Do not claim a measured score or formal ASD-STE100 compliance.
+Return only JSON in one of these forms:
+{"kind":"question","question":"...","recommendation":"..."}
+{"kind":"explanation","text":"...","scope":["..."],"criteria":["..."]}
+Do not write code, generate a PRD, or start implementation.
+
+exec
+/bin/zsh -lc "cat .agents/issues/README.md .agents/issues/2-discover-approve-and-verify-project-commands.md docs/wiki/features/feature-interview.md; sed -n '1,250p' tests/integration/03-interview.test.ts; sed -n '1,250p' src/planning/interview.ts" in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 0ms:
+cat: .agents/issues/README.md: No such file or directory
+# 2. Discover, approve, and verify project commands
+
+**Type:** AFK  
+**Status:** Ready to implement once dependencies are complete  
+**User stories:** US-1  
+**Source:** [PRD.md](../../PRD.md)  
+**Implementation order:** Approved by the user on 2026-10-14
+
+## What to build
+
+Implement /ralph-commands from codebase exploration to a user-approved, saved, verified .ralph/commands.json. Execute setup, checks, app startup/readiness, and cleanup through a platform-aware runner. Expose clear setup status in OpenCode and block project readiness when verification fails. Preserve previous verified configuration until a replacement is explicitly approved.
+
+## Context: files to read before implementing
+
+- `PRD.md` (lines 88–97): numbered user stories used in this ticket.
+- `PRD.md` (lines 156–165): one-time command discovery, approval, save, verification, and immutable run revisions.
+- `PRD.md` (lines 285–299): permissions, secret references, models and platform-aware commands.
+- [Implementation conventions and graph](README.md): proposed common interfaces, test commands, and greenfield constraints.
+- [Issue 1: Install the plugin and run an OpenCode session](1-install-plugin-and-run-opencode-session.md): predecessor contracts and the code delivered by that slice.
+- `src/commands/project-setup.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/config/commands.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/process/runner.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+- `src/process/environment.ts`: proposed implementation target for this slice; inspect its current contents if a predecessor has already introduced it.
+
+**Repository evidence:** At issue authoring, the repository contains only `PRD.md` plus this backlog and Git metadata, with no commits, package manifest, source code, tests, CLAUDE.md, AGENTS.md, CONTEXT.md, or ADRs. There are no existing implementation snippets or source line numbers to cite. Source paths and symbol names below are proposed contracts, not claims about existing code. Read the predecessor implementation before editing; preserve its verified SDK mapping. Do not invent existing patterns.
+
+## Patterns to follow
+
+Use the adapter and durable store established by issue 1. Model command results as completed, timed_out, cancelled, or permission_denied rather than conflating every failure with an exit code. Store environment variable names, never secret values, in tracked JSON.
+
+**Naming and module boundaries:** TypeScript with named exports; keep SDK calls in `src/opencode/adapter.ts`, Git mutations in `src/git/`, approved commands in `src/process/`, and deterministic state transitions separate from agent prose.
+
+**Error and state handling:** Preserve typed causes, run/job/attempt/revision identity, and evidence. Never treat missing output as success. Capture operation intent before external effects and ignore stale completions.
+
+**Test pattern:** Write one failing behavioral test, implement it, then refactor with green tests. Use `bun:test`, temporary real Git repositories, and the controllable adapter from issue 1; exercise public workflow entrypoints. New behavior uses TDD; document genuine non-behavior exceptions. Do not write tests that merely restate internal implementation.
+
+
+## Step-by-step tasks
+
+### 1. Define and propose project lifecycle commands
+
+**Files:** `src/config/commands.ts`, `src/commands/project-setup.ts`, `skills/command-discovery/SKILL.md`
+
+- **IMPLEMENT:** Define CommandSpec with stable id, phase (setup/check/start/readiness/cleanup), executable, args, cwd, timeoutMs, platform applicability, and environment references; allow an explicitly selected shell when necessary. Validate IDs, platform applicability, paths and lifecycle ordering. Dispatch a repository-exploration job that returns a proposed complete configuration and rationale, not a write approval.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import OpenCodeAdapter from src/opencode/adapter.ts and RunStore from src/state/run-store.ts. Export parseCommandConfig, CommandSpec, and ApprovedCommandConfig from src/config/commands.ts.
+- **GOTCHA:** Handle absent scripts honestly and explain unsupported platform variants. Configuration changes are a user-run setup operation, not automatic feature-agent behavior.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/02-project-commands.test.ts`; add the tests below as this slice develops.
+
+### 2. Approve, save, and verify the exact configuration
+
+**Files:** `src/process/runner.ts`, `src/process/environment.ts`, `src/commands/project-setup.ts`, `src/commands/router.ts`
+
+- **IMPLEMENT:** Present the full revision to the main session, obtain a correlated user approval, atomically save it, and run the selected lifecycle. Implement runCommand and prepareEnvironment/disposeEnvironment with owned-process tracking, timeouts, readiness and cleanup. Store verification against the configuration content hash and host platform. Surface check logs and cleanup errors in status.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import spawn from node:child_process and path helpers from node:path; export runCommand and CommandResult from runner.ts, EnvironmentLease and prepareEnvironment/disposeEnvironment from environment.ts.
+- **GOTCHA:** Do not auto-approve initial setup by skipping a timed-out check. Always attempt applicable cleanup after setup/check errors. Use argument arrays on Windows; do not rely on /bin/sh, kill -9, or Unix-only utility syntax.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/02-project-commands.test.ts`; add the tests below as this slice develops.
+
+### 3. Exercise setup approval and execution with fixtures
+
+**Files:** `tests/integration/02-project-commands.test.ts`, `tests/fixtures/process-child.ts`
+
+- **IMPLEMENT:** Test proposal rejection, modified/stale approval, successful verification, failed check, missing executable, hung setup, hung check, readiness timeout and child-tree cleanup. Use portable fixture commands to record argv/cwd and verify environment handling. Verify denied execution cannot be bypassed by the runner.
+- **PATTERN:** Follow the contracts in the predecessor tickets and the PRD references above; reuse issue 1's adapter/store and public test fixtures.
+- **IMPORTS:** Import createTestProject and createFakeOpenCode from issue 1 helpers; import public setup handler and runCommand rather than mocking their private internals.
+- **GOTCHA:** No real application credentials are needed. Concurrent resource allocation is extended in issue 8; make environment leases explicit now.
+- **VALIDATE:** `bun run typecheck` and `bun test tests/integration/02-project-commands.test.ts`; add the tests below as this slice develops.
+
+## Acceptance criteria
+
+- [ ] Approval is required before executable JSON is saved; approved content and hash match what is verified.
+- [ ] Verification failure leaves project setup not-ready and reports the failing phase.
+- [ ] Startup/readiness/cleanup work for configured local services; command arguments containing spaces survive unchanged.
+- [ ] Commands and logs do not persist supplied secret values.
+- [ ] The runner enforces timeouts and records owned child processes on all supported platforms.
+- [ ] This slice's behavioral regression tests pass: `bun test tests/integration/02-project-commands.test.ts`.
+- [ ] Type checking and lint pass; no unsupported platform is silently excluded.
+- [ ] The demonstrable flow below works through the public command/adapter boundary.
+
+## Validation commands
+
+These are implementation acceptance commands, **not checks already available or run at issue-authoring time**. Issue 1 establishes the package scripts; each ticket creates its named test file. Use the pinned Bun version from issue 1.
+
+```bash
+bun run typecheck
+bun run lint
+bun test tests/integration/02-project-commands.test.ts
+
+```
+
+**Demonstration:** Run /ralph-commands in a fixture with a check and HTTP readiness endpoint, approve it, and inspect verified status and saved JSON. Repeat with a failing command to demonstrate the readiness gate.
+
+## Blocked by
+
+- [1-install-plugin-and-run-opencode-session.md](1-install-plugin-and-run-opencode-session.md) — install the plugin and run an opencode session supplies the prerequisite behavior/contracts.
+
+## Completion evidence
+
+Record changed public behaviors, red/green test evidence or justified exception, command results, demonstrated scenario, and remaining platform/live-smoke limitations. Do not report unrun live checks as passed. This ticket requests implementation only; it does not authorize package publication, external messages, or automatic target-branch merging.
+
+
+## Completion evidence — 2026-10-15
+
+Implemented the public `/ralph-commands` router/plugin boundary, bundled read-only
+command discovery, strict lifecycle schema/platform coverage, exact revision/hash
+approval correlation, atomic command save, immutable approved revision archives,
+verification status/readiness assertion, per-command host permissions, environment
+references/redaction, bounded logs, owned process wrappers, timeouts/readiness and
+cleanup of partial startup. Save intent with approval request/session/message identity
+and verification results use the predecessor RunStore. Replacement rejection or stale
+approval preserves the previously verified file. Setup is serialized across linked
+worktrees; cwd symlink escapes are rejected at execution.
+
+TDD red/green evidence: first rejection test failed because `setupProject` did not exist;
+it passed after adding proposal/approval handling. Approved verification initially
+returned `not-ready` and became green after lifecycle execution. The HTTP/argv/secret
+fixture exposed Bun's missing IPC-channel `unref` method and canonical macOS temp-path
+behavior; corrected implementation/test expectations made it green. An overlapping
+setup test demonstrated a second configuration executing during pending approval;
+the repository lock made it green. The immutable archive assertion failed with ENOENT
+before archive storage and passed afterward. Additional failure/denial/schema/cleanup
+regressions exercise already implemented behavior through public interfaces.
+
+Validation on macOS arm64/Bun 1.4.3: `bun run typecheck` passed. The slice's
+`bun test tests/integration/02-project-commands.test.ts` has 15 passing tests.
+`bun test --timeout 30000 tests/integration` passed 90 tests, skipped 1 gated browser
+probe, failed 0 (before the final archive assertion and registered-command test were
+added; the final slice suite was rerun afterward). Predecessor suite alone passed 19.
+Biome passes all 11 changed source/test files. Repository-wide `bun run lint` fails
+only on formatting in untouched `tests/browser/dashboard.test.ts:38`; it was not edited
+because this task prohibits unrelated changes.
+
+Demonstration: the public `dispatch("ralph-commands", ..., mainSession)` boundary
+uses fake SDK repository discovery and a correlated host human approval. The portable
+fixture executes setup/check with unchanged space-containing arguments and referenced
+environment values, starts an HTTP service plus descendant, verifies the HTTP endpoint,
+cleans the tree, and inspects verified status, saved JSON, and its immutable archive.
+A failing check returns not-ready with phase/exit/log evidence and still runs cleanup;
+cleanup failure also blocks `assertProjectReady`. No application credentials are used.
+
+**Remaining blocker; this ticket is not fully complete:** the predecessor's pinned v2
+adapter explicitly lacks verified human-input provenance. Production `requestUserInput`
+continues returning unsupported; neither assistant/API-created messages nor permission
+replies are substituted for human approval. A registered-command fixture proves this
+stops before writing commands. The host's real `ctx.permission.assert` is wired for
+execution authorization, but live approval/permission interaction was not smoke-tested.
+Native Linux/Windows execution remains unrun locally; platform coverage is explicit in
+config and the runner includes Windows argument-array/tree-cleanup paths. Interrupted
+setup locks remain retained and require reconciliation rather than automatic stealing.
+
+Wiki created: `docs/wiki/features/project-commands.md`; index/open questions and
+README/compatibility limitations updated. No publication, external message or branch
+merge was performed.
+
+## Revalidation — 2026-10-15
+
+The implementation above was already present on entry; no behavioral changes were
+made or claimed. Bun 1.4.3 rerun: the issue-2 suite passed all 15 tests (61 assertions),
+including HTTP readiness/child cleanup and the registered-command refusal to save
+without a verified approval channel. Scoped Biome checks passed for the 10 relevant
+source/test files. This is revalidation, not new red/green implementation evidence.
+
+The production approval blocker remains: `createOpenCodeAdapter.requestUserInput`
+returns `unsupported`. Inspected pinned SDK form types expose answered/cancelled
+state and a public reply operation, but no responder-origin evidence; their presence
+alone does not establish the predecessor's required human-input provenance contract.
+No live human approval or native Linux/Windows execution was run. The ticket remains
+incomplete rather than treating fixture approvals as production approval evidence.
+
+Current repository-wide validation differs from the earlier evidence: typecheck
+fails on missing issue-6 `src/execution/execute-issue.ts` and
+`src/execution/integrate-issue.ts` imports. Lint reports seven errors and four warnings
+outside this slice's scoped check: formatting in `src/agents/results.ts`,
+`src/core/types.ts`, `src/git/worktrees.ts`, `src/state/run-store.ts`,
+`tests/browser/dashboard.test.ts`, and `tests/integration/06-single-issue.test.ts`,
+plus import ordering in `src/agents/results.ts` and non-null assertion warnings in
+the issue-6 test. These unrelated files were not changed. No wiki update was needed
+because this rerun changed no durable project behavior or approval contract.
+
+## Iteration 2 revalidation — 2026-10-15
+
+Existing implementation retained; no behavioral changes or new TDD evidence.
+On macOS with pinned Bun 1.4.3, `bun run typecheck` and `bun run lint` both
+passed (Biome checked 98 files). `bun test tests/integration/02-project-commands.test.ts`
+passed all 15 tests and 61 assertions, including HTTP readiness, argument/environment
+handling, process-tree cleanup, failure readiness gates, replacement preservation,
+and the registered command's refusal to save without supported human approval.
+These results supersede the repository-wide failures in the preceding revalidation.
+
+The predecessor's production approval blocker remains unchanged:
+`createOpenCodeAdapter.requestUserInput` returns `unsupported`. The pinned SDK's
+`form.replied` data identifies the form/session and answer but supplies no verified
+human responder origin. No replacement approval mechanism was inferred from that
+event. Production setup therefore still stops before saving executable JSON, and
+this ticket remains incomplete pending the prerequisite human-input contract.
+No live approval or native Linux/Windows execution was run. Only this ticket's
+evidence was updated; no runtime, wiki, or unrelated files were changed.
+
+## Iteration 3 revalidation — 2026-10-15
+
+Existing implementation retained. Bun 1.4.3 on macOS: `bun run typecheck`
+and `bun run lint` passed (98 files checked); the issue-2 integration suite
+passed all 15 tests and 61 assertions. The public command fixtures exercised
+approved save/verification, HTTP readiness and child-tree cleanup, failure gates,
+replacement preservation and refusal to save without supported human approval.
+No behavior changed, so no new red/green evidence or wiki update is claimed.
+
+Reinspected the predecessor contract, production adapter and pinned SDK form
+event schema. `requestUserInput` still returns `unsupported`; `form.replied`
+data contains form ID, session ID and answer without verified human responder
+origin. Production approval remains blocked, so this ticket is still incomplete.
+No live approval or native Linux/Windows execution was run. Only this ticket's
+completion evidence was changed.
+# Feature interview and explanation approval
+
+## Summary
+`/ralph-orchestrator` starts durable planning only after the current command hash,
+revision and platform have verified setup. `startInterview` ends at explanation approval; the public command then continues through PRD/issue planning and combined approval.
+
+## Key behavior
+- The canonical Git-common-directory store owns `active-run.lock`, including linked
+  worktrees. Planning and its approved explanation retain the lock for downstream phases.
+- Main-session questions use `requestUserInput`; pending requests, recommendations,
+  answers, typed failures and explanation scope/criteria are journaled.
+- Correlation checks bind human message provenance, session, request and revision.
+  Assistant prose cannot approve. Content changes recompute the hash, advance the
+  artifact revision and invalidate carried-forward approvals and old pending requests.
+- Interview jobs use read-only observation sessions and the selected role model.
+- Optional `.ralph/project.json` sets role models, skill paths, concurrency (default 2)
+  and agent timeout (default 300000 ms). Relative overrides resolve from the workspace.
+  Captured instruction hashes must match when continuing; missing skills fail before locking.
+- Agent timeout freezes completions, records interruption and cancels the correlated session.
+  Human response waits have no timeout.
+
+## Code references
+- `src/commands/orchestrator.ts`, `src/commands/router.ts`, `src/plugin.ts` — public entrypoints.
+- `src/planning/interview.ts`, `src/planning/types.ts`, `src/planning/artifacts.ts` — conversational state and gate.
+- `src/state/run-store.ts` — compare-and-swap persistence and approval invalidation.
+- `src/config/project.ts`, `src/agents/skills.ts`, `skills/grill-me/SKILL.md` — configuration and original bundled guidance.
+- `src/opencode/adapter.ts` — reads the pinned v2 main-session model selection.
+- `tests/integration/03-interview.test.ts` — public workflow demonstration and regressions.
+
+## Related
+- [Project commands](project-commands.md)
+- [Workflow recovery](workflow-recovery.md)
+
+## Notes
+Production human-input provenance remains unsupported by the predecessor adapter.
+The fixture demonstrates approvals without substituting synthetic/model text in production.
+See [PRD and issue planning](feature-planning.md) for the automatic handoff. Planning lock reconciliation and live conversation
+continuation after recovery still need lifecycle integration; locks are conservatively retained.
+Native Linux/Windows and live model approval smoke checks were not run locally.
+
+## Last updated
+2026-10-15
+import { expect, test } from "bun:test";
+import { createCommandRouter } from "../../src/commands/router.js";
+import { createOpenCodeAdapter } from "../../src/opencode/adapter.js";
+import { openRunStore } from "../../src/state/run-store.js";
+import { createFakeOpenCode } from "../helpers/fake-opencode.js";
+import { createTestProject } from "../helpers/project.js";
+
+test("orchestrator rejects a feature before verified setup", async () => {
+  const project = await createTestProject();
+  try {
+    const fake = createFakeOpenCode();
+    const store = await openRunStore(project.directory);
+    const router = createCommandRouter(
+      store,
+      createOpenCodeAdapter(fake.client, store),
+    );
+    await expect(
+      router.dispatch("ralph-orchestrator", "Add reset", {
+        workspace: project.directory,
+        sessionId: "main",
+      }),
+    ).rejects.toThrow("verification");
+    expect(await store.listRuns()).toHaveLength(0);
+  } finally {
+    await project.cleanup();
+  }
+});
+
+test("recommended interview question, rejected revision and human approval hand off to PRD generation", async () => {
+  const project = await createTestProject();
+  try {
+    const fake = createFakeOpenCode();
+    const store = await openRunStore(project.directory);
+    const adapter = createOpenCodeAdapter(fake.client, store);
+    adapter.getSessionModel = async () => ({
+      providerID: "fixture",
+      modelID: "default",
+    });
+    const router = createCommandRouter(
+      store,
+      adapter,
+      undefined,
+      project.directory,
+    );
+    fake.respond(
+      JSON.stringify({
+        schemaVersion: 1,
+        revision: 1,
+        rationale: "Fixture",
+        commands: [
+          {
+            id: "check",
+            phase: "check",
+            executable: process.execPath,
+            args: ["-e", "process.exit(0)"],
+            cwd: ".",
+            timeoutMs: 2000,
+            platforms: ["darwin", "linux", "win32"],
+            env: {},
+          },
+        ],
+      }),
+    );
+    adapter.authorizeCommand = async () => ({ ok: true });
+    adapter.requestUserInput = async (request) => ({
+      ok: true,
+      ...request,
+      source: "user",
+      messageId: "setup-human",
+      text: `approve ${request.question.match(/hash ([a-f0-9]+)/)?.[1]}`,
+    });
+    await router.setupProject({
+      workspace: project.directory,
+      sessionId: "main",
+    });
+    fake.respond(
+      JSON.stringify({
+        kind: "question",
+        question: "How long should tokens last?",
+        recommendation: "15 minutes",
+      }),
+    );
+    let count = 0;
+    adapter.requestUserInput = async (request) => {
+      expect(request.sessionId).toBe("main");
+      count++;
+      if (count === 1) {
+        fake.respond(
+          JSON.stringify({
+            kind: "explanation",
+            text: "Expire reset tokens after 15 minutes.",
+            scope: ["Reset tokens"],
+            criteria: ["Expired tokens fail"],
+          }),
+        );
+        return {
+          ok: true,
+          ...request,
+          source: "user",
+          messageId: "answer",
+          text: "15 minutes",
+        };
+      }
+      if (count === 2) {
+        fake.respond(
+          JSON.stringify({
+            kind: "explanation",
+            text: "Expire reset tokens after 10 minutes.",
+            scope: ["Reset tokens"],
+            criteria: ["Tokens fail after 10 minutes"],
+          }),
+        );
+        return {
+          ok: true,
+          ...request,
+          source: "user",
+          messageId: "reject",
+          text: "revise: use 10 minutes",
+        };
+      }
+      return {
+        ok: true,
+        ...request,
+        source: "user",
+        messageId: "approve",
+        text: `approve ${request.revision}`,
+      };
+    };
+    const result = JSON.parse(
+      await router.dispatch("ralph-orchestrator", "Add password reset", {
+        workspace: project.directory,
+        sessionId: "main",
+      }),
+    );
+    const run = await store.getRun(result.runId);
+    expect(run?.planning?.phase).toBe("prd_generation");
+    expect(run?.planning?.error?.code).toBe("missing-output");
+    expect(run?.planning?.explanation?.revision).toBe(2);
+    expect(run?.planning?.approval?.revision).toBe(2);
+    expect(
+      run?.planning?.transcript.filter((entry) => entry.source === "user"),
+    ).toHaveLength(4);
+    expect(
+      Object.values(run?.jobs ?? {}).every((job) =>
+        ["interview", "prd"].includes(job.envelope.role),
+      ),
+    ).toBe(true);
+    expect(JSON.parse(await router.status(result.runId)).planning.phase).toBe(
+      "prd_generation",
+    );
+  } finally {
+    await project.cleanup();
+  }
+});
+
+async function readyProject() {
+  const project = await createTestProject();
+  const fake = createFakeOpenCode();
+  const store = await openRunStore(project.directory);
+  const adapter = createOpenCodeAdapter(fake.client, store);
+  adapter.getSessionModel = async () => ({
+    providerID: "fixture",
+    modelID: "default",
+  });
+  const router = createCommandRouter(
+    store,
+    adapter,
+    undefined,
+    project.directory,
+  );
+  fake.respond(
+    JSON.stringify({
+      schemaVersion: 1,
+      revision: 1,
+      rationale: "Fixture",
+      commands: [
+        {
+          id: "check",
+          phase: "check",
+          executable: process.execPath,
+          args: ["-e", "process.exit(0)"],
+          cwd: ".",
+          timeoutMs: 2000,
+          platforms: ["darwin", "linux", "win32"],
+          env: {},
+        },
+      ],
+    }),
+  );
+  adapter.authorizeCommand = async () => ({ ok: true });
+  adapter.requestUserInput = async (request) => ({
+    ok: true,
+    ...request,
+    source: "user",
+    messageId: "setup",
+    text: `approve ${request.question.match(/hash ([a-f0-9]+)/)?.[1]}`,
+  });
+  await router.setupProject({
+    workspace: project.directory,
+    sessionId: "main",
+  });
+  return {
+    project,
+    fake,
+    store,
+    adapter,
+    router,
+    context: { workspace: project.directory, sessionId: "main" },
+  };
+}
+
+test("planning holds the canonical repository lock and a stale approval cannot approve a revised explanation", async () => {
+  const { project, fake, store, adapter, router, context } =
+    await readyProject();
+  try {
+    fake.respond(
+      JSON.stringify({
+        kind: "explanation",
+        text: "Add reset.",
+        scope: ["Reset"],
+        criteria: ["Reset works"],
+      }),
+    );
+    let old: import("../../src/core/types.js").UserInputRequest | undefined;
+    let count = 0;
+    adapter.requestUserInput = async (request) => {
+      count++;
+      if (count === 1) {
+        old = request;
+        await expect(
+          router.dispatch("ralph-orchestrator", "Another feature", context),
+        ).rejects.toThrow("already owns");
+        fake.respond(
+          JSON.stringify({
+            kind: "explanation",
+            text: "Add expiring reset.",
+            scope: ["Expiring reset"],
+            criteria: ["Expiry works"],
+          }),
+        );
+        return {
+          ok: true,
+          ...request,
+          source: "user",
+          messageId: "reject",
+          text: "revise expiry",
+        };
+      }
+      if (!old) throw new Error("No previous request");
+      return {
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, realpath, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { z } from "zod";
+import { loadRoleInstructions } from "../agents/skills.js";
+import {
+  assertProjectReady,
+  projectStatus,
+} from "../commands/project-setup.js";
+import { commandConfigHash } from "../config/commands.js";
+import { loadProjectConfig } from "../config/project.js";
+import type { JobEnvelope, JobResult, UserInputResult } from "../core/types.js";
+import { verifyReviewRepository } from "../git/review-workspace.js";
+import type { OpenCodeAdapter } from "../opencode/adapter.js";
+import type { RunStore } from "../state/run-store.js";
+import { explanationHash } from "./artifacts.js";
+import type { PlanningState } from "./types.js";
+
+const output = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("question"),
+      question: z.string().min(1),
+      recommendation: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("explanation"),
+      text: z.string().min(1),
+      scope: z.array(z.string().min(1)).min(1),
+      criteria: z.array(z.string().min(1)).min(1),
+    })
+    .strict(),
+]);
+export interface InterviewOptions {
+  workspace: string;
+  sessionId: string;
+  feature?: string;
+  store: RunStore;
+  adapter: OpenCodeAdapter;
+}
+async function save(
+  store: RunStore,
+  runId: string,
+  revision: number,
+  state: PlanningState,
+) {
+  if (!(await store.recordPlanning(runId, revision, state)))
+    throw new Error("Stale interview transition");
+}
+/** Human provenance and the persisted request are the only approval authority. */
+export async function handleInterviewResponse(
+  store: RunStore,
+  runId: string,
+  response: UserInputResult,
+): Promise<boolean> {
+  const run = await store.getRun(runId);
+  const state = run?.planning;
+  const pending = state?.pending;
+  if (
+    !run ||
+    !state ||
+    !pending ||
+    !response.ok ||
+    response.source !== "user" ||
+    !response.messageId ||
+    !response.text.trim() ||
+    response.requestId !== pending.requestId ||
+    response.revision !== pending.revision ||
+    response.sessionId !== pending.sessionId ||
+    state.transcript.some((entry) => entry.messageId === response.messageId)
+  )
+    return false;
+  const next = structuredClone(state);
+  delete next.pending;
+  delete next.error;
+  next.transcript.push({
+    source: "user",
+    text: response.text,
+    messageId: response.messageId,
+    requestId: response.requestId,
+    revision: response.revision,
+  });
+  if (state.phase === "explanation_approval") {
+    const explanation = state.explanation;
+    if (!explanation || explanation.revision !== response.revision)
+      return false;
+    if (response.text.trim() === `approve ${explanation.revision}`) {
+      next.phase = "explanation_approved";
+      next.approval = {
+        revision: explanation.revision,
+        hash: explanation.hash,
+        messageId: response.messageId,
+        requestId: response.requestId,
+      };
+    } else {
+      next.phase = "interview";
+      delete next.approval;
+    }
+  } else if (!next.feature) next.feature = response.text;
+  return store.recordPlanning(runId, run.revision, next);
+}
+export async function continueInterview(
+  store: RunStore,
+  adapter: OpenCodeAdapter,
+  runId: string,
+  instructions: string,
+) {
+  for (;;) {
+    const run = await store.getRun(runId);
+    if (!run?.planning) throw new Error("Unknown planning run");
+    const state = structuredClone(run.planning);
+    if (
+      createHash("sha256").update(instructions).digest("hex") !==
+      state.settings.skills.interview?.hash
+    )
+      throw new Error(
+        "Interview instructions differ from the captured run hash. Restore the selected skill before continuing.",
+      );
+    if (
+      state.phase === "explanation_approved" ||
+      (run.control && run.control.status !== "active")
+    )
+      return run;
+    if (state.pending) {
+      const published = await adapter.publishStatus(
+        state.sessionId,
+        state.workspace,
+        state.pending.question,
+      );
+      const response: UserInputResult = published.ok
+        ? await adapter.requestUserInput(state.pending)
+        : {
+            ok: false,
+            error: published.error ?? {
+              code: "sdk-error",
+              message: "Could not publish question",
+            },
+          };
+      if (!response.ok) {
+        const latest = await store.getRun(runId);
+        if (latest?.planning?.pending?.requestId === state.pending.requestId)
+          await save(store, runId, latest.revision, {
+            ...latest.planning,
+            error: response.error ?? {
+              code: "sdk-error",
+              message: "Could not publish question",
+            },
+          });
+        return store.getRun(runId);
+      }
+      if (!(await handleInterviewResponse(store, runId, response)))
+        return store.getRun(runId);
+      continue;
+    }
+    if (state.phase === "explanation_approval" && state.explanation) {
+      const artifact = state.explanation;
+      state.pending = {
+        runId,
+        workspace: state.workspace,
+        sessionId: state.sessionId,
+        requestId: randomUUID(),
+        revision: artifact.revision,
+        question: `${artifact.text}\nScope:\n${artifact.scope.join("\n")}\nAcceptance criteria:\n${artifact.criteria.join("\n")}\nApprove revision ${artifact.revision} by replying approve ${artifact.revision}, or reply with revisions.`,
+      };
+      await save(store, runId, run.revision, state);
+      continue;
+    }
+    if (!state.feature) {
+      state.pending = {
+        runId,
+        workspace: state.workspace,
+        sessionId: state.sessionId,
+        requestId: randomUUID(),
+        revision: 0,
+        question: "What feature should we build? Describe the result you need.",
+      };
+      await save(store, runId, run.revision, state);
+      continue;
+    }
+    state.turn++;
+    await save(store, runId, run.revision, state);
+    const selectedModel = state.settings.models.interview;
+    if (!selectedModel)
+      throw new Error("Planning run has no captured interview model");
+    const job: JobEnvelope = {
+      runId,
+      jobId: `interview-${state.turn}`,
+      attempt: 1,
+      role: "interview",
+      workspace: state.workspace,
+      baseCommit: "",
+      inputRevisions: {
+        interview: state.turn,
+        explanation: state.explanation?.revision ?? 0,
+      },
+      readOnly: true,
+      model: selectedModel,
+      prompt: `${instructions}\nFeature: ${state.feature}\nTranscript: ${JSON.stringify(state.transcript)}\nPrevious explanation: ${JSON.stringify(state.explanation ?? null)}`,
+    };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), state.settings.timeoutMs);
+    });
+    let result: JobResult | undefined;
+    try {
+      result = await Promise.race([
+        adapter.dispatchJob(job).catch(
+          (cause): JobResult => ({
+            ...job,
+            outcome: "failed",
+            evidence: [],
+            error: {
+              code: "sdk-error",
+              message: "Interview dispatch failed",
+              cause: String(cause),
+            },
+          }),
+        ),
+        timeout,
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!result) {
+      const timed = await store.getRun(runId);
+      if (
+        timed?.planning &&
+        timed.planning.turn === state.turn &&
+        (!timed.control || timed.control.status === "active")
+      ) {
+        await save(store, runId, timed.revision, {
+          ...timed.planning,
+          error: {
+            code: "cancelled",
+            message: `Interview timed out after ${state.settings.timeoutMs}ms`,
+          },
+        });
+        await store.recordControl(runId, {
+          status: "interrupted",
+          source: "recovery",
+          facts: [
+            "Interview timed out; inspect the correlated session before resuming.",
+          ],
+        });
+        await adapter.cancelJob(job);
+      }
+      return store.getRun(runId);
+    }
+
+exec
+/bin/zsh -lc 'bun run lint' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun --version; bun run typecheck' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+exec
+/bin/zsh -lc 'bun test tests/integration/03-interview.test.ts' in /Users/rwmmtzqy/Documents/opencode-ralph-plugin
+ succeeded in 72ms:
+$ biome check src tests scripts
+Checked 98 files in 93ms. No fixes applied.
+
+ succeeded in 1602ms:
+1.4.3
+$ tsc --noEmit
+
+ succeeded in 2931ms:
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/03-interview.test.ts:
+(pass) orchestrator rejects a feature before verified setup [174.63ms]
+(pass) recommended interview question, rejected revision and human approval hand off to PRD generation [480.39ms]
+(pass) planning holds the canonical repository lock and a stale approval cannot approve a revised explanation [379.29ms]
+(pass) project instructions and role models are captured and missing overrides fail before claiming a run [334.97ms]
+(pass) changed command config or platform blocks planning, and model prose cannot approve [436.06ms]
+(pass) changing an approved explanation invalidates approval even if a caller carries the old approval forward [268.41ms]
+(pass) interview timeout freezes late agent completions without approving [346.68ms]
+(pass) feature input is collected in the main session and an assistant response cannot approve [280.82ms]
+(pass) explanations cannot claim measured STE compliance [257.44ms]
+
+ 9 pass
+ 0 fail
+ 47 expect() calls
+Ran 9 tests across 1 file. [3.04s]
+
+codex
+Existing implementation confirmed; no files changed.
+
+Bun 1.4.3 checks passed: typecheck, full lint, and all 9 interview tests (47 assertions), including rejection, revision, and correlated approval.
+
+Live approval remains blocked by the predecessor adapter’s unsupported human-input provenance. No live OpenCode or native Linux/Windows checks were run.
+tokens used
+24,321
+Existing implementation confirmed; no files changed.
+
+Bun 1.4.3 checks passed: typecheck, full lint, and all 9 interview tests (47 assertions), including rejection, revision, and correlated approval.
+
+Live approval remains blocked by the predecessor adapter’s unsupported human-input provenance. No live OpenCode or native Linux/Windows checks were run.

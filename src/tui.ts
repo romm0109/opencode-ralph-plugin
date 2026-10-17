@@ -7,7 +7,11 @@ export default define({
     const revisions = new Map<string, number>();
     const unsubscribe = ctx.data.listen(({ details }) => {
       if (
-        !["rpc.ralph.status", "rpc.ralph.stageSession"].includes(details.type)
+        ![
+          "rpc.ralph.status",
+          "rpc.ralph.stageSession",
+          "rpc.ralph.question",
+        ].includes(details.type)
       )
         return;
       if (
@@ -16,6 +20,13 @@ export default define({
       )
         return;
       const data = details.data as Record<string, unknown> | undefined;
+      if (details.type === "rpc.ralph.question") {
+        if (typeof data?.sessionId === "string")
+          void ctx.data.session.form
+            .sync(data.sessionId, ctx.location)
+            .catch(() => {});
+        return;
+      }
       if (details.type === "rpc.ralph.stageSession") {
         if (
           !ctx.location ||

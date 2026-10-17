@@ -88,6 +88,70 @@ async function progressView(run: RunRecord) {
     runtimeSecretValues(),
   );
 }
+const SECTION_LABELS: Record<string, string> = {
+  commands: "Commands",
+  completion: "Result",
+  planning: "Stage",
+  control: "Run",
+  baseline: "Baseline",
+  agents: "Agents",
+  issues: "Issues",
+  checks: "Checks",
+  review: "Review",
+  errors: "Errors",
+};
+function scalar(value: unknown) {
+  return value === null || typeof value !== "object";
+}
+function readable(value: unknown, indent = ""): string[] {
+  if (value === null || value === undefined) return [];
+  if (scalar(value)) return [`${indent}${String(value)}`];
+  if (Array.isArray(value))
+    return value.flatMap((item) => {
+      if (scalar(item)) return [`${indent}- ${String(item)}`];
+      const entries = Object.entries(item as object).filter(
+        ([, v]) => v !== null && v !== undefined,
+      );
+      if (entries.every(([, v]) => scalar(v)))
+        return [
+          `${indent}- ${entries.map(([k, v]) => `${k}: ${v}`).join(", ")}`,
+        ];
+      const [first, ...rest] = readable(item, `${indent}  `);
+      return first ? [`${indent}- ${first.trimStart()}`, ...rest] : [];
+    });
+  return Object.entries(value as object).flatMap(([key, v]) => {
+    if (v === null || v === undefined || (Array.isArray(v) && !v.length))
+      return [];
+    if (scalar(v)) return [`${indent}${key}: ${String(v)}`];
+    const nested = readable(v, `${indent}  `);
+    return nested.length ? [`${indent}${key}:`, ...nested] : [];
+  });
+}
+/** One line a person can read at a glance; also used as the chat entry title. */
+export function progressHeadline(
+  view: Awaited<ReturnType<typeof progressView>>,
+) {
+  if (view.completion)
+    return `Ralph finished: ${view.completion.outcome} (${view.completion.branch})`;
+  if (view.control && view.control.status !== "active")
+    return `Ralph ${view.control.status}`;
+  const planning = view.planning;
+  if (!planning) return "Ralph progress";
+  const reason = planning.waitingReason ? ` — ${planning.waitingReason}` : "";
+  return `Ralph ${planning.stage}: ${planning.status}${reason}`;
+}
+function formatProgress(
+  view: Awaited<ReturnType<typeof progressView>>,
+  changed: Record<string, unknown>,
+) {
+  return [
+    progressHeadline(view),
+    ...Object.entries(changed).flatMap(([key, value]) => {
+      const body = readable(value, "  ");
+      return body.length ? [`${SECTION_LABELS[key] ?? key}:`, ...body] : [];
+    }),
+  ].join("\n");
+}
 type Cursor = {
   sequence: number;
   sessionId: string;
@@ -110,7 +174,14 @@ export function createProgressObserver(options: {
   let stopped = false;
   let running: Promise<void> | undefined;
   async function observe() {
-    const location = await realpath(directory);
+    let location: string;
+    try {
+      location = await realpath(directory);
+    } catch (cause) {
+      // A location module can outlive successful owned-worktree cleanup.
+      if ((cause as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw cause;
+    }
     await mkdir(root, { recursive: true });
     for (const run of await store.listRuns()) {
       if (stopped || !visibleOwner(run) || !run.planning) continue;
@@ -155,7 +226,7 @@ export function createProgressObserver(options: {
         );
         if (Object.keys(changed).length) {
           const text = sanitizeValue(
-            `Ralph progress · ${run.runId} · event ${event.sequence}\n${JSON.stringify(changed, null, 2)}`,
+            formatProgress(view, changed),
             runtimeSecretValues(),
           );
           await deliver({

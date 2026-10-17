@@ -2,6 +2,10 @@ import type { Plugin } from "@opencode/plugin";
 import type { CommandDefinition } from "@opencode/plugin/promise/command";
 import type { Info, ToolEditor } from "@opencode/plugin/promise/tool";
 import { createAdapterClient } from "../../src/opencode/adapter.js";
+import { relayedStageWork } from "../../src/plugin.js";
+
+// Fixture hosts are never reloaded; disposal must not wait for a successor.
+process.env.RALPH_RELOAD_GRACE_MS ??= "0";
 
 export function createFakeOpenCode(options: { sessionPrefix?: string } = {}) {
   const requests: {
@@ -36,6 +40,7 @@ export function createFakeOpenCode(options: { sessionPrefix?: string } = {}) {
   let reply: string | Responder = "actual response";
   let failedCodeMode = false;
   let missingRead: { tool: string; message: string } | undefined;
+  let interleaved: Record<string, unknown>[] = [];
   const client = createAdapterClient(
     "http://fixture.invalid",
     async (request) => {
@@ -170,6 +175,7 @@ export function createFakeOpenCode(options: { sessionPrefix?: string } = {}) {
               text: sessions.get(sessionID as string)?.text,
               time: { created: 1 },
             },
+            ...interleaved,
             {
               id: "earlier-message",
               type: "assistant",
@@ -300,6 +306,10 @@ export function createFakeOpenCode(options: { sessionPrefix?: string } = {}) {
     failObservation: (tool: string, message: string) => {
       missingRead = { tool, message };
     },
+    // Messages the host recorded during the turn, after the delivered prompt.
+    interleave: (messages: Record<string, unknown>[]) => {
+      interleaved = messages;
+    },
     failCodeMode: () => {
       failedCodeMode = true;
     },
@@ -334,7 +344,9 @@ export function createFakeOpenCode(options: { sessionPrefix?: string } = {}) {
 export function createFakePluginContext(
   directory: string,
   client = createFakeOpenCode().client,
+  options: { autoRelay?: boolean } = {},
 ) {
+  const autoRelay = options.autoRelay ?? true;
   const commands = new Map<string, CommandDefinition>();
   const tools = new Map<string, Info & { id: string }>();
   const hooks = new Map<string, (input: unknown) => Promise<void> | void>();
@@ -342,11 +354,59 @@ export function createFakePluginContext(
   const stageSessions: unknown[] = [];
   const rpcHandlers = new Map<string, (input: never) => Promise<unknown>>();
   const registration = (dispose = async () => {}) => ({ dispose });
+  // Plays the session agent: Ralph relays its questions through the agent's
+  // own question tool call, which Ralph's tool hooks rewrite and observe.
+  let relayCalls = 0;
+  async function answerRelay(sessionID: string) {
+    const question = tools.get("question");
+    if (!question) return;
+    const call = {
+      tool: "question",
+      sessionID,
+      agent: "build",
+      messageID: `msg_relay-${++relayCalls}`,
+      id: `call_relay-${relayCalls}`,
+      input: {} as unknown,
+    };
+    await hooks.get("tool.execute.before")?.(call);
+    try {
+      const result = await question.execute(
+        call.input as never,
+        {
+          sessionID,
+          agent: "build",
+          messageID: call.messageID,
+          id: call.id,
+          signal: new AbortController().signal,
+        } as never,
+      );
+      await hooks.get("tool.execute.after")?.({
+        ...call,
+        status: "completed",
+        result,
+      });
+    } catch (error) {
+      await hooks.get("tool.execute.after")?.({
+        ...call,
+        status: "error",
+        error,
+      });
+    }
+  }
   const context = {
     location: { directory },
     permission: { assert: async () => {} },
     session: {
       ...client.session,
+      async prompt(input: Parameters<typeof client.session.prompt>[0]) {
+        const receipt = await client.session.prompt(input);
+        if (
+          autoRelay &&
+          String(input.text).startsWith("Ralph needs a human answer")
+        )
+          setTimeout(() => void answerRelay(input.sessionID), 0);
+        return receipt;
+      },
       hook: async (
         name: string,
         hook: (input: unknown) => Promise<void> | void,
@@ -385,7 +445,30 @@ export function createFakePluginContext(
             tools.delete(id);
           },
           add: (info) => {
-            tools.set(info.name, { ...info, id: info.name });
+            const execute = info.execute;
+            tools.set(info.name, {
+              ...info,
+              id: info.name,
+              // The agent answers a relayed question; the test then sees the
+              // stage tool's completed outcome.
+              async execute(input, toolContext) {
+                const result = await execute(input, toolContext);
+                if (
+                  !autoRelay ||
+                  !String(result.content).includes('"outcome":"awaiting-human"')
+                )
+                  return result;
+                await answerRelay(
+                  (toolContext as { sessionID: string }).sessionID,
+                );
+                return {
+                  ...result,
+                  content: JSON.stringify(
+                    await relayedStageWork.get(toolContext as object),
+                  ),
+                };
+              },
+            });
             added.push(info.name);
           },
         });
@@ -435,5 +518,6 @@ export function createFakePluginContext(
     statuses,
     stageSessions,
     rpcHandlers,
+    answerRelay,
   };
 }

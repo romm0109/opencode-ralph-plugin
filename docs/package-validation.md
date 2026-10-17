@@ -19,6 +19,44 @@ bun run test:smoke
 OPENCODE_SMOKE=1 bun test --timeout 180000 tests/smoke/opencode.test.ts
 ```
 
+## Current production fixes and retest (2026-10-16)
+
+The installed-host opening-form failure recorded below is resolved. The plugin
+preserves host location spelling for same-checkout sessions; canonical aliases had
+selected a different form service. The final real installed OpenCode smoke passed 56 assertions (two tests, one
+explicit credentialed-probe skip), including opening/scope forms, same-session PRD delivery and a completed
+discovery receipt (`/tmp/ralph-final-release-20261016/09.log`).
+
+A credentialed native counter-reset trial also exposed the plugin context's missing
+session/inbox list APIs. Stable session IDs plus metadata/workspace validation and
+the host's stable prompt-ID reconciliation now support those limited capabilities.
+Recovery retained the accepted PRD and opened one planner on attempt 1; real execution
+then integrated the issue on its first attempt. The current trial and verification
+results are recorded in [live-opencode-trial.md](live-opencode-trial.md). Agent-operated
+forms are not human-visible acceptance. Human UI and native Linux/Windows evidence
+remain separate requirements. The iteration tables and JSON revalidation records
+below retain the earlier failing receipts; they predate these fixes.
+
+## Final sequential local validation
+
+All eleven final commands passed on macOS arm64 with unchanged Bun 1.4.3 and pinned
+OpenCode 2.0.29. `bun run test:status` passed 15 tests; `bun run test` passed 296
+with one separately gated skip and 2,034 assertions. All seven browser tests,
+package validation, the end-to-end package test, typecheck, lint, build, the opted-in
+real-host smoke and `pack:local` passed. Exact receipts and log hashes are in
+`docs/live-opencode-evidence.json` → `nativeWorkflowRetest20261016`.
+
+The removal trial additionally reproduced false preview invalidation from read-only
+progress cursor writes. Only regular known-run cursor files and their UUID-v4
+atomic-write temporaries are excluded from fingerprint churn; unknown files and
+workflow changes remain guarded and the observer data is still removed.
+
+The retry regression now asserts the injected timer fires before awaiting integration
+under its unchanged outer deadline. A separate two-pass real-Git scope-change test
+has an explicit 90-second harness budget after observed 30-second harness timeouts.
+Assertions, product deadlines, dependencies and approved command configurations
+remain unchanged. Failed/interrupted receipts remain retained, not counted as passes.
+
 ## Iteration 2 revalidation (2026-10-16)
 
 All twelve listed commands were rerun sequentially after predecessor iteration 2, with unchanged Bun 1.4.3, pinned OpenCode 2.0.29, fixtures and runtime code. Typecheck, lint, focused package integration (3 tests), status (15 tests), full integration (293 passed, 1 gated skip, 2,018 assertions), build, browser (7 tests), package, end-to-end and default smoke passed. The default smoke had three explicit opt-in skips.
@@ -37,15 +75,15 @@ The registered `/ralph-orchestrator` handler opens an interview with a mandatory
 
 Duplicate PRD/issue completion must not create another planner or executor. Issue completion starts real red/green worker tests, candidate Git integration, automatic independent reviews and a published final report. Reviewers observe the installed addition implementation in their worktrees. The passing consumer produces `verified`; the second changes an already approved environment reference after setup to trigger an actual validation timeout, producing `incomplete-validation`. No second execution gate or explicit second review is needed.
 
-The installed real-host smoke uses pinned OpenCode and a deterministic HTTP model. The test attempts to answer native forms via `session.form.reply` and verify same-session PRD approval. **This currently fails:** the opening request persists, but no form is exposed and no permission is pending. Downstream native-answer/completion assertions have not run successfully. It also covers actual denied permission, foreground command execution, cancellation, bounded server shutdown and persisted restart state. These are API/host observations, not human-visible TUI acceptance. Browser tests observe read-only planning, waiting/blockers, progress and validation omissions. Broader public-interface tests in `03-interview`, `04-planning`, `14-recovery`, `chat-workflow` and `tui-input` cover unavailable questions, stale replies, retry exhaustion and stop/restart.
+The installed real-host smoke uses pinned OpenCode and a deterministic HTTP model. The test answers native forms via `session.form.reply` and verifies same-session PRD approval. The earlier opening-form failure is retained below; the current retest above passes these assertions. It also covers actual denied permission, foreground command execution, cancellation, bounded server shutdown and persisted restart state. These are API/host observations, not human-visible TUI acceptance. Browser tests observe read-only planning, waiting/blockers, progress and validation omissions. Broader public-interface tests in `03-interview`, `04-planning`, `14-recovery`, `chat-workflow` and `tui-input` cover unavailable questions, stale replies, retry exhaustion and stop/restart.
 
 All consumers are temporary and removed after the test. Their branch/remotes assertions prohibit target merge or push; no PR is created. The plugin lifecycle remains bound to OpenCode. Complete human observation of shutdown during the new flow remains on the live checklist.
 
-## Evidence and release blockers
+## Historical iteration 2 evidence and release blockers
 
 Exact command exits, durations, logs and package results are captured in [live-opencode-evidence.json](live-opencode-evidence.json). Logs are local artifacts under `/tmp/ralph-native-release-20261016`; consumer paths in package evidence are historical references to removed temporary repositories.
 
-- Pinned installed-host native opening form: FAIL. With a real OpenCode 2.0.29 server, native startup persists `pending.kind=feature` but `session.form.list` remains empty through the bounded 15-second wait; permissions are empty. Temporary tracing reached `question.execute` in `src/opencode/native-input.ts`. Production tracing was removed. This transport gap blocks release; fixture-native success cannot qualify it.
+- Earlier pinned installed-host native opening form: FAIL (resolved by the retest above). With a real OpenCode 2.0.29 server, native startup persists `pending.kind=feature` but `session.form.list` remains empty through the bounded 15-second wait; permissions are empty. Temporary tracing reached `question.execute` in `src/opencode/native-input.ts`. Production tracing was removed. This transport gap blocks release; fixture-native success cannot qualify it.
 - Human-visible new-protocol native form rendering, session switches and visible progress: pending. The historical 2026-10-15 verified run cannot satisfy this requirement.
 - Native Linux and Windows: not run on this Mac; successful platform artifacts remain required.
 - Credentialed provider smoke: separately gated; skipped unless endpoint/model/auth inputs are available. A local deterministic model does not certify provider behavior.
@@ -54,7 +92,7 @@ Missing evidence remains a release blocker. No unrun interactive or platform che
 
 ## Sequential command results
 
-The machine-readable evidence retains the initial sequential run and final follow-up checks. All commands below ran; **release is blocked** by the opted-in installed-host failure.
+The machine-readable evidence retains the initial sequential run and final follow-up checks. All commands below ran in the earlier iteration; that iteration was blocked by the installed-host failure. Current host results are above; human UI and native platform requirements remain open.
 
 | Command | Result |
 | --- | --- |

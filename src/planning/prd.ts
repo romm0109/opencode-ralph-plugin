@@ -61,6 +61,21 @@ export async function queueApprovedPrd(
     };
     await savePlanning(store, runId, run.revision, next);
   }
+  // Scope approval completes discovery. Its same-session PRD prompt and progress
+  // messages must not make the generic response collector report a failed turn.
+  for (const entry of Object.values(run.jobs)) {
+    if (
+      entry.status === "running" &&
+      entry.envelope.role === "interview" &&
+      entry.envelope.sessionId === state.approval.sessionId &&
+      entry.envelope.inputRevisions.interview === state.turn
+    )
+      await store.recordResult({
+        ...entry.envelope,
+        outcome: "completed",
+        evidence: [`Native scope approval: ${state.approval.requestId}`],
+      });
+  }
   const delivery = next.prdDelivery;
   if (!delivery) throw new Error("Missing PRD delivery intent");
   await registerPlanningAttempt(store, runId, delivery.id, delivery.text);

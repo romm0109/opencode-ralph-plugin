@@ -200,7 +200,10 @@ export interface UserInputRequest {
   workspace: string;
   requestId: string;
   revision: number;
+  /** Kept short: OpenCode forms do not scroll, so long text hides the options. */
   question: string;
+  /** Full context shown in the chat right before the form, when it is long. */
+  details?: string;
 }
 export type UserInputResult =
   | {

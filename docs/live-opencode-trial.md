@@ -4,7 +4,92 @@ The current protocol is `native-interview-v1` from the 2026-10-16 PRD. Automated
 
 Current sequential validation results are recorded in [package-validation.md](package-validation.md) and [live-opencode-evidence.json](live-opencode-evidence.json). The 2026-10-15 trial below is historical evidence for the replaced protocol only. Its verified commit and screenshots must not be presented as acceptance of the new flow.
 
-## Current installed-host blocker
+## Installed-host fix and retest (2026-10-16)
+
+The opening-form failure below was reproduced and fixed. OpenCode's tool/form
+services are scoped by location spelling. The plugin created an interview at the
+canonical `/private/var/...` path while its native question tool belonged to the
+equivalent `/var/...` host location. A location-wide form query found the actual
+pending form even though the interview's form query was empty.
+
+`src/plugin.ts` now preserves the host's exact location spelling when creating a
+session in that same checkout, using real-path comparison only for identity. Other
+worktrees keep their separate locations. `03-interview.test.ts` covers a normalized
+path alias. The unchanged real installed-host smoke then passed: 1 test, 53
+assertions, including native opening and explanation answers and same-session PRD
+handoff. Log: `/tmp/ralph-location-fix2-host.log`. This is automated host/API evidence;
+it does not establish human-visible TUI acceptance or Linux/Windows support.
+
+A credentialed counter-reset trial then reached accepted PRD completion and exposed
+another native capability mismatch: `Plugin.Context.session` lacks `list` and
+`inbox.list`. The adapter now reconciles issue creation by its deterministic session
+ID with exact metadata/workspace checks. Prompt delivery reuses its stable ID and
+the pinned host's queued/promoted-message reconciliation. The capability-subset
+regression was observed failing before the fix and passing afterward. Restart and
+`/ralph-resume` recovered the accepted PRD and opened the fresh issue-planning session
+on attempt 1, without re-authoring the PRD or resetting its budget.
+
+### Credentialed native counter-reset trial
+
+- Repository: `/private/tmp/ralph-native-feature-20261016-2/repo`.
+- Model: `openai/gpt-6.1-sol`; real OpenCode 2.0.29 and Bun 1.4.3.
+- Run: `feature-b6965eef-7c7e-4d62-8e07-33a83b0de3be`.
+- Starting `main`: `1f8f385362f4fad84eba7d9384c36c4925a923cf`.
+- Feature branch: `ralph/feature-b6965eef-7c7e-4d62-8e07-33a83b0de3be`.
+- Final commit: `0bd3315a4613c82ecb372b608bb71a6de8f493c3`.
+- Native feature/scope forms, same-session PRD, fresh issue planner, baseline,
+  executor, candidate integration, two independent review rounds and terminal
+  reports all ran. Agent-operated form replies used the user's end-to-end testing
+  authorization; they are not evidence of human interaction with the TUI.
+- The executor added `createCounter().reset()`, public-interface tests and a compact
+  counter wiki. Native receipts show missing-method red failures followed by both
+  approved checks passing: five tests and 32 assertions. One executor attempt,
+  no repair tasks, no skipped checks and no recorded cleanup failures.
+- Both code reviews passed with no findings. Both functional reviews passed the
+  behavior checks but left the composite no-push/no-merge criterion unverified
+  because their supplied evidence lacked operation history. The terminal outcome
+  remains **unverified**; the retry did not overwrite round one. An independent
+  post-run audit found `main` unchanged, a clean main checkout and no remotes. That
+  audit was not supplied to those reviewers and does not replace their verdicts.
+- The original failed discovery receipt is preserved. Native approval now settles
+  discovery before downstream delivery; the installed-host smoke covers this fix.
+  A removed-location observer regression also prevents recurring delivery errors
+  from successfully cleaned worktrees.
+- Full local evidence: `/private/tmp/ralph-native-feature-20261016-2/evidence.json`;
+  final report: `/private/tmp/ralph-native-feature-20261016-2/final-report.json`.
+  The first archive contained the location fix; after the capability failure the
+  installed distribution was updated and the accepted PRD was resumed. Archive
+  identity and this distinction are retained in the evidence.
+- After the terminal report, SIGTERM did not close the host within more than 20
+  seconds. The exact owned host PID was forcibly terminated with no active model
+  jobs. No graceful-shutdown acceptance is claimed. Trial services are stopped;
+  feature and diagnostic worktrees remain retained.
+
+### Final source and installed-host checks
+
+The final sequential validation passed: typecheck, lint, the focused scope-change
+regression, 15 status tests, 296 integration tests (one gated skip, 2,034 assertions),
+build, all seven browser tests, package/end-to-end coverage, the real installed host
+(two passed tests, one opt-in credentialed-session skip, 56 assertions), and local
+packing. Receipts: `docs/live-opencode-evidence.json` → `nativeWorkflowRetest20261016`;
+logs: `/tmp/ralph-final-release-20261016`.
+
+The native removal probe exposed observer cursor churn invalidating an otherwise
+unchanged removal preview. The removal fingerprint now excludes only recognized
+regular cursor files and their UUID-v4 write temporaries; unknown files and workflow
+revisions remain guarded. Its public regression failed before the fix and all four
+removal tests then passed. The real host also passed native removal after the fix.
+The smoke waits for the exact delivered reply and its following idle marker.
+
+A retry fixture's extra 1.5-second watchdog incorrectly timed the entire real Git
+integration/cleanup path. It now verifies that the injected timer fires, then awaits
+integration under the existing test deadline. All 17 retry tests passed in a fresh
+process and in the full suite. The separate two-pass scope-change integration test
+uses an explicit 90-second harness budget after observed default 30-second harness
+timeouts. Product deadlines and approved commands were not changed. Earlier failures
+and interrupted runs are retained; none is represented as a successful check.
+
+## Previously observed installed-host blocker
 
 The 2026-10-16 automated trial with the pinned real OpenCode host fails before opening-form answers: state contains the opening feature request and its interview owner, but `session.form.list` is empty and no permission is pending. Temporary tracing reached `question.execute` in `src/opencode/native-input.ts`; no native form was observed. The smoke now reports that failure directly instead of letting a cleanup-time command connection reset mask it. This is a release blocker, not human acceptance. Same-session PRD assertions in that smoke remain unverified; the two packed deterministic hosts pass separately.
 

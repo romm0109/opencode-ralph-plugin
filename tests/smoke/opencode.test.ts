@@ -669,39 +669,62 @@ smoke(
       }
       expect(approved?.planning?.sessionId).toBe(interviewId);
       expect(approved?.planning?.owner?.stage).toBe("prd");
+      expect(
+        Object.values(approved?.jobs ?? {}).find(
+          (job) => job.envelope.role === "interview",
+        )?.result?.outcome,
+      ).toBe("completed");
       expect(approved?.planning?.approval?.messageId).toStartWith("question:");
       await restarted.session.command({
         sessionID: workflowSession.id,
         name: "ralph-stop",
         text: feature.runId,
       });
-      // Preview and approve project removal in a normal OpenCode conversation.
+      // Removal is deterministic: one native form bound to the plugin's preview.
       const removeSession = await restarted.session.create({
         location: { directory: project.directory },
         title: "Remove Ralph",
         model: { providerID: "fixture", id: "fixture" },
       });
-      await restarted.session.command({
+      const removal = restarted.session.command({
         sessionID: removeSession.id,
         name: "ralph-remove",
         text: "",
       });
-      await restarted.session.wait({ sessionID: removeSession.id });
+      const removalDeadline = Date.now() + 15000;
+      let removalForms = await restarted.session.form.list({
+        sessionID: removeSession.id,
+      });
+      while (!removalForms.length && Date.now() < removalDeadline) {
+        await Bun.sleep(25);
+        removalForms = await restarted.session.form.list({
+          sessionID: removeSession.id,
+        });
+      }
+      const removalForm = removalForms[0];
+      const removalField = removalForm?.fields[0];
+      if (!removalForm || !removalField || removalField.type !== "string")
+        throw new Error("Removal did not open a native confirmation form");
+      expect(JSON.stringify(removalForm)).toContain(".ralph");
+      // Before the answer nothing is deleted.
       expect(
         await Bun.file(
           join(project.directory, ".ralph/commands.json"),
         ).exists(),
       ).toBe(true);
-      expect(
-        JSON.stringify(
-          await restarted.session.context({ sessionID: removeSession.id }),
-        ),
-      ).toContain("planId");
-      await restarted.session.prompt({
+      await restarted.session.form.reply({
         sessionID: removeSession.id,
-        text: "yes",
+        formID: removalForm.id,
+        answer: { [removalField.key]: "Remove Ralph state" },
       });
-      await restarted.session.wait({ sessionID: removeSession.id });
+      await removal;
+      while (
+        (await Bun.file(
+          join(project.directory, ".ralph/commands.json"),
+        ).exists()) &&
+        Date.now() < removalDeadline
+      )
+        await Bun.sleep(25);
       expect(
         await Bun.file(
           join(project.directory, ".ralph/commands.json"),

@@ -134,6 +134,8 @@ export async function handleInterviewResponse(
     next.feature = response.text;
   return store.recordPlanning(runId, run.revision, next);
 }
+const INTERVIEW_TICK_MS = 250;
+
 export async function continueInterview(
   store: RunStore,
   adapter: OpenCodeAdapter,
@@ -214,9 +216,17 @@ export async function continueInterview(
       model: selectedModel,
       prompt: `${instructions}\nFeature: ${state.feature}\nTranscript: ${JSON.stringify(state.transcript)}\nPrevious explanation: ${JSON.stringify(state.explanation ?? null)}\nStage identity: runId=${runId}, attempt=${state.owner?.attempt ?? 1}. Finish with ralph_complete_interview.`,
     };
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    // The interviewer waits for human answers inside its turn. Only time spent
+    // without a pending native question counts toward the turn deadline.
+    let timer: ReturnType<typeof setInterval> | undefined;
     const timeout = new Promise<undefined>((resolve) => {
-      timer = setTimeout(() => resolve(undefined), state.settings.timeoutMs);
+      let active = 0;
+      timer = setInterval(async () => {
+        const planning = (await store.getRun(runId))?.planning;
+        if (planning?.nativeQuestions?.length || planning?.pending) return;
+        active += INTERVIEW_TICK_MS;
+        if (active >= state.settings.timeoutMs) resolve(undefined);
+      }, INTERVIEW_TICK_MS);
     });
     let result: JobResult | undefined;
     try {
@@ -236,7 +246,7 @@ export async function continueInterview(
         timeout,
       ]);
     } finally {
-      if (timer) clearTimeout(timer);
+      if (timer) clearInterval(timer);
     }
     if (!result) {
       const timed = await store.getRun(runId);

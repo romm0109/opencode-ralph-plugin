@@ -5,6 +5,37 @@ import type { UserInputRequest, UserInputResult } from "../core/types.js";
 
 const answers = z.object({ answers: z.tuple([z.tuple([z.string().min(1)])]) });
 
+/** The exact native question input for a Ralph request. */
+export function nativeQuestionInput(request: UserInputRequest) {
+  return {
+    questions: [
+      {
+        question: request.question,
+        header: "Ralph",
+        custom: true,
+        options:
+          request.options ??
+          (request.kind === "feature"
+            ? []
+            : [
+                {
+                  label: request.recommendation ?? "Continue",
+                  description: request.recommendation
+                    ? "Recommended answer; you can also enter your own answer"
+                    : "Use the free-text field to describe or revise the feature",
+                },
+              ]),
+      },
+    ],
+  };
+}
+
+/** Reads the single human answer from the host question tool's metadata. */
+export function nativeAnswer(metadata: unknown): string | undefined {
+  const parsed = answers.safeParse(metadata);
+  return parsed.success ? parsed.data.answers[0][0] : undefined;
+}
+
 /** Invoke the host's question UI directly; model prose cannot settle a gate. */
 export async function requestNativeInput(
   ctx: Pick<Plugin.Context, "session" | "tool">,
@@ -24,40 +55,17 @@ export async function requestNativeInput(
       },
     };
   const session = await ctx.session.get({ sessionID: request.sessionId });
-  const result = await question.execute(
-    {
-      questions: [
-        {
-          question: request.question,
-          header: "Ralph",
-          custom: true,
-          options:
-            request.options ??
-            (request.kind === "feature"
-              ? []
-              : [
-                  {
-                    label: request.recommendation ?? "Continue",
-                    description: request.recommendation
-                      ? "Recommended answer; you can also enter your own answer"
-                      : "Use the free-text field to describe or revise the feature",
-                  },
-                ]),
-        },
-      ],
-    },
-    {
-      sessionID: request.sessionId as ToolContext["sessionID"],
-      agent: (session.agent ?? "build") as ToolContext["agent"],
-      messageID: `ralph-input:${request.requestId}` as ToolContext["messageID"],
-      id: `ralph-input:${request.requestId}` as ToolContext["id"],
-      signal,
-      progress: async () => {},
-    },
-  );
+  const result = await question.execute(nativeQuestionInput(request), {
+    sessionID: request.sessionId as ToolContext["sessionID"],
+    agent: (session.agent ?? "build") as ToolContext["agent"],
+    messageID: `ralph-input:${request.requestId}` as ToolContext["messageID"],
+    id: `ralph-input:${request.requestId}` as ToolContext["id"],
+    signal,
+    progress: async () => {},
+  });
   signal.throwIfAborted();
-  const parsed = answers.safeParse(result.metadata);
-  if (!parsed.success)
+  const text = nativeAnswer(result.metadata);
+  if (!text)
     return {
       ok: false,
       error: {
@@ -72,6 +80,6 @@ export async function requestNativeInput(
     revision: request.revision,
     sessionId: request.sessionId,
     messageId: `question:${request.requestId}`,
-    text: parsed.data.answers[0][0],
+    text,
   };
 }

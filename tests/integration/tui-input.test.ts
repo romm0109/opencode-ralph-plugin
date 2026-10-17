@@ -122,3 +122,40 @@ test("TUI follows only matching stage locations once, with router fallback when 
   expect(focused).not.toContain("invalid");
   if (typeof dispose === "function") dispose();
 });
+
+test("TUI loads a Ralph question form that was created while its session was open", () => {
+  let listener: ((event: unknown) => void) | undefined;
+  const synced: unknown[] = [];
+  const dispose = RalphTui.setup({
+    location: { directory: "/project" },
+    ui: { toast: { show: () => {} } },
+    data: {
+      listen: (next: (event: unknown) => void) => {
+        listener = next;
+        return () => {
+          listener = undefined;
+        };
+      },
+      session: {
+        form: {
+          sync: async (sessionID: string, location: unknown) => {
+            synced.push([sessionID, location]);
+          },
+        },
+      },
+    },
+  } as never);
+  const event = (directory: string, sessionId: unknown = "interview-1") => ({
+    details: {
+      type: "rpc.ralph.question",
+      location: { directory },
+      data: { sessionId },
+    },
+  });
+  listener?.(event("/other"));
+  listener?.(event("/project", 7));
+  expect(synced).toEqual([]);
+  listener?.(event("/project"));
+  expect(synced).toEqual([["interview-1", { directory: "/project" }]]);
+  if (typeof dispose === "function") dispose();
+});

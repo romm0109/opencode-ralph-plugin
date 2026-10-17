@@ -612,6 +612,13 @@ test("native progress follows persisted owner, survives observer restart, and de
     expect(messages().map((m) => m.path)).toEqual([
       "/api/session/interview/synthetic",
     ]);
+    // People read progress in chat: a headline title and no raw JSON.
+    const [first] = messages();
+    const headline = String(first?.body.text).split("\n")[0];
+    expect(headline).toMatch(/^Ralph \w+/);
+    expect(first?.body.description).toBe(headline);
+    expect(first?.body.text).not.toContain('"planning"');
+    expect(first?.body.text).not.toContain("{");
     // A backlog from the retired chat must not starve the new visible owner.
     for (let i = 0; i < 101; i++)
       await store.recordControl(run.runId, {

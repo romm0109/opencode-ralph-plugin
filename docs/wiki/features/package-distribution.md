@@ -37,6 +37,10 @@ The 2026-10-15 credentialed trial used the previous protocol. It does not certif
 
 Iteration 2 reran the full prescribed sequence after predecessor updates. Fixture integration (293 passed, one gated skip), seven browser tests and both packaged outcomes still pass; the opted-in real host reproduces the missing opening form (zero pending permissions). `docs/live-opencode-evidence.json` → `automated.revalidation` retains current command/log hashes, source receipts and archive identity alongside earlier evidence. No runtime or fixture change was made. Human participation was requested but no acceptance was recorded; human and Linux/Windows blockers remain.
 
+The later native-host fixes preserve location spelling and reconcile issue sessions/prompts through the limited plugin context. The real installed smoke now reaches native answers and same-session PRD delivery (55 assertions in that case; 56 including fresh installation). See the latest section of `docs/live-opencode-trial.md`; the iteration 2 failure remains historical evidence. Human UI and native platform acceptance remain separate.
+
+Final local validation passed 296 integration tests with one gated skip, all seven browser tests, package/end-to-end tests and the opted-in real-host smoke. The current credentialed feature report remains unverified for missing operation-history evidence, not a behavior failure. Exact receipts are under `nativeWorkflowRetest20261016` in `docs/live-opencode-evidence.json`.
+
 ## Last updated
 
 2026-10-16

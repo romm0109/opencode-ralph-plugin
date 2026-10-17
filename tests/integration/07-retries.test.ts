@@ -211,16 +211,13 @@ test("all hung checks are omitted with incomplete status, immutable config and f
         ).exists())
       );
     });
+    const scheduled = time.pending;
+    expect(scheduled).toBeGreaterThan(0);
     time.advance(5000);
-    const result = await Promise.race([
-      running,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("Injected clock did not terminate check")),
-          1500,
-        ),
-      ),
-    ]);
+    expect(time.pending).toBeLessThan(scheduled);
+    // The injected deadline must fire now; Git integration and owned cleanup
+    // still use real I/O and finish under this test's unchanged outer deadline.
+    const result = await running;
     expect(result.status).toBe("integrated");
     expect(result.attempt).toBe(1);
     expect(result.validation?.status).toBe("passed_with_omissions");

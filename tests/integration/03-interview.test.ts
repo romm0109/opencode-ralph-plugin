@@ -61,7 +61,7 @@ async function readyProject() {
   };
 }
 
-test("native slash command owns a fresh interview, confirms supplied text and reuses its session", async () => {
+test("native slash command preserves host location spelling, confirms supplied text and reuses its session", async () => {
   const { project, fake, store } = await readyProject();
   const { writeFile } = await import("node:fs/promises");
   const { join } = await import("node:path");
@@ -82,7 +82,7 @@ test("native slash command owns a fresh interview, confirms supplied text and re
       recommendation: "15 minutes",
     }),
   );
-  const host = createFakePluginContext(project.directory, fake.client);
+  const host = createFakePluginContext(`${project.directory}/.`, fake.client);
   const questions: {
     sessionID: string;
     input: { questions: { question: string; options: { label: string }[] }[] };
@@ -122,6 +122,10 @@ test("native slash command owns a fresh interview, confirms supplied text and re
     } as never);
     const run = (await store.listRuns()).find((run) => run.planning);
     expect(questions).toHaveLength(3);
+    expect(
+      fake.requests.slice(before).find((r) => r.path === "/api/session")?.body
+        .location,
+    ).toEqual({ directory: host.context.location.directory });
     expect(host.stageSessions).toEqual([
       {
         revision: expect.any(Number),
@@ -195,9 +199,19 @@ test("native slash command owns a fresh interview, confirms supplied text and re
     ).rejects.toThrow("ownership");
     expect(run?.planning?.transcript[0]?.messageId).toStartWith("question:");
     expect(run?.planning?.phase).toBe("interview");
-    const prompts = fake.requests
+    const allPrompts = fake.requests
       .slice(before)
       .filter((r) => r.path.endsWith("/prompt"));
+    const relayed = allPrompts.filter((r) =>
+      String(r.body.text).startsWith("Ralph needs a human answer"),
+    );
+    // Questions after the opening form are relayed through the interviewer's
+    // own question tool call in the same session.
+    expect(relayed).toHaveLength(2);
+    expect(
+      relayed.every((r) => r.path.includes(`/${run?.planning?.sessionId}/`)),
+    ).toBe(true);
+    const prompts = allPrompts.filter((r) => !relayed.includes(r));
     expect(prompts).toHaveLength(2);
     expect(prompts.every((r) => !r.path.includes("/main/"))).toBe(true);
     expect(prompts[0]?.body.text).toContain("Walk down each branch");
@@ -365,10 +379,11 @@ test("native completion authorizes only the owner and queues full PRD instructio
             questions: { question: string; options: { label: string }[] }[];
           }
         ).questions[0];
+        // The form stays short; the full criteria are shown in chat first.
         expect(question?.question).toContain(project.commit);
-        expect(question?.question).toContain("Acceptance criteria");
-        expect(question?.question).toContain("Command revision: 1");
-        expect(question?.question).toContain("Branch:");
+        expect(question?.question).toContain("command revision 1");
+        expect(question?.question).toContain("Branch ");
+        expect(question?.question).not.toContain("Acceptance criteria");
         expect(question?.options[0]?.label).toContain("implementation");
         expect(
           fake.requests
@@ -724,8 +739,12 @@ test("native approval rejects stale results and repeated completion reports the 
           run.planning.sessionId,
         )
       ).outcome,
-    ).toBe("already-requested");
-    expect(count).toBe(1);
+    ).toBe("stale");
+    // The same recorded request was shown again; no new revision was opened.
+    expect(count).toBe(2);
+    expect((await store.getRun(run.runId))?.planning?.pending?.requestId).toBe(
+      pending.requestId,
+    );
     expect((await store.getRun(run.runId))?.planning?.approval).toBeUndefined();
     expect(
       fake.requests.some((r) =>
@@ -805,6 +824,139 @@ test("native approved prompt delivery retains intent on denial and retries witho
       1,
     );
   } finally {
+    await project.cleanup();
+  }
+});
+
+test("time waiting for a human answer does not count toward the interview deadline", async () => {
+  const { startNativeFeature } = await import(
+    "../../src/commands/orchestrator.js"
+  );
+  const { setPlanningQuestionWaiting } = await import(
+    "../../src/planning/generation.js"
+  );
+  const { writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { project, fake, adapter, store, context } = await readyProject();
+  try {
+    await writeFile(
+      join(project.directory, ".ralph/project.json"),
+      JSON.stringify({ timeoutMs: 300 }),
+    );
+    adapter.discoverTools = async () => ["question", "read"];
+    adapter.requestUserInput = async (request) => ({
+      ok: true,
+      ...request,
+      source: "user",
+      messageId: "human-feature",
+      text: "Build reset",
+    });
+    // The interviewer asks a native question and the human answers slowly.
+    fake.respond(async () => {
+      const run = (await store.listRuns()).find((r) => r.planning);
+      const sessionId = run?.planning?.owner?.sessionId ?? "";
+      await setPlanningQuestionWaiting(
+        store,
+        run?.runId ?? "",
+        sessionId,
+        "q1",
+        true,
+      );
+      await Bun.sleep(1200);
+      await setPlanningQuestionWaiting(
+        store,
+        run?.runId ?? "",
+        sessionId,
+        "q1",
+        false,
+      );
+      return "Still exploring.";
+    });
+    const run = await startNativeFeature({ ...context, adapter, store });
+    expect(run?.control?.status ?? "active").toBe("active");
+    expect(String(run?.planning?.error?.message)).not.toContain("timed out");
+  } finally {
+    await project.cleanup();
+  }
+});
+
+test("scope approval returns to the agent and rides its next question call", async () => {
+  const { startNativeFeature } = await import(
+    "../../src/commands/orchestrator.js"
+  );
+  const { RalphPlugin, relayedStageWork } = await import("../../src/plugin.js");
+  const { createFakePluginContext } = await import(
+    "../helpers/fake-opencode.js"
+  );
+  const { project, fake, adapter, store, context } = await readyProject();
+  const host = createFakePluginContext(project.directory, fake.client, {
+    autoRelay: false,
+  });
+  const asked: string[] = [];
+  host.tools.set("question", {
+    id: "question",
+    name: "question",
+    description: "Native question",
+    input: {} as never,
+    async execute(input) {
+      const q = (
+        input as {
+          questions: { question: string; options: { label: string }[] }[];
+        }
+      ).questions[0];
+      asked.push(q?.question ?? "");
+      return {
+        content: "",
+        metadata: { answers: [[q?.options[0]?.label ?? ""]] },
+      };
+    },
+  });
+  const dispose = await RalphPlugin.setup(host.context);
+  try {
+    adapter.discoverTools = async () => ["question", "read"];
+    adapter.requestUserInput = async (request) => ({
+      ok: true,
+      ...request,
+      source: "user",
+      messageId: "feature-human",
+      text: "Build reset",
+    });
+    fake.respond("Ready for completion tool");
+    const run = await startNativeFeature({ ...context, adapter, store });
+    if (!run?.planning) throw new Error("Missing run");
+    const toolContext = {
+      sessionID: run.planning.sessionId,
+      signal: new AbortController().signal,
+    };
+    const raw = await host.tools.get("ralph_complete_interview")?.execute(
+      {
+        runId: run.runId,
+        attempt: 1,
+        text: "Build reset. Tokens expire.",
+        scope: ["Reset tokens"],
+        criteria: ["Expired tokens fail"],
+      },
+      toolContext as never,
+    );
+    // The tool does not block on the human: the agent shows the full
+    // proposal, then its own question call carries the approval form.
+    const result = JSON.parse(String(raw?.content));
+    expect(result.outcome).toBe("awaiting-human");
+    expect(result.show).toContain(
+      "Acceptance criteria:\n- Expired tokens fail",
+    );
+    expect(result.show).toContain(project.commit);
+    expect(asked).toEqual([]);
+    expect((await store.getRun(run.runId))?.planning?.approval).toBeUndefined();
+    await host.answerRelay(run.planning.sessionId);
+    await relayedStageWork.get(toolContext);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain("Approve explanation revision 1");
+    const approved = (await store.getRun(run.runId))?.planning;
+    expect(approved?.approval?.messageId).toBe("question:call_relay-1");
+    expect(approved?.owner?.stage).toBe("prd");
+  } finally {
+    if (typeof dispose === "function") await dispose();
     await project.cleanup();
   }
 });

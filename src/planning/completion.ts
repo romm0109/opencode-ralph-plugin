@@ -115,14 +115,9 @@ export async function completeInterview(
       requestId: state.pending.requestId,
       message: "Resolve the pending native question first",
     };
-  if (!renew && state.phase === "explanation_approval" && state.pending)
-    return {
-      outcome: "already-requested",
-      requestId: state.pending.requestId,
-      revision: state.pending.revision,
-      message:
-        "The recorded native approval request is pending; no second request was opened",
-    };
+  // A repeated call re-shows the same recorded request (same id and
+  // revision). A plugin reload loses the in-memory question, so the stage
+  // must be able to ask again without opening a new approval revision.
   if (!state.pending) {
     const config = await loadProjectConfig(state.workspace);
     const commandHash = commandConfigHash(config.commands);
@@ -189,7 +184,8 @@ export async function completeInterview(
       workspace: state.workspace,
       requestId: randomUUID(),
       revision,
-      question: `${value.text}\nScope:\n${value.scope.join("\n")}\nAcceptance criteria:\n${value.criteria.join("\n")}\nBranch: ${branch}\nFull pinned HEAD SHA: ${sha}\nCommand revision: ${config.commands.revision}\nCommand hash: ${commandHash}\n${renew ? `Previous pinned HEAD: ${state.approval?.sha ?? state.history?.at(-1)?.approval?.sha ?? "unavailable"}\nRevised command configuration: ${JSON.stringify(config.commands)}\n` : ""}Approve revision ${revision} to authorize PRD creation, issue planning, and automatic execution through implementation within this scope. Reject or request changes to return to grilling.`,
+      details: `Explanation revision ${revision}\n${value.text}\nScope:\n${value.scope.map((line) => `- ${line}`).join("\n")}\nAcceptance criteria:\n${value.criteria.map((line) => `- ${line}`).join("\n")}\nBranch: ${branch}\nFull pinned HEAD SHA: ${sha}\nCommand revision: ${config.commands.revision}\nCommand hash: ${commandHash}${renew ? `\nPrevious pinned HEAD: ${state.approval?.sha ?? state.history?.at(-1)?.approval?.sha ?? "unavailable"}\nRevised command configuration: ${JSON.stringify(config.commands)}` : ""}`,
+      question: `Approve explanation revision ${revision} shown above in this chat?\n${value.text.split(/(?<=[.!?])\s/)[0]}\nBranch ${branch} · pinned HEAD ${sha} · command revision ${config.commands.revision}\nApproving authorizes PRD creation, issue planning, and automatic execution through implementation within this scope. Request changes to return to grilling.`,
       options: [
         {
           label,

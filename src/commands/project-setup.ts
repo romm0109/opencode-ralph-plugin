@@ -311,16 +311,17 @@ export async function projectStatus(
       };
     return status;
   } catch {
-    return { status: "not-ready", reason: "No valid command verification" };
+    return {
+      status: "not-ready",
+      reason: "Project commands are not set up",
+    };
   }
 }
 export async function assertProjectReady(workspace: string) {
   const status = await projectStatus(workspace);
   if (status.status !== "verified")
     throw new Error(
-      status.reason ??
-        status.cleanupError ??
-        "Project commands are not verified",
+      `${status.reason ?? status.cleanupError ?? "Project commands are not verified"}. Run /ralph-commands to discover and approve project commands, then retry.`,
     );
 }
 
@@ -329,9 +330,7 @@ export async function assertProjectConfigured(workspace: string) {
   const status = await projectStatus(workspace);
   if (status.status !== "configured" && status.status !== "verified")
     throw new Error(
-      status.reason ??
-        status.cleanupError ??
-        "Project commands are not configured",
+      `${status.reason ?? status.cleanupError ?? "Project commands are not configured"}. Run /ralph-commands to discover and approve project commands, then retry.`,
     );
 }
 

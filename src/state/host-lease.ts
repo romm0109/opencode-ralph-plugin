@@ -115,6 +115,9 @@ export async function acquireHostLease(root: string) {
         });
         return true;
       }
+      // A plugin reload in this same host disposes the old instance first.
+      // Revive its closing lease so the reload does not act as a shutdown.
+      if (owner.status === "closing") owner.status = "active";
       if (owner.status !== "active") return false;
       token = owner.token;
       owner.locations.push(location);
@@ -150,6 +153,16 @@ export async function acquireHostLease(root: string) {
         await write(owner);
         return last;
       });
+    },
+    /** After the last release: true when a reloaded instance took over. */
+    async awaitSuccessor(timeoutMs: number) {
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        const owner = await read();
+        if (owner?.token === token && owner.status === "active") return true;
+        if (owner?.token !== token || Date.now() >= deadline) return false;
+        await Bun.sleep(50);
+      }
     },
     async finish() {
       await transact(async () => {

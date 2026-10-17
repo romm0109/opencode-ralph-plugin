@@ -7,7 +7,7 @@ import {
   realpath,
   rm,
 } from "node:fs/promises";
-import { isAbsolute, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { gitOutput } from "../git/worktrees.js";
 import { inspectOwnedProcess } from "../process/ownership.js";
 import type { RunStore } from "../state/run-store.js";
@@ -20,14 +20,37 @@ const liveFiles = new Set([
   "write.lock.recovery",
   "project-setup.lock",
 ]);
-async function describe(path: string): Promise<unknown[]> {
+async function describe(
+  path: string,
+  progress: { root: string; runs: string[] },
+): Promise<unknown[]> {
   const info = await lstat(path).catch((error) => {
     if (error.code === "ENOENT") return undefined;
     throw error;
   });
   if (!info) return [];
+  if (info.isFile() && dirname(path) === progress.root) {
+    const name = basename(path);
+    if (
+      progress.runs.some((runId) => {
+        const cursor = `${runId}.json`;
+        return (
+          name === cursor ||
+          (name.startsWith(`${cursor}.`) &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/i.test(
+              name.slice(cursor.length + 1),
+            ))
+        );
+      })
+    )
+      return [];
+  }
   return [
-    [path, info.mode, info.size, info.mtimeMs],
+    // Observer checkpoints are not workflow authority. Atomic cursor writes
+    // change this directory's size/mtime; unknown children remain fingerprinted.
+    path === progress.root && info.isDirectory()
+      ? [path, info.mode]
+      : [path, info.mode, info.size, info.mtimeMs],
     ...(info.isDirectory()
       ? (
           await Promise.all(
@@ -35,7 +58,7 @@ async function describe(path: string): Promise<unknown[]> {
               await readdir(path)
             )
               .sort()
-              .map((name) => describe(join(path, name))),
+              .map((name) => describe(join(path, name), progress)),
           )
         ).flat()
       : []),
@@ -106,7 +129,13 @@ export async function previewProjectRemoval(
       .filter((name) => !liveFiles.has(name) && !retained.has(name))
       .map((name) => join(store.root, name)),
   ];
-  const inventory = (await Promise.all(targets.map(describe))).flat();
+  const progress = {
+    root: join(store.root, "chat-progress"),
+    runs: runs.map((run) => run.runId),
+  };
+  const inventory = (
+    await Promise.all(targets.map((path) => describe(path, progress)))
+  ).flat();
   const hash = createHash("sha256")
     .update(
       JSON.stringify({

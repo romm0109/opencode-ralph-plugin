@@ -27,5 +27,8 @@ export const ralphBridge = Rpc.define({
       }),
     },
     status: { schema: z.object({ text: z.string() }) },
+    // The TUI loads forms when a session opens; a Ralph question created while
+    // its session is already open must be loaded explicitly to appear.
+    question: { schema: z.object({ sessionId: z.string() }) },
   },
 });

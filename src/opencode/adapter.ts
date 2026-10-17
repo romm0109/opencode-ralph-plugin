@@ -276,6 +276,8 @@ export function createOpenCodeAdapter(
   client: AdapterHost,
   store: RunStore,
 ): OpenCodeAdapter {
+  const issueSessionId = (runId: string, jobId: string, attempt: number) =>
+    `ses_${artifactHash(JSON.stringify([runId, jobId, attempt])).slice(0, 32)}`;
   async function finish(job: JobEnvelope, error: Failure): Promise<JobResult> {
     const result: JobResult = {
       ...job,
@@ -317,16 +319,17 @@ export function createOpenCodeAdapter(
   const adapter: OpenCodeAdapter = {
     cancelStageSession: abortSession,
     async inspectStagePrompt(sessionId, messageId, text) {
-      if (!client.session.inbox) return "unknown";
       try {
-        const queued = await client.session.inbox.list({
-          sessionID: sessionId,
-        });
+        const queued =
+          (await client.session.inbox?.list({
+            sessionID: sessionId,
+          })) ?? [];
         const history = await client.session.context({ sessionID: sessionId });
         const matches = [...queued, ...history].filter(
           (m) => m.id === messageId,
         );
-        if (!matches.length) return "missing";
+        if (!matches.length)
+          return client.session.inbox ? "missing" : "unknown";
         // Stable IDs correlate effects; the host owns message bytes and provenance.
         return matches.every(
           (m) =>
@@ -340,8 +343,36 @@ export function createOpenCodeAdapter(
       }
     },
     async findIssueSession(workspace, runId, jobId, attempt) {
-      if (!client.session.list)
-        throw new Error("Session metadata reconciliation is unavailable");
+      if (!client.session.list) {
+        // Plugin.Context exposes get/create, but not the client's list API.
+        // The deterministic creation ID lets us reconcile the same effect.
+        let session: Awaited<ReturnType<typeof client.session.get>>;
+        try {
+          session = await client.session.get({
+            sessionID: issueSessionId(runId, jobId, attempt),
+          });
+        } catch (cause) {
+          const tag = (cause as { _tag?: string })?._tag;
+          if (tag === "Session.NotFoundError" || tag === "SessionNotFoundError")
+            return undefined;
+          throw cause;
+        }
+        const metadata = session.metadata?.ralph as
+          | { runId?: string; jobId?: string; attempt?: number }
+          | undefined;
+        if (
+          metadata?.runId !== runId ||
+          metadata.jobId !== jobId ||
+          metadata.attempt !== attempt ||
+          !session.location?.directory ||
+          (await realpath(session.location.directory)) !==
+            (await realpath(workspace))
+        )
+          throw new Error(
+            "Issue session metadata or workspace does not match handoff",
+          );
+        return session.id;
+      }
       let cursor: string | undefined;
       const matches: string[] = [];
       do {
@@ -370,7 +401,7 @@ export function createOpenCodeAdapter(
     },
     async createIssueSession(workspace, runId, jobId, attempt, model) {
       const session = await client.session.create({
-        id: `ses_${artifactHash(JSON.stringify([runId, jobId, attempt])).slice(0, 32)}`,
+        id: issueSessionId(runId, jobId, attempt),
         location: { directory: workspace },
         title: `Ralph issues ${runId}`,
         model: { providerID: model.providerID, id: model.modelID },
@@ -582,15 +613,16 @@ export function createOpenCodeAdapter(
     async queueStagePrompt(sessionId, id, text) {
       // Reconcile a lost inbox receipt before resending the stable message ID.
       if (id.startsWith("msg_ralph-issues-")) {
-        if (!client.session.inbox)
-          throw new Error("Stage inbox reconciliation unavailable");
-        const queued = await client.session.inbox.list({
-          sessionID: sessionId,
-        });
+        const queued =
+          (await client.session.inbox?.list({
+            sessionID: sessionId,
+          })) ?? [];
         if (queued.some((message) => message.id === id)) return;
         const history = await client.session.context({ sessionID: sessionId });
         if (history.some((message) => message.id === id)) return;
       }
+      // The pinned host reconciles the stable prompt ID against queued and
+      // promoted messages itself when Plugin.Context has no inbox-list API.
       // prompt returns an inbox receipt, not completion of the active turn.
       await client.session.prompt({
         sessionID: sessionId,
@@ -687,7 +719,10 @@ export function createOpenCodeAdapter(
             current.status === "running"
           )
             return;
-          if (interrupt) await abortSession(bound);
+          // Native stage completion can settle the job while its next prompt
+          // already uses this session. Only cancellation may interrupt it.
+          if (interrupt && current?.result?.outcome !== "completed")
+            await abortSession(bound);
           return (
             current?.result ?? {
               ...bound,
@@ -729,10 +764,14 @@ export function createOpenCodeAdapter(
             message: "No correlated delivered prompt in session context",
           });
         const turn = history.slice(start + 1);
+        // Ralph publishes progress into the visible stage session while its
+        // agent works; only other inputs make the turn's result ambiguous.
         if (
           turn.some(
             (message) =>
-              message.type === "user" || message.type === "synthetic",
+              message.type === "user" ||
+              (message.type === "synthetic" &&
+                !message.id.startsWith("msg_ralph-progress-")),
           )
         )
           return finish(bound, {
@@ -931,7 +970,9 @@ export function createOpenCodeAdapter(
           sessionID: sessionId,
           id,
           text: sanitizeValue(text, runtimeSecretValues()).slice(0, 16000),
-          description: "Ralph workflow progress",
+          // The first line is the headline; it titles the collapsed chat entry.
+          description:
+            text.split("\n", 1)[0]?.slice(0, 120) || "Ralph workflow progress",
           resume: false,
         });
         return { ok: true };

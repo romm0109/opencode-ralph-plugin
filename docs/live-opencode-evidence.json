@@ -445,7 +445,7 @@
   },
   "humanVisibleTrial": {
     "status": "not-run",
-    "reason": "No human-visible new-protocol trial recorded; participation requested in both task iterations, with no human answers or acceptance recorded",
+    "reason": "The current credentialed native trial used agent-operated forms under the user test request; no human-visible UI acceptance is claimed.",
     "checklist": "docs/live-opencode-trial.md",
     "nativeFormRendering": false,
     "sessionFocusObservedByHuman": false,
@@ -457,7 +457,6 @@
     "win32": "not-run"
   },
   "releaseBlockers": [
-    "Pinned installed host native opening request waits without exposing a form; installed-host smoke fails",
     "Human-visible installed native forms/session navigation/progress and shutdown trial",
     "Native Linux and Windows evidence"
   ],
@@ -1135,7 +1134,230 @@
   "recordedAtUtc": "2026-10-16T09:27:52.741071+00:00",
   "allRequiredChecksPassed": false,
   "sourceCheckout": {
+    "commit": "cbbab4c960a01ea868912af813866cb7cd5eefbd",
+    "workingTreeChanges": true,
+    "note": "Final local checks validate the working tree, not an invented committed candidate. Exact behavior/test bytes are hashed in nativeWorkflowRetest20261016."
+  },
+  "historicalSourceCheckout": {
     "commit": null,
     "reason": "Repository is unborn/uncommitted; packaged consumers use independent real committed Git histories."
+  },
+  "nativeWorkflowRetest20261016": {
+    "recordedAtUtc": "2026-10-16T13:16:34.667348+00:00",
+    "platform": "darwin-arm64",
+    "bun": "1.4.3",
+    "opencode": "2.0.29",
+    "allRequiredLocalCommandsPassed": true,
+    "integration": {
+      "passed": 296,
+      "failed": 0,
+      "skipped": 1,
+      "assertions": 2034,
+      "skip": "Opt-in real agent-browser committed fixture"
+    },
+    "browser": {
+      "passed": 7
+    },
+    "sequentialCommands": [
+      {
+        "command": "bun run typecheck",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 4.83,
+        "logPath": "/tmp/ralph-final-release-20261016/00.log",
+        "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+      },
+      {
+        "command": "bun run lint",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 0.28,
+        "logPath": "/tmp/ralph-final-release-20261016/01.log",
+        "logSha256": "5456eef05d50f715326457e2b39528904e0b10e1a5d3f9215b3c77fd47ece22d"
+      },
+      {
+        "command": "bun test --timeout 30000 tests/integration/04-planning.test.ts --test-name-pattern native executor scope proposals",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 10.56,
+        "logPath": "/tmp/ralph-final-release-20261016/02.log",
+        "logSha256": "a3bd3d63a5483c2f68de750550a263599561a104e7a339fe462a02c2cb448082"
+      },
+      {
+        "command": "bun run test:status",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 17.75,
+        "logPath": "/tmp/ralph-final-release-20261016/03.log",
+        "logSha256": "8eddedfef0866f53d0d3640805d8d3322ad7569d555d438354aaabc509d7c3fe"
+      },
+      {
+        "command": "bun run test",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 373.06,
+        "logPath": "/tmp/ralph-final-release-20261016/04.log",
+        "logSha256": "02d2028b1c83212c0bfe458ecb7b1928b89eb83eaafa279b9063ab93a5ee89ec"
+      },
+      {
+        "command": "bun run build",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 4.16,
+        "logPath": "/tmp/ralph-final-release-20261016/05.log",
+        "logSha256": "b4f4a9bc0ede4a83dcf71d8f1bf0a617195b0902777cf78ddfcac3c32897d609"
+      },
+      {
+        "command": "bun run test:browser",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 17.29,
+        "logPath": "/tmp/ralph-final-release-20261016/06.log",
+        "logSha256": "02df15810de5a1c05fba1c6028316935c902f3aa9b9bebaa2b7b0d9f88dd25b8"
+      },
+      {
+        "command": "bun run test:package",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 22.7,
+        "logPath": "/tmp/ralph-final-release-20261016/07.log",
+        "logSha256": "761115c98799b274926f610af78353efc00c9756a8b21e7ae749adcf74af1333"
+      },
+      {
+        "command": "bun run test:e2e",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 18.97,
+        "logPath": "/tmp/ralph-final-release-20261016/08.log",
+        "logSha256": "277485f471e3f5dbb0a632488539c48311cf23735412cd7f79fd271df45533f9"
+      },
+      {
+        "command": "bun test --timeout 180000 tests/smoke/opencode.test.ts",
+        "env": {
+          "OPENCODE_SMOKE": "1"
+        },
+        "exitCode": 0,
+        "seconds": 28.35,
+        "logPath": "/tmp/ralph-final-release-20261016/09.log",
+        "logSha256": "b1fba4ec7ed4b445f5f4dc3a57a2a86a7d3328c4d72ca0e987c1c0c52ca872de"
+      },
+      {
+        "command": "bun run pack:local",
+        "env": {},
+        "exitCode": 0,
+        "seconds": 3.1,
+        "logPath": "/tmp/ralph-final-release-20261016/10.log",
+        "logSha256": "a471c7dff48486a15dd53ed3a3d5f2cf97c85f97ed585d92094be3fb7277bfc2"
+      }
+    ],
+    "previousFailedValidations": [
+      "/tmp/ralph-final-release-20261016/attempt-1/results.json",
+      "/tmp/ralph-final-release-20261016/attempt-2/results.json",
+      "/tmp/ralph-final-release-20261016/attempt-3/results.json"
+    ],
+    "retryFixture": {
+      "logPath": "/tmp/ralph-final-release-20261016/retry-regression.log",
+      "passed": 17,
+      "failed": 0,
+      "assertions": 152,
+      "note": "Assert the injected timer fires; await integration under the unchanged outer deadline. The separate two-pass Git scope-change integration test now has an explicit 90-second harness deadline. Product timeouts and approved commands are unchanged."
+    },
+    "fixes": [
+      "Preserve native host location spelling for same-checkout sessions",
+      "Reconcile deterministic issue sessions and prompts without unavailable plugin list/inbox APIs",
+      "Record native-approved discovery completion before same-session PRD handoff",
+      "Ignore progress observation for successfully removed worktree locations",
+      "Keep removal previews stable across recognized observation cursor updates while guarding unknown files and workflow state"
+    ],
+    "sourceHead": "cbbab4c960a01ea868912af813866cb7cd5eefbd",
+    "sourceHashes": {
+      ".bun-version": "bd31e8d9cf8d14a1e9e3fdf3b9f6a524819aed0d1b14627523c6765767c7d8f1",
+      "package.json": "cfe2afc64f4ba410bf740676d352bbdd2f9ec438078fe25ce993d169da169442",
+      "bun.lock": "96c7cd4bdc7886a55ba5c293205133fe4e323c459f88d9e9e3ca8f5e33c97139",
+      "src/plugin.ts": "de08500a3adbb50b9c11d5d9089567268a4c052fd7a7ae702c7edf572ae0be06",
+      "src/commands/remove-project.ts": "a0b3b0aeac501746e1b521ce1ddbc4dc36fbb7aa6d76941bf8db28b974efab49",
+      "src/opencode/adapter.ts": "7b49d3e4fd4e9345138665efc41ad0032038dcefeb3fd253db25472f8ec72b73",
+      "src/opencode/progress.ts": "407009fae8f02aaac84129a7fa047ce5e91b435c39d30219009ce23bf3461fea",
+      "src/planning/prd.ts": "525169ee10e576d47e2d8679caeccd7008ca03048eb3e82c0979303c9ccd2c1d",
+      "tests/integration/03-interview.test.ts": "71a6072106e5cb831095a9b37cff7ab80c121cf59fa405a14e0d05ca8a297a95",
+      "tests/integration/04-planning.test.ts": "190785392ade12036bb8315650850b726c2e3f6350a5f9d18fca2149c64a298f",
+      "tests/integration/07-retries.test.ts": "fd6bca250f9cd4404366e314b36ac514f31b1810023f3f071b2cf6063dee35e3",
+      "tests/integration/remove-project.test.ts": "3d9d26688083f92e67c6e25a57cc70982b7192b2e3826669e947d3edd33168d9",
+      "tests/integration/native-host-capabilities.test.ts": "9f2a8b5c12d566fc94699100357f6e2797575f3f14d7fd580b92c369a49f9f80",
+      "tests/integration/progress-location.test.ts": "6dd585cad05a38e17d96963d525043c3f9d29a4b2e527f6ae54a431add19834a",
+      "tests/smoke/opencode.test.ts": "d7fb8113b99777f328ea92a6099e7af62d8a54e190bbc743afc06eb3cb1d17bf"
+    },
+    "credentialedTrial": {
+      "model": "openai/gpt-6.1-sol",
+      "interaction": "Agent-operated native forms under the user request to test a small feature end to end; not human-visible UI acceptance.",
+      "repository": "/private/tmp/ralph-native-feature-20261016-2/repo",
+      "runId": "feature-b6965eef-7c7e-4d62-8e07-33a83b0de3be",
+      "startingSha": "1f8f385362f4fad84eba7d9384c36c4925a923cf",
+      "commandHash": "1168f4d5d1d72b362c5489ba2587caff86344c5668b9963bb9811e986d20c2bb",
+      "feature": "createCounter().reset() returns zero, resets local state, preserves independent counters and subsequent increments",
+      "branch": "ralph/feature-b6965eef-7c7e-4d62-8e07-33a83b0de3be",
+      "commit": "0bd3315a4613c82ecb372b608bb71a6de8f493c3",
+      "outcome": "unverified",
+      "attempts": [
+        {
+          "issueId": "1",
+          "used": 1
+        }
+      ],
+      "completedIssues": [
+        "1"
+      ],
+      "findings": [],
+      "skippedChecks": [],
+      "cleanupFailures": [],
+      "unavailableReview": [
+        "Functional review: missing verification",
+        "issue-1-7: Source scope, API preservation and dependency preservation are supported. No supplied operation history establishes the additional prohibition on pushing or merging main, so the complete criterion cannot be marked passed."
+      ],
+      "rounds": [
+        {
+          "round": 1,
+          "commit": "0bd3315a4613c82ecb372b608bb71a6de8f493c3",
+          "code": "passed",
+          "functional": "unverified"
+        },
+        {
+          "round": 2,
+          "commit": "0bd3315a4613c82ecb372b608bb71a6de8f493c3",
+          "code": "passed",
+          "functional": "unverified"
+        }
+      ],
+      "independentSafetyAudit": {
+        "mainSha": "1f8f385362f4fad84eba7d9384c36c4925a923cf",
+        "remotes": "",
+        "workingTree": "",
+        "note": "Independent post-run observations. These were not supplied to the native final reviewers; their unverified reports remain unchanged."
+      },
+      "shutdown": {
+        "requested": "SIGTERM after terminal round-two report",
+        "forcedTermination": true,
+        "reason": "The completed host remained alive after more than 20 seconds; the exact owned PID was then killed. No active model jobs remained. Graceful shutdown is not claimed."
+      },
+      "archive": {
+        "path": "/private/tmp/ralph-native-feature-build-20261016/opencode-ralph-plugin-0.2.0.tgz",
+        "sha256": "2f44a830aefda365945b66696d2db04feb04106c0c5645d451a8d2aa10dda4bf",
+        "note": "Initial archive includes the location fix. After the PRD handoff blocker, the installed dist was replaced with the build containing the native capability fix, then the same accepted PRD was resumed. The historical failed interview receipt is retained; its reporting fix is verified separately in the 54-assertion installed-host smoke."
+      },
+      "fullEvidencePath": "/private/tmp/ralph-native-feature-20261016-2/evidence.json",
+      "reportPath": "/private/tmp/ralph-native-feature-20261016-2/final-report.json",
+      "historicalReceiptNote": "The failed discovery receipt remains retained; its reporting fix is verified in the final installed-host smoke. Native capability fixes were installed before resuming the accepted PRD."
+    },
+    "packageArchive": {
+      "path": "/Users/rwmmtzqy/Documents/opencode-ralph-plugin/opencode-ralph-plugin-0.2.0.tgz",
+      "hashReceiptPath": "/tmp/ralph-final-release-20261016/final-archive.json"
+    },
+    "limitations": [
+      "Human-visible new-protocol TUI acceptance not performed",
+      "Native Linux/Windows not run",
+      "Live report remains unverified for missing supplied operation history",
+      "Credentialed trial host needed forced termination after terminal report; graceful shutdown not claimed",
+      "Separate opt-in credentialed session smoke is skipped; the credentialed counter trial is recorded independently"
+    ]
   }
 }

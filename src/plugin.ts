@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { realpath } from "node:fs/promises";
 import { Plugin } from "@opencode/plugin";
 import type { Registration } from "@opencode/plugin/promise/registration";
@@ -5,20 +6,14 @@ import type { ToolEditor } from "@opencode/plugin/promise/tool";
 import { z } from "zod";
 import { handleControlCommand } from "./commands/control.js";
 import { startNativeFeature } from "./commands/orchestrator.js";
-import {
-  approvesRemoval,
-  type RemovalReceipt,
-} from "./commands/removal-approval.js";
-import {
-  previewProjectRemoval,
-  removeProject,
-} from "./commands/remove-project.js";
+import { runRemovalCommand } from "./commands/remove-command.js";
 import { createCommandRouter } from "./commands/router.js";
 import {
   commandSetupPrompt,
   saveProjectCommands,
 } from "./commands/save-commands.js";
 import { commandConfigSchema } from "./config/commands.js";
+import type { UserInputRequest, UserInputResult } from "./core/types.js";
 import { startDashboard } from "./dashboard/server.js";
 import {
   createOpenCodeAdapter,
@@ -26,7 +21,11 @@ import {
   reviewTools,
 } from "./opencode/adapter.js";
 import { ralphBridge } from "./opencode/bridge.js";
-import { requestNativeInput } from "./opencode/native-input.js";
+import {
+  nativeAnswer,
+  nativeQuestionInput,
+  requestNativeInput,
+} from "./opencode/native-input.js";
 import { createProgressObserver } from "./opencode/progress.js";
 import {
   planningFileInput,
@@ -54,10 +53,161 @@ import { acquireHostLease } from "./state/host-lease.js";
 import { openRunStore } from "./state/run-store.js";
 import { runtimeSecretValues, sanitizeValue } from "./state/sanitize.js";
 
+const RALPH_COMMANDS = [
+  "ralph-status",
+  "ralph-commands",
+  "ralph-orchestrator",
+  "ralph-pause",
+  "ralph-resume",
+  "ralph-stop",
+  "ralph-remove",
+] as const;
+
+/** The TUI shows a synthetic message collapsed to its description, so it must carry the outcome. */
+const brief = (text: string) => {
+  const line = text.split("\n", 1)[0] ?? "";
+  return line.length > 200 ? `${line.slice(0, 199)}…` : line;
+};
+const RELAY_PROMPT =
+  "Ralph needs a human answer in this session. Call the question tool exactly once now with any input; Ralph replaces it with the pending question and records the human answer. Then end your turn.";
+const RELAYED = Symbol("relayed");
+/** How long a disposed last instance waits for a reloaded successor. */
+function reloadGraceMs() {
+  const value = Number(process.env.RALPH_RELOAD_GRACE_MS);
+  return Number.isFinite(value) && value >= 0 ? value : 3000;
+}
+/** The background completion of each relayed stage tool call, by tool context. */
+export const relayedStageWork = new WeakMap<object, Promise<unknown>>();
+
 export const RalphPlugin = Plugin.define({
   id: "ralph",
   async setup(ctx) {
     const directory = ctx.location.directory;
+    // The Ralph stage tool call that is running, if any.
+    const stageToolCall = new AsyncLocalStorage<{
+      sessionId: string;
+      relayed: () => void;
+      returned: boolean;
+    }>();
+    // OpenCode shows forms that Ralph creates itself only while a slash command
+    // runs. Every other Ralph question is relayed through the session agent's
+    // own question tool call: Ralph replaces that call's input with the pending
+    // question and reads the human answer from the host result.
+    const relays = new Map<
+      string,
+      {
+        request: UserInputRequest;
+        resolve: (result: UserInputResult) => void;
+        callId?: string;
+      }
+    >();
+    async function relayUserInput(
+      request: UserInputRequest,
+    ): Promise<UserInputResult> {
+      if (!(await ctx.tool.list()).some((tool) => tool.id === "question"))
+        return {
+          ok: false,
+          error: {
+            code: "unsupported",
+            message: "OpenCode's native question tool is unavailable",
+          },
+        };
+      return new Promise<UserInputResult>((resolve) => {
+        relays.get(request.sessionId)?.resolve({
+          ok: false,
+          error: {
+            code: "cancelled",
+            message: "Superseded by a newer Ralph question",
+          },
+        });
+        relays.set(request.sessionId, { request, resolve });
+        const caller = stageToolCall.getStore();
+        // Only the first question can ride the agent's next tool call; once
+        // the stage tool has returned, later questions prompt the agent.
+        if (caller?.sessionId === request.sessionId && !caller.returned) {
+          caller.returned = true;
+          caller.relayed();
+          return;
+        }
+        void ctx.session
+          .prompt({
+            sessionID: request.sessionId,
+            text: request.details
+              ? `${RELAY_PROMPT}\nBefore calling it, write this text to the user verbatim as your message:\n\n${request.details}`
+              : RELAY_PROMPT,
+            metadata: { ralphCommand: true },
+          })
+          .catch((cause) => {
+            if (relays.get(request.sessionId)?.request !== request) return;
+            relays.delete(request.sessionId);
+            resolve({
+              ok: false,
+              error: { code: "sdk-error", message: String(cause) },
+            });
+          });
+      });
+    }
+    /** Returns to the agent as soon as its tool call needs a relayed answer. */
+    async function relayingTool(
+      context: { sessionID: string },
+      work: () => Promise<unknown>,
+    ) {
+      const sessionId = context.sessionID;
+      let relayed: () => void = () => {};
+      const asked = new Promise<typeof RELAYED>((resolve) => {
+        relayed = () => resolve(RELAYED);
+      });
+      const running = stageToolCall.run(
+        { sessionId, relayed: () => relayed(), returned: false },
+        work,
+      );
+      const first = await Promise.race([running, asked]);
+      if (first !== RELAYED) return JSON.stringify(first);
+      relayedStageWork.set(context, running);
+      running.catch((cause) =>
+        console.error(
+          "Ralph stage completion failed",
+          sanitizeValue(String(cause), runtimeSecretValues()).slice(0, 1000),
+        ),
+      );
+      const details = relays.get(sessionId)?.request.details;
+      return JSON.stringify({
+        outcome: "awaiting-human",
+        ...(details
+          ? {
+              show: details,
+              next: "First write the `show` text to the user verbatim as your message. Then call the question tool with any input. Ralph shows its pending question there and records the human answer. Call no other tool first.",
+            }
+          : {
+              next: "Call the question tool now with any input. Ralph shows its pending question there and records the human answer. Call no other tool first.",
+            }),
+      });
+    }
+    // A globally installed plugin also loads in folders that are not Git
+    // repositories. Stay loaded and explain the requirement instead of failing.
+    if (
+      Bun.spawnSync(["git", "-C", directory, "rev-parse", "--git-dir"], {
+        stdout: "ignore",
+        stderr: "ignore",
+      }).exitCode !== 0
+    ) {
+      const registration = await ctx.command.transform((editor) => {
+        for (const name of RALPH_COMMANDS)
+          editor.add({
+            name,
+            description: "Ralph needs a Git repository in this folder",
+            async execute(input) {
+              await ctx.session.synthetic({
+                sessionID: input.sessionID,
+                text: `Ralph is unavailable here: ${directory} is not inside a Git repository. Run \`git init\` and commit your project, then restart OpenCode in it.`,
+                description: "Ralph needs a Git repository",
+                resume: false,
+              });
+            },
+          });
+      });
+      return () => registration.dispose();
+    }
     const store = await openRunStore(directory);
     const lease = await acquireHostLease(store.root);
     const registrations: Registration[] = [];
@@ -97,9 +247,25 @@ export const RalphPlugin = Plugin.define({
       | undefined;
     const adapter = createOpenCodeAdapter(
       {
-        session: ctx.session,
+        session: {
+          ...ctx.session,
+          async create(input) {
+            // OpenCode scopes forms and tools by location spelling. A canonical
+            // path can identify the same checkout but select a different scope.
+            const sameWorkspace =
+              input?.location?.directory &&
+              (await realpath(input.location.directory)) ===
+                (await realpath(directory));
+            return ctx.session.create({
+              ...input,
+              ...(sameWorkspace ? { location: { directory } } : {}),
+            });
+          },
+        },
         requestUserInput: (request) =>
-          requestNativeInput(ctx, request, eventsAbort.signal),
+          request.kind === "feature" || request.kind === "existing-run"
+            ? requestNativeInput(ctx, request, eventsAbort.signal)
+            : relayUserInput(request),
         assertCommandPermission: async (sessionId, command, hash) => {
           await ctx.permission.assert({
             sessionID: sessionId,
@@ -200,8 +366,6 @@ export const RalphPlugin = Plugin.define({
     const eventsAbort = new AbortController();
     let disposed = false;
     const stopPlanningSupervision = startPlanningSupervision(store, adapter);
-    const receipts = new Map<string, RemovalReceipt>();
-    const removalPlans = new Map<string, string>();
     let notification: ReturnType<typeof setImmediate> | undefined;
     let progressTimer: ReturnType<typeof setInterval> | undefined;
     const progress = createProgressObserver({
@@ -218,7 +382,12 @@ export const RalphPlugin = Plugin.define({
         );
         if (!result?.ok)
           throw new Error(result?.error?.message ?? "Progress unavailable");
-        await adapter.publishStatus(sessionId, directory, text.slice(0, 1000));
+        // Toasts stay short; the full update is in the chat entry.
+        await adapter.publishStatus(
+          sessionId,
+          directory,
+          text.split("\n", 1)[0]?.slice(0, 200) ?? "",
+        );
       },
     });
     async function interviewOwner(sessionID: string) {
@@ -248,7 +417,22 @@ export const RalphPlugin = Plugin.define({
       await progress.stop();
       if (notification) clearImmediate(notification);
       eventsAbort.abort();
-      const lastInstance = await lease.release();
+      for (const relay of relays.values())
+        relay.resolve({
+          ok: false,
+          error: { code: "cancelled", message: "Ralph is shutting down" },
+        });
+      relays.clear();
+      // A config change reloads plugins in this same host: the new instance
+      // takes over the durable runs, so only a real shutdown stops them.
+      const live = (await store.listRuns()).some(
+        (run) =>
+          run.control?.status !== "stopped" &&
+          run.reviewWorkflow?.status !== "terminal",
+      );
+      const lastInstance =
+        (await lease.release()) &&
+        !(live && (await lease.awaitSuccessor(reloadGraceMs())));
       try {
         if (lastInstance)
           for (const run of await store.listRuns()) {
@@ -302,26 +486,23 @@ export const RalphPlugin = Plugin.define({
       registrations.push(statusEvents);
       registrations.push(
         await ctx.command.transform((editor) => {
-          for (const name of [
-            "ralph-status",
-            "ralph-commands",
-            "ralph-orchestrator",
-            "ralph-pause",
-            "ralph-resume",
-            "ralph-stop",
-            "ralph-remove",
-          ]) {
+          for (const name of RALPH_COMMANDS) {
             editor.add({
               name,
-              description:
-                name === "ralph-status"
-                  ? "Read durable Ralph run status"
-                  : name === "ralph-commands"
-                    ? "Discover, review and approve project commands"
-                    : `${name.slice(6)} the durable Ralph run`,
+              description: {
+                "ralph-status": "Read durable Ralph run status",
+                "ralph-commands":
+                  "Discover, review and approve project commands",
+                "ralph-orchestrator":
+                  "Build a feature: interview, PRD, issues, then automatic execution",
+                "ralph-pause": "Pause the Ralph run after current work settles",
+                "ralph-resume": "Resume the paused or interrupted Ralph run",
+                "ralph-stop": "Stop the Ralph run and its owned work",
+                "ralph-remove":
+                  "Preview and remove Ralph state from this project",
+              }[name],
               async execute(input) {
                 if (name === "ralph-commands") {
-                  receipts.delete(input.sessionID);
                   await ctx.session.prompt({
                     sessionID: input.sessionID,
                     text: commandSetupPrompt,
@@ -331,7 +512,6 @@ export const RalphPlugin = Plugin.define({
                   return;
                 }
                 if (name === "ralph-orchestrator") {
-                  receipts.delete(input.sessionID);
                   try {
                     await startNativeFeature({
                       workspace: directory,
@@ -350,7 +530,7 @@ export const RalphPlugin = Plugin.define({
                     await ctx.session.synthetic({
                       sessionID: input.sessionID,
                       text,
-                      description: "Ralph startup blocker",
+                      description: brief(text),
                       resume: false,
                     });
                   }
@@ -371,18 +551,30 @@ export const RalphPlugin = Plugin.define({
                   await ctx.session.synthetic({
                     sessionID: input.sessionID,
                     text,
-                    description: "Ralph resume result",
+                    description: brief(text),
                     resume: false,
                   });
                   return;
                 }
                 if (name === "ralph-remove") {
-                  receipts.delete(input.sessionID);
-                  await ctx.session.prompt({
+                  let text: string;
+                  try {
+                    text = await runRemovalCommand({
+                      directory,
+                      store,
+                      sessionId: input.sessionID,
+                      ask: (request) =>
+                        requestNativeInput(ctx, request, eventsAbort.signal),
+                    });
+                  } catch (cause) {
+                    text = `Ralph removal failed; nothing more was deleted: ${cause instanceof Error ? cause.message : String(cause)}`;
+                  }
+                  if (disposed) return;
+                  await ctx.session.synthetic({
                     sessionID: input.sessionID,
-                    metadata: { ralphCommand: true },
-                    text: "Remove Ralph from this project. Call ralph_remove action=preview, show exactly what will be deleted and preserved, explain any blockers, then ask for approval and wait. Only after a new user approval, call action=remove with the preview planId. Preserve feature branches and project code. Do not delete files yourself.",
-                    delivery: input.delivery,
+                    text,
+                    description: brief(text),
+                    resume: false,
                   });
                   return;
                 }
@@ -392,7 +584,7 @@ export const RalphPlugin = Plugin.define({
                   await ctx.session.synthetic({
                     sessionID: input.sessionID,
                     text,
-                    description: "Ralph command result",
+                    description: brief(text),
                     resume: false,
                   });
                 };
@@ -443,8 +635,8 @@ export const RalphPlugin = Plugin.define({
             async execute(input, context) {
               context.signal.throwIfAborted();
               return {
-                content: JSON.stringify(
-                  await requestProductDecision(
+                content: await relayingTool(context, () =>
+                  requestProductDecision(
                     store,
                     adapter,
                     input,
@@ -463,13 +655,8 @@ export const RalphPlugin = Plugin.define({
             async execute(input, context) {
               context.signal.throwIfAborted();
               return {
-                content: JSON.stringify(
-                  await completeInterview(
-                    store,
-                    adapter,
-                    input,
-                    context.sessionID,
-                  ),
+                content: await relayingTool(context, () =>
+                  completeInterview(store, adapter, input, context.sessionID),
                 ),
               };
             },
@@ -542,42 +729,6 @@ export const RalphPlugin = Plugin.define({
             },
           });
           editor.add({
-            name: "ralph_remove",
-            description:
-              "Preview removal of this project's Ralph configuration and saved workflow state. Only remove after the user approves the displayed preview. Keeps code, branches, worktrees and the global plugin.",
-            input: z.object({
-              action: z.enum(["preview", "remove"]),
-              planId: z.string().optional(),
-            }),
-            options: { codemode: false },
-            async execute(input, context) {
-              if (input.action === "preview") {
-                const plan = await previewProjectRemoval(directory, store);
-                removalPlans.set(context.sessionID, plan.planId);
-                return { content: JSON.stringify(plan) };
-              }
-              const receipt = receipts.get(context.sessionID);
-              if (
-                !input.planId ||
-                removalPlans.get(context.sessionID) !== input.planId ||
-                !receipt?.requests.has(`remove:${input.planId}`) ||
-                !approvesRemoval(receipt.text)
-              )
-                throw new Error(
-                  "Show a removal preview and wait for a new user approval in this chat.",
-                );
-              const result = await removeProject(
-                directory,
-                store,
-                input.planId,
-                context.signal,
-              );
-              removalPlans.delete(context.sessionID);
-              receipts.delete(context.sessionID);
-              return { content: JSON.stringify(result) };
-            },
-          });
-          editor.add({
             name: "ralph_status",
             description:
               "Read persisted Ralph phase, correlated job result, errors and dashboard URL.",
@@ -631,19 +782,6 @@ export const RalphPlugin = Plugin.define({
         }),
       );
       registrations.push(
-        await ctx.session.hook("prompt", async (input) => {
-          if (input.metadata?.ralphCommand) return;
-          const requests = new Set<string>();
-          const plan = removalPlans.get(input.sessionID);
-          if (plan) requests.add(`remove:${plan}`);
-          receipts.set(input.sessionID, {
-            messageId: input.messageID,
-            text: input.prompt.text,
-            requests,
-          });
-        }),
-      );
-      registrations.push(
         await ctx.session.hook("context", async (input) => {
           const owner = await interviewOwner(input.sessionID);
           if (owner) {
@@ -676,11 +814,7 @@ export const RalphPlugin = Plugin.define({
                 ? !allowed.has(name)
                 : name.startsWith("ralph_review_") ||
                   (!!entry &&
-                    [
-                      "ralph_remove",
-                      "ralph_save_commands",
-                      "ralph_control",
-                    ].includes(name))
+                    ["ralph_save_commands", "ralph_control"].includes(name))
             )
               delete input.tools[name];
           }
@@ -698,12 +832,55 @@ export const RalphPlugin = Plugin.define({
               String(input.id),
               false,
             );
+          // Resolve after the waiting flag is cleared: both update planning state.
+          const relay = relays.get(input.sessionID);
+          if (relay && relay.callId === String(input.id)) {
+            relays.delete(input.sessionID);
+            const text =
+              input.status === "completed"
+                ? nativeAnswer(input.result.metadata)
+                : undefined;
+            relay.resolve(
+              text
+                ? {
+                    ok: true,
+                    source: "user",
+                    requestId: relay.request.requestId,
+                    revision: relay.request.revision,
+                    sessionId: relay.request.sessionId,
+                    messageId: `question:${String(input.id)}`,
+                    text,
+                  }
+                : {
+                    ok: false,
+                    error: {
+                      code:
+                        input.status === "error"
+                          ? "cancelled"
+                          : "missing-output",
+                      message:
+                        input.status === "error"
+                          ? "The question was dismissed without an answer"
+                          : "Native question returned no single answer",
+                    },
+                  },
+            );
+          }
         }),
       );
       // Execution checks also cover tools reached through code mode or renamed
       // definitions. Never change a host denial into an allow.
       registrations.push(
         await ctx.tool.hook("execute.before", async (input) => {
+          // The agent's question call carries Ralph's pending question; the
+          // model cannot change its wording or options.
+          if (input.tool === "question") {
+            const relay = relays.get(input.sessionID);
+            if (relay && !relay.callId) {
+              relay.callId = String(input.id);
+              input.input = nativeQuestionInput(relay.request);
+            }
+          }
           const owner = await interviewOwner(input.sessionID);
           if (owner) {
             const pendingNativeQuestion =
@@ -756,9 +933,7 @@ export const RalphPlugin = Plugin.define({
           const job = entry?.envelope;
           if (
             entry &&
-            ["ralph_remove", "ralph_save_commands", "ralph_control"].includes(
-              input.tool,
-            )
+            ["ralph_save_commands", "ralph_control"].includes(input.tool)
           )
             throw new Error(
               "Ralph administrative tools belong to the user's main chat, not worker agents.",
@@ -789,6 +964,12 @@ export const RalphPlugin = Plugin.define({
         try {
           for await (const event of events) {
             if (disposed) break;
+            // The TUI loads forms when a session opens; ask it to load forms
+            // created while their session is already open.
+            if (event.type === "form.created")
+              await statusEvents?.events
+                .emit("question", { sessionId: event.data.form.sessionID })
+                .catch(() => {});
             await adapter.receiveEvent(event);
           }
         } catch (cause) {

@@ -13,7 +13,7 @@ PRD authoring now completes through `ralph_complete_prd`. It validates the writt
 - Interview/PRD sessions can observe repository files and ask native questions. Catalog filtering and execution checks deny generic shell, write/edit, delegation, code mode and review aliases. Only the PRD stage gains the scoped writer. Existing reviewer and administrative restrictions remain separate.
 
 - PRD completion requires the owning session/attempt and active authorization, full nonempty required sections, and the supplied explanation revision/hash reference. API Specification and Appendix are optional. Invalid drafts return actionable correctable outcomes without a planner. Traversal and symlink sources are rejected.
-- Acceptance intent stores exact bytes before publication. A persisted handoff stores PRD input revision, full adapted skill/prompt and stable message identity before host effects. Creation is correlated by runId/jobId/attempt, reconciled through paginated session metadata, and uses a stable host session ID. Ownership attaches before prompt delivery. Lost prompt receipts reconcile inbox/history; lost focus receipts use TUI event deduplication. Successful repeated calls return the recorded result without new prompts or focus.
+- Acceptance intent stores exact bytes before publication. A persisted handoff stores PRD input revision, full adapted skill/prompt and stable message identity before host effects. Creation is correlated by runId/jobId/attempt and uses a stable host session ID. Full clients reconcile paginated session metadata; native Plugin.Context lacks session listing, so it looks up that exact ID and verifies its metadata and workspace. Ownership attaches before prompt delivery. Lost prompt receipts reconcile inbox/history where available; native plugin delivery reuses the stable ID and the pinned host reconciles queued/promoted messages itself; lost focus receipts use TUI event deduplication. Successful repeated calls return the recorded result without new prompts or focus.
 - The fresh owner can write only `graph.json` and safe `issues/<number>-<slug>.md` files under `issues-draft-<attempt>`. The former owner cannot replace accepted PRD bytes. Generic writes, shell and delegation remain denied at execution. The full to-issues adaptation preserves exploration, vertical slices, concrete patterns/tasks/test guidance and local Markdown; it removes tracker setup and breakdown approval.
 - Graph validation requires nonempty What to build, Context: files to read before implementing, Patterns to follow, Step-by-step tasks, Acceptance criteria, Validation commands and Blocked by sections, plus existing strict graph identity/dependency/cycle checks. Historical test fixtures now use that template too.
 - `ralph_complete_issues` validates the owning stage, accepted PRD, unchanged commit/configuration and graph/files. It publishes immutable accepted artifacts and records execution eligibility under the existing scope authorization before starting preflight and scheduling automatically. Duplicate accepted calls return the recorded result without redispatch; prose never starts execution.
@@ -34,6 +34,8 @@ PRD authoring now completes through `ralph_complete_prd`. It validates the writt
 - `src/planning/graph.ts`, `skills/to-issues/SKILL.md` — required issue content and full adapted local planning skill.
 - `src/opencode/bridge.ts`, `src/tui.ts`, `tests/integration/tui-input.test.ts` — issue-stage focus events and location-scoped duplicate navigation suppression.
 
+- `tests/integration/native-host-capabilities.test.ts` — limited native session API, stable-ID lookup, prompt deduplication and mismatched metadata rejection.
+
 ## Related
 - [Execution baseline](execution-baseline.md)
 - [Feature interview](feature-interview.md)
@@ -43,6 +45,8 @@ PRD authoring now completes through `ralph_complete_prd`. It validates the writt
 Fake-host tests verify native completion, automatic execution, retry/recovery contracts and prompt payloads; they are not evidence of real native UI rendering. Installed-host and cross-platform evidence belongs to issue 25.
 
 Legacy JSON generators, graph approval handlers and chat transport have been removed. All feature command entrypoints use native stage services. Unsupported saved workflows cannot resume or migrate; their artifacts remain intact.
+
+The two-execution scope-change integration test has a 90-second real-I/O harness budget; its agent/check deadlines remain injected and its assertions are unchanged. This does not change approved project commands or runtime attempt deadlines.
 
 ## Last updated
 2026-10-16

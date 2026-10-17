@@ -94,12 +94,23 @@ async function nativePrdFixture() {
     text: "Diamond",
   });
   const host = createFakePluginContext(f.project.directory, f.fake.client);
+  const questionCalls: {
+    messageID?: string;
+    id?: string;
+    question?: string | undefined;
+  }[] = [];
   host.tools.set("question", {
     id: "question",
     name: "question",
     description: "Native input",
     input: {} as never,
-    async execute(input) {
+    async execute(input, toolContext) {
+      questionCalls.push({
+        messageID: toolContext.messageID,
+        id: toolContext.id,
+        question: (input as { questions: { question: string }[] }).questions[0]
+          ?.question,
+      });
       const q = (input as { questions: { options: { label: string }[] }[] })
         .questions[0];
       return { content: "", metadata: { answers: [[q?.options[0]?.label]] } };
@@ -116,6 +127,8 @@ async function nativePrdFixture() {
   if (!run?.planning) throw new Error("Missing native run");
   const context = {
     sessionID: run.planning.sessionId,
+    messageID: "msg_complete-interview",
+    id: "call_complete-interview",
     signal: new AbortController().signal,
   } as never;
   await host.tools.get("ralph_complete_interview")?.execute(
@@ -159,12 +172,35 @@ async function nativePrdFixture() {
     if (!tool) throw new Error("Missing PRD completion tool");
     return JSON.parse(String((await tool.execute(args, ctx)).content));
   };
-  return { ...f, host, dispose, run, context, text, input, write, complete };
+  return {
+    ...f,
+    host,
+    dispose,
+    run,
+    context,
+    text,
+    input,
+    write,
+    complete,
+    questionCalls,
+  };
 }
 
 test("native PRD completion accepts exact bytes and opens one restricted fresh planner", async () => {
   const f = await nativePrdFixture();
   try {
+    // OpenCode does not show forms Ralph creates from a tool call, so the scope
+    // approval is relayed through the interviewer's own question tool call.
+    // The agent called it with empty input; Ralph supplied the exact question.
+    expect(f.questionCalls).toEqual([
+      {
+        messageID: "msg_relay-1",
+        id: "call_relay-1",
+        question: expect.stringContaining(
+          "Approve explanation revision 1 shown above in this chat?",
+        ),
+      },
+    ]);
     await f.write(f.text);
     const [result, duplicate] = await Promise.all([f.complete(), f.complete()]);
     expect(duplicate).toEqual(result);
@@ -784,7 +820,7 @@ test("native accepted issues run real Git workers and both independent reviewers
       !f.fake.requests.some(
         (r) =>
           r.path.endsWith("/synthetic") &&
-          String(r.body.text).includes('"outcome": "verified"'),
+          String(r.body.text).startsWith("Ralph finished: verified"),
       ) &&
       Date.now() < deadline
     )
@@ -792,13 +828,13 @@ test("native accepted issues run real Git workers and both independent reviewers
     const progress = f.fake.requests.filter(
       (r) =>
         r.path.endsWith("/synthetic") &&
-        r.body.description === "Ralph workflow progress",
+        String(r.body.id).startsWith("msg_ralph-progress-"),
     );
     expect(
       progress.some(
         (r) =>
           r.path === `/api/session/${f.state.sessionId}/synthetic` &&
-          String(r.body.text).includes('"outcome": "verified"'),
+          String(r.body.text).startsWith("Ralph finished: verified"),
       ),
     ).toBe(true);
     expect(progress.every((r) => r.body.resume === false)).toBe(true);
@@ -979,7 +1015,15 @@ test("native planner scope revision invalidates accepted artifacts and requires 
     );
     expect(result.outcome).toBe("accepted");
     expect(questions).toHaveLength(2);
-    expect(questions[1]).toContain("Expires after one day");
+    expect(questions[1]).toContain("Approve explanation revision 2");
+    // The full revised scope is shown in the planner chat before the form.
+    expect(
+      f.fake.requests.some(
+        (r) =>
+          r.path.endsWith("/prompt") &&
+          String(r.body.text).includes("Expires after one day"),
+      ),
+    ).toBe(true);
     const after = required((await f.store.getRun(f.run.runId))?.planning);
     expect(after.approval?.requestId).not.toBe(
       required(f.state.approval?.requestId),
@@ -1085,7 +1129,8 @@ for (const changed of ["HEAD", "commands"] as const) {
       const { resumeWorkflow } = await import("../../src/commands/resume.js");
       let shown = "";
       f.adapter.requestUserInput = async (request) => {
-        shown = request.question;
+        // The short form question plus the full context shown in chat.
+        shown = `${request.question}\n${request.details ?? ""}`;
         return {
           ok: true,
           ...request,
@@ -1159,6 +1204,7 @@ test("pending native decision blocks completion and stale native results retain 
   }
 });
 
+// Two real Git execution passes need an I/O budget; agent/check deadlines stay injected.
 test("native executor scope proposals require explanation approval and regenerated accepted artifacts", async () => {
   const f = await nativeIssueFixture();
   try {
@@ -1297,7 +1343,7 @@ test("native executor scope proposals require explanation approval and regenerat
   } finally {
     await f.cleanup();
   }
-});
+}, 90_000);
 
 test("native revised scope approval recovers its persisted request after unavailable input", async () => {
   const f = await nativePrdFixture();
@@ -1387,8 +1433,8 @@ for (const changed of ["HEAD", "commands"] as const) {
       };
       await resumeWorkflow(f.store, f.adapter, f.run.runId);
       const after = required((await f.store.getRun(f.run.runId))?.planning);
-      expect(displayed?.question).toContain("Previous pinned HEAD:");
-      expect(displayed?.question).toContain("Revised command configuration:");
+      expect(displayed?.details).toContain("Previous pinned HEAD:");
+      expect(displayed?.details).toContain("Revised command configuration:");
       expect(after.approval?.requestId).toBe(required(displayed).requestId);
       expect(after.approval?.requestId).not.toBe(
         required(f.state.approval?.requestId),

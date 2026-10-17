@@ -3,6 +3,7 @@ import {
   mkdir,
   readFile,
   realpath,
+  rm,
   symlink,
   writeFile,
 } from "node:fs/promises";
@@ -17,7 +18,7 @@ import { openRunStore } from "../../src/state/run-store.js";
 import { createFakePluginContext } from "../helpers/fake-opencode.js";
 import { createTestProject, git } from "../helpers/project.js";
 
-test("removal requires a new chat approval, clears state and allows setup again while preserving code and branches", async () => {
+test("removal asks one native question for its exact preview, clears state and allows setup again while preserving code and branches", async () => {
   const project = await createTestProject();
   const host = createFakePluginContext(project.directory);
   const dispose = await RalphPlugin.setup(host.context);
@@ -41,44 +42,58 @@ test("removal requires a new chat approval, clears state and allows setup again 
       tree,
     ]);
     await writeFile(join(tree, "unsaved.txt"), "Keep this code");
-    const tool = host.tools.get("ralph_remove");
-    if (!tool) throw new Error("Missing removal tool");
-    const invoke = async (input: unknown) =>
-      JSON.parse(
-        (
-          await tool.execute(input, {
-            sessionID: "main",
-            signal: new AbortController().signal,
-          } as never)
-        ).content as string,
-      );
-    await host.hooks.get("session.prompt")?.({
-      sessionID: "main",
-      messageID: "too-early",
-      prompt: { text: "approve" },
+    // The command asks one native question bound to its own preview.
+    const asked: { sessionID: string; question: string; options: string[] }[] =
+      [];
+    let answer: string | undefined;
+    host.tools.set("question", {
+      id: "question",
+      name: "question",
+      description: "Native input",
+      input: {} as never,
+      async execute(input, context) {
+        const [q] = (
+          input as {
+            questions: { question: string; options: { label: string }[] }[];
+          }
+        ).questions;
+        asked.push({
+          sessionID: context.sessionID,
+          question: q?.question ?? "",
+          options: q?.options.map((o) => o.label) ?? [],
+        });
+        return {
+          content: "",
+          metadata: answer ? { answers: [[answer]] } : {},
+        };
+      },
     });
-    const preview = await invoke({ action: "preview" });
-    expect(preview.blockers).toEqual([]);
-    expect(preview.retainedWorktrees).toContain(await realpath(tree));
-    await expect(
-      invoke({ action: "remove", planId: preview.planId }),
-    ).rejects.toThrow("new user approval");
-    await host.hooks.get("session.prompt")?.({
-      sessionID: "main",
-      messageID: "reject",
-      prompt: { text: "no" },
-    });
-    await expect(
-      invoke({ action: "remove", planId: preview.planId }),
-    ).rejects.toThrow("new user approval");
-    await host.hooks.get("session.prompt")?.({
-      sessionID: "main",
-      messageID: "approve",
-      prompt: { text: "yes" },
-    });
+    const remove = () =>
+      host.commands.get("ralph-remove")?.execute({
+        sessionID: "main",
+        prompt: { text: "" },
+        delivery: "steer",
+      } as never);
+    // No answer from the form: nothing is removed and no model is prompted.
+    await remove();
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.sessionID).toBe("main");
+    expect(asked[0]?.question).toContain(".ralph");
+    expect(asked[0]?.question).toContain(await realpath(tree));
+    expect(asked[0]?.options).toEqual([
+      "Remove Ralph state",
+      "Keep everything",
+    ]);
+    expect(await store.listRuns()).toHaveLength(1);
+    // Declining keeps everything.
+    answer = "Keep everything";
+    await remove();
+    expect(await store.listRuns()).toHaveLength(1);
     expect(
-      (await invoke({ action: "remove", planId: preview.planId })).status,
-    ).toBe("removed");
+      await Bun.file(join(project.directory, ".ralph/commands.json")).exists(),
+    ).toBe(true);
+    answer = "Remove Ralph state";
+    await remove();
     expect(await store.listRuns()).toEqual([]);
     expect(
       await Bun.file(join(project.directory, ".ralph/commands.json")).exists(),
@@ -182,5 +197,57 @@ test("removal unlinks a configuration symlink without traversing its target", as
   } finally {
     await project.cleanup();
     await outside.cleanup();
+  }
+});
+
+test("removal ignores known observation cursor churn but guards unknown files and workflow changes", async () => {
+  const project = await createTestProject();
+  try {
+    const store = await openRunStore(project.directory);
+    await store.createRun("observed");
+    await mkdir(join(project.directory, ".ralph"));
+    await writeFile(join(project.directory, ".ralph/commands.json"), "config");
+    const progress = join(store.root, "chat-progress");
+    await mkdir(progress);
+    await writeFile(join(progress, "observed.json"), '{"sequence":1}');
+    const preview = await previewProjectRemoval(project.directory, store);
+    await writeFile(
+      join(progress, "observed.json"),
+      '{"sequence":200,"view":{"changed":true}}',
+    );
+    await writeFile(
+      join(progress, "observed.json.12345678-1234-4234-8234-123456789abc.tmp"),
+      "pending atomic checkpoint",
+    );
+    expect((await previewProjectRemoval(project.directory, store)).planId).toBe(
+      preview.planId,
+    );
+    await writeFile(join(progress, "notes.txt"), "Unrecognized user file");
+    await expect(
+      removeProject(project.directory, store, preview.planId),
+    ).rejects.toThrow("changed");
+    await rm(join(progress, "notes.txt"));
+    expect((await previewProjectRemoval(project.directory, store)).planId).toBe(
+      preview.planId,
+    );
+    await store.recordControl("observed", {
+      status: "paused",
+      source: "human",
+    });
+    await expect(
+      removeProject(project.directory, store, preview.planId),
+    ).rejects.toThrow("changed");
+    const current = await previewProjectRemoval(project.directory, store);
+    expect(
+      (await removeProject(project.directory, store, current.planId)).status,
+    ).toBe("removed");
+    expect(await Bun.file(join(progress, "observed.json")).exists()).toBe(
+      false,
+    );
+    expect(await readFile(join(project.directory, "README.md"), "utf8")).toBe(
+      "Fixture\n",
+    );
+  } finally {
+    await project.cleanup();
   }
 });

@@ -22,12 +22,13 @@ test("public feature tools omit the chat protocol and preserve native questions"
   const dispose = await RalphPlugin.setup(host.context);
   try {
     expect(host.tools.has("ralph_workflow")).toBe(false);
+    // Removal is a deterministic command; no model tool can remove state.
+    expect(host.tools.has("ralph_remove")).toBe(false);
     for (const tool of [
       "ralph_complete_interview",
       "ralph_complete_prd",
       "ralph_complete_issues",
       "ralph_save_commands",
-      "ralph_remove",
     ])
       expect(host.tools.has(tool)).toBe(true);
     const input = {

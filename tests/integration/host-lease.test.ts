@@ -45,3 +45,28 @@ test("a new host recovers only after the previous host's birth identity is gone"
     await project.cleanup();
   }
 });
+
+test("a plugin reload in the same host revives the closing lease instead of shutting down", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const root = await mkdtemp(join(tmpdir(), "ralph-reload-"));
+  try {
+    const old = await acquireHostLease(root);
+    await old.ready();
+    // OpenCode disposes the old instance before the new one registers.
+    expect(await old.release()).toBe(true);
+    const waiting = old.awaitSuccessor(2000);
+    const reloaded = await acquireHostLease(root);
+    expect(reloaded.recover).toBe(false);
+    expect(await waiting).toBe(true);
+    await old.finish();
+    // The revived lease still belongs to this host.
+    expect(await reloaded.release()).toBe(true);
+    expect(await reloaded.awaitSuccessor(50)).toBe(false);
+    await reloaded.finish();
+    expect(await acquireHostLease(root).then((l) => l.recover)).toBe(true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

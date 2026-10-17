@@ -1633,3 +1633,121 @@ for (const tool of [
     }
   });
 }
+
+test("Ralph's own progress during a turn does not discard the agent result", async () => {
+  const project = await createTestProject();
+  try {
+    const fake = createFakeOpenCode();
+    const store = await openRunStore(project.directory);
+    await store.createRun("progress-turn");
+    const adapter = createOpenCodeAdapter(fake.client, store);
+    const job = (jobId: string) => ({
+      runId: "progress-turn",
+      jobId,
+      attempt: 1,
+      role: "command-discovery" as const,
+      workspace: project.directory,
+      inputRevisions: {},
+      baseCommit: project.commit,
+      prompt: "Explore the actual files",
+    });
+    fake.interleave([
+      {
+        id: "msg_ralph-progress-progress-turn-3",
+        type: "synthetic",
+        text: "Ralph progress",
+        time: { created: 1 },
+      },
+    ]);
+    const result = await adapter.dispatchJob(job("own-progress"));
+    expect(result.outcome).toBe("completed");
+    expect(result.text).toBe("actual response");
+    // Any other input during the turn still makes the result ambiguous.
+    fake.interleave([
+      { id: "other", type: "synthetic", text: "x", time: { created: 1 } },
+    ]);
+    const foreign = await adapter.dispatchJob(job("foreign-input"));
+    expect(foreign.outcome).toBe("failed");
+    expect(foreign.error?.message).toContain("another input");
+  } finally {
+    await project.cleanup();
+  }
+});
+
+test("a global install loads outside Git and explains the repository requirement", async () => {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const folder = await mkdtemp(join(tmpdir(), "ralph-no-git-"));
+  const fake = createFakeOpenCode();
+  const host = createFakePluginContext(folder, fake.client);
+  const dispose = await RalphPlugin.setup(host.context);
+  try {
+    expect([...host.commands.keys()]).toContain("ralph-orchestrator");
+    await host.commands.get("ralph-orchestrator")?.execute({
+      sessionID: "main",
+      prompt: { text: "anything" },
+      delivery: "steer",
+    } as never);
+    const [notice] = fake.requests.filter((r) => r.path.endsWith("/synthetic"));
+    expect(String(notice?.body.text)).toContain("not inside a Git repository");
+    expect(fake.requests.some((r) => r.path.endsWith("/prompt"))).toBe(false);
+  } finally {
+    await dispose?.();
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test("a startup blocker shows its reason in the collapsed chat message", async () => {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const folder = await mkdtemp(join(tmpdir(), "ralph-unconfigured-"));
+  Bun.spawnSync(["git", "-C", folder, "init", "-q"]);
+  const fake = createFakeOpenCode();
+  const host = createFakePluginContext(folder, fake.client);
+  const dispose = await RalphPlugin.setup(host.context);
+  try {
+    await host.commands.get("ralph-orchestrator")?.execute({
+      sessionID: "main",
+      prompt: { text: "add remove" },
+      delivery: "steer",
+    } as never);
+    const [notice] = fake.requests.filter((r) => r.path.endsWith("/synthetic"));
+    expect(String(notice?.body.description)).toStartWith(
+      "Ralph interview blocked: ",
+    );
+    expect(String(notice?.body.description)).toContain(
+      "Project commands are not set up. Run /ralph-commands",
+    );
+  } finally {
+    await dispose?.();
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test("a plugin reload keeps live runs; a real shutdown still interrupts them", async () => {
+  const project = await createTestProject();
+  const grace = process.env.RALPH_RELOAD_GRACE_MS;
+  process.env.RALPH_RELOAD_GRACE_MS = "3000";
+  try {
+    const store = await openRunStore(project.directory);
+    const first = createFakePluginContext(project.directory);
+    const disposeFirst = await RalphPlugin.setup(first.context);
+    await store.createRun("live");
+    // OpenCode disposes the old instance before the reloaded one registers.
+    const disposing = disposeFirst?.();
+    await Bun.sleep(100);
+    const second = createFakePluginContext(project.directory);
+    const disposeSecond = await RalphPlugin.setup(second.context);
+    await disposing;
+    expect((await store.getRun("live"))?.control?.status ?? "active").toBe(
+      "active",
+    );
+    process.env.RALPH_RELOAD_GRACE_MS = "100";
+    await disposeSecond?.();
+    expect((await store.getRun("live"))?.control?.status).toBe("interrupted");
+  } finally {
+    if (grace === undefined) delete process.env.RALPH_RELOAD_GRACE_MS;
+    else process.env.RALPH_RELOAD_GRACE_MS = grace;
+    await project.cleanup();
+  }
+});

@@ -37,5 +37,10 @@ The native issue owner completes planning with `ralph_complete_issues({runId, at
 ## Notes
 Historical direct planning APIs/tests still describe the former execution approval phase; that phase cannot authorize native runs. Changed native inputs persist blockers; the revision-question workflow belongs to the next slice. Fake-host tests establish tool behavior, not installed native UI evidence. Native Linux/Windows remain unverified locally.
 
+`tests/integration/07-retries.test.ts` verifies injected check deadlines by observing
+the scheduled timer fire, then awaits Git integration and cleanup under the unchanged
+test deadline. A separate 1.5-second watchdog around the whole operation caused false
+failures and allowed unfinished work to outlive fixture cleanup; it is removed.
+
 ## Last updated
 2026-10-16

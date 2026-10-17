@@ -90,10 +90,12 @@ export async function verifyPackage(
       // Copy only the controllable HTTP fixture. Its adapter import resolves in the installed package.
       const fake = (
         await readFile(join(root, "tests/helpers/fake-opencode.ts"), "utf8")
-      ).replace(
-        "../../src/opencode/adapter.js",
-        "opencode-ralph-plugin/adapter",
-      );
+      )
+        .replace(
+          "../../src/opencode/adapter.js",
+          "opencode-ralph-plugin/adapter",
+        )
+        .replace("../../src/plugin.js", "opencode-ralph-plugin");
       await writeFile(join(project.directory, "fake-opencode.ts"), fake);
       await copyFile(
         join(root, "tests/helpers/packaged-workflow.ts"),

@@ -27,9 +27,12 @@ export async function loadRoleInstructions(
     text += `
 Ralph interview stage contract:
 Explore repository facts with observation tools. Resolve scope, acceptance criteria,
-constraints, and failure behavior. Ask one substantive question at a time and include
-its recommended answer. Ralph displays your structured questions through the native
-question tool and records the human answer. Return a question as JSON:
+constraints, and failure behavior. Ask one substantive question at a time with
+OpenCode's native question tool. Put your recommended answer first as an option
+whose label ends with "(Recommended)", add real alternatives, and wait for the
+human answer. Keep exploring and asking in this same turn; never end your turn
+with a question in prose. Only if the question tool is unavailable, end your turn
+with the question as JSON for Ralph to ask:
 {"kind":"question","question":"...","recommendation":"..."}
 When decisions are resolved, explain the feature using ASD-STE100 writing instructions:
 use short sentences, active voice, consistent terms, and simple vocabulary. This is
